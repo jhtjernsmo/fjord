@@ -148,7 +148,8 @@ fn tool_definitions() -> Vec<Value> {
         tool(
             "add_note",
             "Add a markdown note — to a project, or to the global notespace if project is omitted. Link with [[Project]], [[#12]] (task) or [[Note title]].",
-            json!({ "project": project, "title": { "type": "string" }, "body": { "type": "string" } }),
+            json!({ "project": project, "title": { "type": "string" }, "body": { "type": "string" },
+                    "folder": { "type": "string", "description": "e.g. product/ideas" }, "pinned": { "type": "boolean" } }),
             &["title"],
         ),
         tool(
@@ -370,11 +371,18 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
                 Some(p) => Some(store.find_project(&p)?.id),
                 None => None,
             };
-            serde_json::to_value(store.create_note(
+            let mut note = store.create_note(
                 project_id,
                 str_arg(args, "title")?,
                 &opt_str(args, "body").unwrap_or_default(),
-            )?)?
+            )?;
+            if let Some(folder) = opt_str(args, "folder") {
+                note = store.set_note_folder(note.id, &folder)?;
+            }
+            if let Some(true) = args.get("pinned").and_then(Value::as_bool) {
+                note = store.set_note_pinned(note.id, true)?;
+            }
+            serde_json::to_value(note)?
         }
         "list_notes" => {
             let notes = match opt_str(args, "project") {
@@ -562,8 +570,10 @@ mod tests {
             &mut s,
             3,
             "add_note",
-            json!({ "title": "Plan", "body": "Work on [[Bokost]]" }),
+            json!({ "title": "Plan", "body": "Work on [[Bokost]]", "folder": "inbox" }),
         );
+        assert_eq!(n["structuredContent"]["result"]["folder"], "inbox");
+        assert_eq!(n["structuredContent"]["result"]["project_id"], Value::Null);
         let id = n["structuredContent"]["result"]["id"].as_i64().unwrap();
 
         let free = call(&mut s, 4, "list_notes", json!({ "free_only": true }));
