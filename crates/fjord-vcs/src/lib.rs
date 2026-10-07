@@ -2,6 +2,7 @@
 //! branches from tasks, list pull requests with CI state, open PRs, and move
 //! tasks along the board as their PRs get merged.
 
+pub mod credentials;
 pub mod git;
 pub mod github;
 
@@ -12,7 +13,10 @@ use serde::Serialize;
 use thiserror::Error;
 
 pub use git::{Branch, Commit, Git, branch_name_for_task, task_id_from_branch};
-pub use github::{Checks, GitHub, PullRequest, find_token, parse_github_remote};
+pub use github::{
+    Checks, GitHub, GitHubAccount, PullRequest, TokenSource, connect_github, disconnect_github,
+    find_token, github_account, parse_github_remote,
+};
 
 const RECENT_COMMITS: usize = 15;
 
@@ -26,8 +30,10 @@ pub enum VcsError {
     Git(String),
     #[error("invalid branch name «{0}»")]
     InvalidBranch(String),
-    #[error("GitHub is not connected: run `gh auth login` or set GITHUB_TOKEN")]
+    #[error("GitHub is not connected: connect it in Settings (or run `gh auth login`)")]
     NoToken,
+    #[error("credential store: {0}")]
+    Credentials(String),
     #[error("GitHub: {0}")]
     GitHub(String),
     #[error("this project is not linked to a git repository")]

@@ -80,6 +80,12 @@ export interface Note {
   updated_at: string
 }
 
+export interface GitHubAccount {
+  login: string
+  source: 'env' | 'saved' | 'gh_cli'
+  private_repos: boolean
+}
+
 export interface LinkTarget {
   kind: 'project' | 'task' | 'note'
   id: number
@@ -243,6 +249,9 @@ export const api = {
   syncPullRequests: (projectId: number) => invoke<SyncReport>('sync_pull_requests', { projectId }),
   openPullRequest: (taskId: number, draft: boolean) => invoke<PullRequest>('open_pull_request', { taskId, draft }),
   openUrl: (url: string) => invoke<void>('open_url', { url }),
+  githubAccount: () => invoke<GitHubAccount | null>('github_account'),
+  connectGithub: (token: string) => invoke<GitHubAccount>('connect_github', { token }),
+  disconnectGithub: () => invoke<void>('disconnect_github'),
 }
 
 export function errorMessage(err: unknown): string {

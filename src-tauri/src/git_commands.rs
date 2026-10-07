@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use fjord_core::{ProjectRepo, Task};
-use fjord_vcs::{GitOverview, PullRequest, StartedBranch, SyncReport};
+use fjord_vcs::{GitHubAccount, GitOverview, PullRequest, StartedBranch, SyncReport};
 use tauri::State;
 
 use crate::AppState;
@@ -124,4 +124,21 @@ pub fn open_url(url: String) -> CmdResult<()> {
         return Err("only https links can be opened".into());
     }
     tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
+}
+
+/// The GitHub account Fjord uses (None when not connected).
+#[tauri::command]
+pub async fn github_account() -> CmdResult<Option<GitHubAccount>> {
+    off_thread(fjord_vcs::github_account).await
+}
+
+/// Verifies a personal access token and saves it in the OS credential store.
+#[tauri::command]
+pub async fn connect_github(token: String) -> CmdResult<GitHubAccount> {
+    off_thread(move || fjord_vcs::connect_github(&token)).await
+}
+
+#[tauri::command]
+pub async fn disconnect_github() -> CmdResult<()> {
+    off_thread(fjord_vcs::disconnect_github).await
 }

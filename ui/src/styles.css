@@ -504,3 +504,7 @@ kbd {
 
 .update-banner { display: flex; align-items: center; gap: 10px; padding: 8px 22px; background: color-mix(in oklab, var(--accent) 14%, var(--bg-2)); border-bottom: 1px solid color-mix(in oklab, var(--accent) 35%, transparent); font-size: 13px; }
 .update-banner .btn { padding: 4px 12px; }
+
+.github-account { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.github-account .ok { color: var(--ok); }
+.hint.warn { color: var(--warn, #d9a441); display: inline-flex; align-items: center; gap: 5px; }

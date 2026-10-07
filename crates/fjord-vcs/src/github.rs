@@ -1,5 +1,6 @@
 //! Minimal GitHub REST client: pull requests and their CI checks.
-//! Auth comes from $GH_TOKEN / $GITHUB_TOKEN or the GitHub CLI (`gh auth token`);
+//! Auth comes from $GH_TOKEN / $GITHUB_TOKEN, a token saved in Settings (kept in the
+//! OS credential store) or the GitHub CLI (`gh auth token`);
 //! public repositories can also be read without a token.
 
 use std::process::Command;
@@ -8,7 +9,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::{Result, VcsError};
+use crate::{Result, VcsError, credentials};
 
 const API: &str = "https://api.github.com";
 const TIMEOUT: Duration = Duration::from_secs(20);
@@ -151,16 +152,104 @@ pub fn parse_github_remote(url: &str) -> Option<(String, String)> {
     (valid(owner) && valid(repo)).then(|| (owner.to_string(), repo.to_string()))
 }
 
+/// Where the GitHub token came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TokenSource {
+    Env,
+    Saved,
+    GhCli,
+}
+
 /// Finds a token without ever printing or storing it.
 pub fn find_token() -> Option<String> {
+    find_token_with_source().map(|(t, _)| t)
+}
+
+fn find_token_with_source() -> Option<(String, TokenSource)> {
     for var in ["GH_TOKEN", "GITHUB_TOKEN"] {
         if let Some(t) = std::env::var(var).ok().filter(|t| !t.trim().is_empty()) {
-            return Some(t.trim().to_string());
+            return Some((t.trim().to_string(), TokenSource::Env));
         }
+    }
+    if let Some(t) = credentials::get(credentials::GITHUB) {
+        return Some((t, TokenSource::Saved));
     }
     let out = Command::new("gh").args(["auth", "token"]).output().ok()?;
     let token = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    (out.status.success() && !token.is_empty()).then_some(token)
+    (out.status.success() && !token.is_empty()).then_some((token, TokenSource::GhCli))
+}
+
+/// The signed-in GitHub user, as shown in Settings.
+#[derive(Debug, Clone, Serialize)]
+pub struct GitHubAccount {
+    pub login: String,
+    pub source: TokenSource,
+    /// False when a classic token lacks the `repo` scope, so private repositories won't show.
+    pub private_repos: bool,
+}
+
+fn agent() -> ureq::Agent {
+    ureq::Agent::config_builder()
+        .timeout_global(Some(TIMEOUT))
+        .build()
+        .into()
+}
+
+fn whoami(token: &str, source: TokenSource) -> Result<GitHubAccount> {
+    let mut res = agent()
+        .get(&format!("{API}/user"))
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "fjord")
+        .header("Authorization", &format!("Bearer {token}"))
+        .call()
+        .map_err(|e| match e {
+            ureq::Error::StatusCode(401) => {
+                VcsError::GitHub("GitHub did not accept this token (401)".into())
+            }
+            other => api_error(other),
+        })?;
+    // Classic tokens list their scopes; fine-grained tokens don't send the header.
+    let private_repos = res
+        .headers()
+        .get("x-oauth-scopes")
+        .and_then(|v| v.to_str().ok())
+        .is_none_or(|scopes| scopes.split(',').any(|s| s.trim() == "repo"));
+    let user: ApiUser = res
+        .body_mut()
+        .read_json()
+        .map_err(|e| VcsError::GitHub(e.to_string()))?;
+    Ok(GitHubAccount {
+        login: user.login,
+        source,
+        private_repos,
+    })
+}
+
+/// Who Fjord talks to GitHub as, or None when no token is available.
+pub fn github_account() -> Result<Option<GitHubAccount>> {
+    match find_token_with_source() {
+        Some((token, source)) => whoami(&token, source).map(Some),
+        None => Ok(None),
+    }
+}
+
+/// Checks a personal access token with GitHub, then saves it in the OS credential store.
+pub fn connect_github(token: &str) -> Result<GitHubAccount> {
+    let token = token.trim();
+    if token.is_empty() || token.chars().any(char::is_whitespace) {
+        return Err(VcsError::GitHub(
+            "that doesn't look like a GitHub token".into(),
+        ));
+    }
+    let account = whoami(token, TokenSource::Saved)?;
+    credentials::set(credentials::GITHUB, token)?;
+    Ok(account)
+}
+
+/// Forgets the token saved in Settings (env vars and the gh CLI are left alone).
+pub fn disconnect_github() -> Result<()> {
+    credentials::delete(credentials::GITHUB)
 }
 
 pub struct GitHub {
@@ -172,14 +261,11 @@ pub struct GitHub {
 
 impl GitHub {
     pub fn new(owner: &str, repo: &str, token: Option<String>) -> Self {
-        let config = ureq::Agent::config_builder()
-            .timeout_global(Some(TIMEOUT))
-            .build();
         Self {
             owner: owner.to_string(),
             repo: repo.to_string(),
             token,
-            agent: config.into(),
+            agent: agent(),
         }
     }
 
@@ -270,7 +356,10 @@ fn api_error(e: ureq::Error) -> VcsError {
             VcsError::GitHub("access denied or rate limited (403)".into())
         }
         ureq::Error::StatusCode(404) => {
-            VcsError::GitHub("repository not found, or private without access (404)".into())
+            VcsError::GitHub(
+                "repository not found (404). If it is private, connect GitHub in Settings with a token that can read it"
+                    .into(),
+            )
         }
         ureq::Error::StatusCode(422) => VcsError::GitHub(
             "GitHub rejected the request (422): is the branch pushed, or does a PR already exist?"
@@ -283,6 +372,13 @@ fn api_error(e: ureq::Error) -> VcsError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn connect_rejects_malformed_tokens_without_calling_github() {
+        for bad in ["", "   ", "ghp_abc def"] {
+            assert!(matches!(connect_github(bad), Err(VcsError::GitHub(_))));
+        }
+    }
 
     #[test]
     fn parses_github_remotes() {
