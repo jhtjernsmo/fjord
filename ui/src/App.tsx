@@ -9,6 +9,7 @@ import { NavContext } from './nav'
 import type { Nav } from './nav'
 import { Notespace } from './components/Notespace'
 import { UpdateBanner } from './components/Updater'
+import { TitleBar } from './components/TitleBar'
 import { LOCALES } from './i18n'
 import type { MessageKey } from './i18n'
 import { ProjectGlyph } from './components/Icons'
@@ -54,6 +55,7 @@ export default function App() {
   const projectId = view.kind === 'project' ? view.id : null
   const [board] = useLive(() => (projectId ? api.getBoard(projectId) : Promise.resolve(null)), [projectId])
   const activeBoard = board && board.project.id === projectId ? board : null
+  const windowTitle = view.kind === 'notes' ? t('nav.notes') : activeBoard ? activeBoard.project.name : 'Fjord'
 
   const openProject = useCallback((id: number, tab: Tab = 'board') => {
     setView({ kind: 'project', id, tab })
@@ -168,6 +170,7 @@ export default function App() {
   return (
     <NavContext.Provider value={nav}>
     <div className="app">
+      <TitleBar title={windowTitle} />
       <Sidebar
         projects={projects ?? []}
         activeId={projectId}
