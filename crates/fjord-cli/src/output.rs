@@ -18,7 +18,11 @@ fn print_json<T: Serialize + ?Sized>(value: &T) -> Result<()> {
 fn progress_bar(done: i64, total: i64) -> String {
     const WIDTH: i64 = 10;
     let filled = if total == 0 { 0 } else { done * WIDTH / total };
-    format!("{}{}", "█".repeat(filled as usize), "░".repeat((WIDTH - filled) as usize))
+    format!(
+        "{}{}",
+        "█".repeat(filled as usize),
+        "░".repeat((WIDTH - filled) as usize)
+    )
 }
 
 fn task_line(t: &Task) -> String {
@@ -50,6 +54,10 @@ fn describe(a: &Activity) -> String {
         "file.detach" => format!("removed file “{subject}”"),
         "note.create" => format!("wrote note “{subject}”"),
         "note.update" => format!("updated note “{subject}”"),
+        "status.create" => format!("added column “{subject}”"),
+        "status.update" => format!("updated column “{subject}”"),
+        "status.move" => format!("moved column “{subject}”"),
+        "status.delete" => format!("removed column “{subject}”"),
         other => format!("{other} “{subject}”"),
     }
 }
@@ -64,8 +72,16 @@ impl Printer {
         }
         for s in list {
             let p = &s.project;
-            let archived = if p.archived_at.is_some() { "  (archived)" } else { "" };
-            let overdue = if s.overdue_count > 0 { format!("  ! {} overdue", s.overdue_count) } else { String::new() };
+            let archived = if p.archived_at.is_some() {
+                "  (archived)"
+            } else {
+                ""
+            };
+            let overdue = if s.overdue_count > 0 {
+                format!("  ! {} overdue", s.overdue_count)
+            } else {
+                String::new()
+            };
             println!(
                 "{} {:<24} {} {}/{}{}{}  [{}]",
                 p.icon,
@@ -106,9 +122,15 @@ impl Printer {
             }
             let columns = statuses
                 .iter()
-                .map(|s| Column { status: s, tasks: tasks.iter().filter(|t| t.status_id == s.id).collect() })
+                .map(|s| Column {
+                    status: s,
+                    tasks: tasks.iter().filter(|t| t.status_id == s.id).collect(),
+                })
                 .collect();
-            return print_json(&Board { project: p, columns });
+            return print_json(&Board {
+                project: p,
+                columns,
+            });
         }
         self.project(p)?;
         for s in statuses {
@@ -128,6 +150,31 @@ impl Printer {
         println!("{}", task_line(t));
         if !t.body_md.is_empty() {
             println!("\n{}", t.body_md);
+        }
+        Ok(())
+    }
+
+    pub fn tasks(&self, list: &[Task]) -> Result<()> {
+        if self.json {
+            return print_json(list);
+        }
+        if list.is_empty() {
+            println!("No tasks.");
+        }
+        list.iter().for_each(|t| println!("{}", task_line(t)));
+        Ok(())
+    }
+
+    pub fn statuses(&self, list: &[Status]) -> Result<()> {
+        if self.json {
+            return print_json(list);
+        }
+        for s in list {
+            let done = if s.is_done { "  (done)" } else { "" };
+            println!(
+                "#{:<4} {}. {}  {}{}",
+                s.id, s.position, s.name, s.color, done
+            );
         }
         Ok(())
     }
@@ -181,7 +228,11 @@ impl Printer {
             return print_json(list);
         }
         for a in list {
-            let when = a.created_at.get(..16).unwrap_or(&a.created_at).replace('T', " ");
+            let when = a
+                .created_at
+                .get(..16)
+                .unwrap_or(&a.created_at)
+                .replace('T', " ");
             println!("{when}  {} {}", a.actor, describe(a));
         }
         Ok(())

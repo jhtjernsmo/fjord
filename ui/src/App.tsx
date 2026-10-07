@@ -10,21 +10,22 @@ import { ProjectGlyph } from './components/Icons'
 import { Board } from './components/Board'
 import { CommandPalette } from './components/CommandPalette'
 import type { PaletteMode } from './components/CommandPalette'
-import { NewProjectDialog } from './components/Dialogs'
+import { applyTheme, loadTheme, NewProjectDialog, SettingsDialog } from './components/Dialogs'
+import type { Theme } from './components/Dialogs'
 import { Home } from './components/Home'
-import { ActivityView, FilesView, NotesView } from './components/ProjectViews'
+import { ActivityView, ArchiveView, FilesView, NotesView } from './components/ProjectViews'
 import { Sidebar } from './components/Sidebar'
 import { TaskPanel } from './components/TaskPanel'
 import { HelpSheet, WhichKey } from './components/WhichKey'
 
-type Tab = 'board' | 'notes' | 'files' | 'activity'
+type Tab = 'board' | 'notes' | 'files' | 'activity' | 'archive'
 type View = { kind: 'home' } | { kind: 'project'; id: number; tab: Tab }
 
-const TABS: Tab[] = ['board', 'notes', 'files', 'activity']
+const TABS: Tab[] = ['board', 'notes', 'files', 'activity', 'archive']
 
 const GLOBAL_ACTIONS = [
   'palette.open', 'help.toggle', 'panel.close', 'go.home', 'project.pick', 'project.new', 'project.archive',
-  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle',
+  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'view.archive',
 ]
 
 export default function App() {
@@ -34,6 +35,9 @@ export default function App() {
   const [palette, setPalette] = useState<PaletteMode | null>(null)
   const [newProject, setNewProject] = useState(false)
   const [help, setHelp] = useState(false)
+  const [settings, setSettings] = useState(false)
+  const [theme, setTheme] = useState<Theme>(loadTheme)
+  useEffect(() => applyTheme(theme), [theme])
   const [dropping, setDropping] = useState(false)
   const [quickAddSignal, setQuickAddSignal] = useState(0)
 
@@ -49,7 +53,7 @@ export default function App() {
   }, [])
   const setTab = (tab: Tab) => projectId && setView({ kind: 'project', id: projectId, tab })
 
-  const overlayOpen = palette !== null || newProject || help
+  const overlayOpen = palette !== null || newProject || help || settings
 
   // Accent colour follows the active project.
   useEffect(() => {
@@ -84,7 +88,8 @@ export default function App() {
       'palette.open': () => setPalette('commands'),
       'help.toggle': () => setHelp((h) => !h),
       'panel.close': () => {
-        if (help) setHelp(false)
+        if (settings) setSettings(false)
+        else if (help) setHelp(false)
         else if (palette) setPalette(null)
         else if (newProject) setNewProject(false)
         else setTaskId(null)
@@ -105,6 +110,8 @@ export default function App() {
       'view.notes': () => setTab('notes'),
       'view.files': () => setTab('files'),
       'view.activity': () => setTab('activity'),
+      'view.archive': () => setTab('archive'),
+      'settings.open': () => setSettings(true),
       'task.new': () => {
         if (!projectId) {
           toast(t('toast.pickProject'), 'info')
@@ -140,6 +147,7 @@ export default function App() {
         onNewProject={() => setNewProject(true)}
         onPalette={() => setPalette('commands')}
         onHelp={() => setHelp(true)}
+        onSettings={() => setSettings(true)}
       />
 
       <main className="main">
@@ -175,6 +183,7 @@ export default function App() {
             {view.tab === 'notes' && <NotesView projectId={activeBoard.project.id} />}
             {view.tab === 'files' && <FilesView projectId={activeBoard.project.id} />}
             {view.tab === 'activity' && <ActivityView projectId={activeBoard.project.id} />}
+            {view.tab === 'archive' && <ArchiveView projectId={activeBoard.project.id} />}
             {taskId !== null && (
               <TaskPanel key={taskId} taskId={taskId} statuses={activeBoard.statuses} onClose={() => setTaskId(null)} />
             )}
@@ -209,6 +218,7 @@ export default function App() {
         />
       )}
       {help && <HelpSheet onClose={() => setHelp(false)} />}
+      {settings && <SettingsDialog theme={theme} onTheme={setTheme} onClose={() => setSettings(false)} />}
       <WhichKey />
     </div>
   )

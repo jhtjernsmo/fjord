@@ -5,7 +5,8 @@ use crate::models::{NewProject, Project, ProjectPatch, ProjectSummary, Status};
 use crate::store::{Store, require_text};
 
 /// (color, is_done) of every new project's columns; names come from `status_names`.
-const DEFAULT_STATUSES: &[(&str, bool)] = &[("#8b8f98", false), ("#f5a524", false), ("#3fb950", true)];
+const DEFAULT_STATUSES: &[(&str, bool)] =
+    &[("#8b8f98", false), ("#f5a524", false), ("#3fb950", true)];
 const DEFAULT_ICON: &str = ">_";
 
 /// Column names for a locale; English unless Norwegian is asked for.
@@ -59,8 +60,16 @@ pub fn slugify(name: &str) -> String {
             _ => '-',
         })
         .collect();
-    let slug = mapped.split('-').filter(|p| !p.is_empty()).collect::<Vec<_>>().join("-");
-    if slug.is_empty() { "project".to_string() } else { slug }
+    let slug = mapped
+        .split('-')
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    if slug.is_empty() {
+        "project".to_string()
+    } else {
+        slug
+    }
 }
 
 impl Store {
@@ -71,11 +80,19 @@ impl Store {
         tx.execute(
             "INSERT INTO projects (name, slug, description, color, icon)
              VALUES (?1, ?2, ?3, coalesce(?4, '#7c9cff'), coalesce(?5, ?6))",
-            params![name, slug, new.description.trim(), new.color, new.icon, DEFAULT_ICON],
+            params![
+                name,
+                slug,
+                new.description.trim(),
+                new.color,
+                new.icon,
+                DEFAULT_ICON
+            ],
         )?;
         let id = tx.last_insert_rowid();
         let names = status_names(new.locale.as_deref());
-        for (position, ((color, is_done), status)) in DEFAULT_STATUSES.iter().zip(names).enumerate() {
+        for (position, ((color, is_done), status)) in DEFAULT_STATUSES.iter().zip(names).enumerate()
+        {
             tx.execute(
                 "INSERT INTO statuses (project_id, name, color, position, is_done)
                  VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -92,7 +109,11 @@ impl Store {
         let mut n = 2;
         while self
             .conn
-            .query_row("SELECT 1 FROM projects WHERE slug = ?1", [&candidate], |_| Ok(()))
+            .query_row(
+                "SELECT 1 FROM projects WHERE slug = ?1",
+                [&candidate],
+                |_| Ok(()),
+            )
             .optional()?
             .is_some()
         {
@@ -104,7 +125,11 @@ impl Store {
 
     pub fn get_project(&self, id: i64) -> Result<Project> {
         self.conn
-            .query_row(&format!("SELECT {PROJECT_COLS} FROM projects WHERE id = ?1"), [id], project_from_row)
+            .query_row(
+                &format!("SELECT {PROJECT_COLS} FROM projects WHERE id = ?1"),
+                [id],
+                project_from_row,
+            )
             .optional()?
             .ok_or_else(|| Error::NotFound(format!("project {id}")))
     }
@@ -125,7 +150,11 @@ impl Store {
     }
 
     pub fn list_projects(&self, include_archived: bool) -> Result<Vec<ProjectSummary>> {
-        let cols = PROJECT_COLS.split(", ").map(|c| format!("p.{c}")).collect::<Vec<_>>().join(", ");
+        let cols = PROJECT_COLS
+            .split(", ")
+            .map(|c| format!("p.{c}"))
+            .collect::<Vec<_>>()
+            .join(", ");
         let mut stmt = self.conn.prepare(&format!(
             "SELECT {cols},
                 (SELECT count(*) FROM tasks t WHERE t.project_id = p.id AND t.archived_at IS NULL),
@@ -180,7 +209,11 @@ impl Store {
              WHERE id = ?2",
             params![archived, id],
         )?;
-        let action = if archived { "project.archive" } else { "project.restore" };
+        let action = if archived {
+            "project.archive"
+        } else {
+            "project.restore"
+        };
         self.log(Some(id), None, action, &project.name, None)?;
         self.get_project(id)
     }
@@ -219,35 +252,66 @@ mod tests {
     #[test]
     fn create_project_adds_default_statuses_and_logs_activity() {
         let (mut s, _dir) = store();
-        let p = s.create_project(NewProject { name: " Reisly ".into(), ..Default::default() }).unwrap();
+        let p = s
+            .create_project(NewProject {
+                name: " Reisly ".into(),
+                ..Default::default()
+            })
+            .unwrap();
         assert_eq!(p.name, "Reisly");
         assert_eq!(p.slug, "reisly");
         let statuses = s.list_statuses(p.id).unwrap();
-        assert_eq!(statuses.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), ["To do", "In progress", "Done"]);
+        assert_eq!(
+            statuses.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+            ["To do", "In progress", "Done"]
+        );
         assert_eq!(p.icon, ">_");
         assert!(statuses[2].is_done);
-        assert_eq!(s.recent_activity(Some(p.id), 10).unwrap()[0].action, "project.create");
+        assert_eq!(
+            s.recent_activity(Some(p.id), 10).unwrap()[0].action,
+            "project.create"
+        );
     }
 
     #[test]
     fn duplicate_names_get_unique_slugs() {
         let (mut s, _dir) = store();
-        let a = s.create_project(NewProject { name: "App".into(), ..Default::default() }).unwrap();
-        let b = s.create_project(NewProject { name: "App".into(), ..Default::default() }).unwrap();
+        let a = s
+            .create_project(NewProject {
+                name: "App".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        let b = s
+            .create_project(NewProject {
+                name: "App".into(),
+                ..Default::default()
+            })
+            .unwrap();
         assert_eq!((a.slug.as_str(), b.slug.as_str()), ("app", "app-2"));
     }
 
     #[test]
     fn empty_name_is_rejected() {
         let (mut s, _dir) = store();
-        let err = s.create_project(NewProject { name: "   ".into(), ..Default::default() }).unwrap_err();
+        let err = s
+            .create_project(NewProject {
+                name: "   ".into(),
+                ..Default::default()
+            })
+            .unwrap_err();
         assert!(matches!(err, Error::Invalid(_)));
     }
 
     #[test]
     fn find_project_by_id_or_slug() {
         let (mut s, _dir) = store();
-        let p = s.create_project(NewProject { name: "Bokost".into(), ..Default::default() }).unwrap();
+        let p = s
+            .create_project(NewProject {
+                name: "Bokost".into(),
+                ..Default::default()
+            })
+            .unwrap();
         assert_eq!(s.find_project("bokost").unwrap().id, p.id);
         assert_eq!(s.find_project(&p.id.to_string()).unwrap().id, p.id);
         assert!(matches!(s.find_project("nope"), Err(Error::NotFound(_))));
@@ -256,7 +320,12 @@ mod tests {
     #[test]
     fn archived_projects_are_hidden_unless_requested() {
         let (mut s, _dir) = store();
-        let p = s.create_project(NewProject { name: "Old".into(), ..Default::default() }).unwrap();
+        let p = s
+            .create_project(NewProject {
+                name: "Old".into(),
+                ..Default::default()
+            })
+            .unwrap();
         s.set_project_archived(p.id, true).unwrap();
         assert!(s.list_projects(false).unwrap().is_empty());
         assert_eq!(s.list_projects(true).unwrap().len(), 1);
@@ -267,15 +336,37 @@ mod tests {
     #[test]
     fn update_project_keeps_unpatched_fields() {
         let (mut s, _dir) = store();
-        let p = s.create_project(NewProject { name: "A".into(), description: "desc".into(), ..Default::default() }).unwrap();
-        let u = s.update_project(p.id, ProjectPatch { color: Some("#ff0000".into()), ..Default::default() }).unwrap();
-        assert_eq!((u.name.as_str(), u.description.as_str(), u.color.as_str()), ("A", "desc", "#ff0000"));
+        let p = s
+            .create_project(NewProject {
+                name: "A".into(),
+                description: "desc".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        let u = s
+            .update_project(
+                p.id,
+                ProjectPatch {
+                    color: Some("#ff0000".into()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            (u.name.as_str(), u.description.as_str(), u.color.as_str()),
+            ("A", "desc", "#ff0000")
+        );
     }
 
     #[test]
     fn find_status_by_name_is_case_insensitive() {
         let (mut s, _dir) = store();
-        let p = s.create_project(NewProject { name: "A".into(), ..Default::default() }).unwrap();
+        let p = s
+            .create_project(NewProject {
+                name: "A".into(),
+                ..Default::default()
+            })
+            .unwrap();
         assert!(s.find_status(p.id, "done").unwrap().is_done);
         assert!(s.find_status(p.id, "IN PROGRESS").is_ok());
     }
@@ -283,7 +374,13 @@ mod tests {
     #[test]
     fn norwegian_locale_gets_norwegian_columns() {
         let (mut s, _dir) = store();
-        let p = s.create_project(NewProject { name: "A".into(), locale: Some("nb_NO".into()), ..Default::default() }).unwrap();
+        let p = s
+            .create_project(NewProject {
+                name: "A".into(),
+                locale: Some("nb_NO".into()),
+                ..Default::default()
+            })
+            .unwrap();
         assert!(s.find_status(p.id, "ferdig").unwrap().is_done);
         assert!(s.find_status(p.id, "PÅGÅR").is_ok());
         assert_eq!(status_names(Some("en_US.UTF-8"))[0], "To do");

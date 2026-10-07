@@ -9,7 +9,8 @@ use crate::error::{Error, Result};
 use crate::models::Attachment;
 use crate::store::Store;
 
-const ATTACHMENT_SELECT: &str = "SELECT a.id, a.project_id, a.task_id, a.original_name, f.sha256, f.size,
+const ATTACHMENT_SELECT: &str =
+    "SELECT a.id, a.project_id, a.task_id, a.original_name, f.sha256, f.size,
         a.added_by, a.created_at
      FROM attachments a JOIN files f ON f.id = a.file_id";
 
@@ -54,15 +55,26 @@ impl Store {
 
     /// Copies `source` into the content-addressed store and attaches it to a
     /// project (and optionally a task). Identical files are stored once.
-    pub fn attach_file(&mut self, project_id: i64, task_id: Option<i64>, source: &Path) -> Result<Attachment> {
+    pub fn attach_file(
+        &mut self,
+        project_id: i64,
+        task_id: Option<i64>,
+        source: &Path,
+    ) -> Result<Attachment> {
         let project = self.get_project(project_id)?;
         if let Some(task_id) = task_id
-            && self.get_task(task_id)?.project_id != project_id {
-                return Err(Error::Invalid(format!("task {task_id} is not in project {project_id}")));
-            }
+            && self.get_task(task_id)?.project_id != project_id
+        {
+            return Err(Error::Invalid(format!(
+                "task {task_id} is not in project {project_id}"
+            )));
+        }
         let meta = fs::metadata(source).map_err(not_found_or_io(source))?;
         if !meta.is_file() {
-            return Err(Error::Invalid(format!("{} is not a file", source.display())));
+            return Err(Error::Invalid(format!(
+                "{} is not a file",
+                source.display()
+            )));
         }
         let name = source
             .file_name()
@@ -83,7 +95,9 @@ impl Store {
             "INSERT INTO files (sha256, size) VALUES (?1, ?2) ON CONFLICT(sha256) DO NOTHING",
             params![sha, meta.len() as i64],
         )?;
-        let file_id: i64 = tx.query_row("SELECT id FROM files WHERE sha256 = ?1", [&sha], |r| r.get(0))?;
+        let file_id: i64 = tx.query_row("SELECT id FROM files WHERE sha256 = ?1", [&sha], |r| {
+            r.get(0)
+        })?;
         tx.execute(
             "INSERT INTO attachments (file_id, project_id, task_id, original_name, added_by)
              VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -98,13 +112,21 @@ impl Store {
 
     pub fn get_attachment(&self, id: i64) -> Result<Attachment> {
         self.conn
-            .query_row(&format!("{ATTACHMENT_SELECT} WHERE a.id = ?1"), [id], attachment_from_row)
+            .query_row(
+                &format!("{ATTACHMENT_SELECT} WHERE a.id = ?1"),
+                [id],
+                attachment_from_row,
+            )
             .optional()?
             .ok_or_else(|| Error::NotFound(format!("attachment {id}")))
     }
 
     /// All attachments of a project, or only those of one task.
-    pub fn list_attachments(&self, project_id: i64, task_id: Option<i64>) -> Result<Vec<Attachment>> {
+    pub fn list_attachments(
+        &self,
+        project_id: i64,
+        task_id: Option<i64>,
+    ) -> Result<Vec<Attachment>> {
         let mut stmt = self.conn.prepare(&format!(
             "{ATTACHMENT_SELECT} WHERE a.project_id = ?1 AND (?2 IS NULL OR a.task_id = ?2)
              ORDER BY a.created_at DESC, a.id DESC"
@@ -121,8 +143,15 @@ impl Store {
     /// Removes the link only; the blob stays (other attachments may share it).
     pub fn detach_file(&mut self, id: i64) -> Result<()> {
         let a = self.get_attachment(id)?;
-        self.conn.execute("DELETE FROM attachments WHERE id = ?1", [id])?;
-        self.log(Some(a.project_id), a.task_id, "file.detach", &a.original_name, None)?;
+        self.conn
+            .execute("DELETE FROM attachments WHERE id = ?1", [id])?;
+        self.log(
+            Some(a.project_id),
+            a.task_id,
+            "file.detach",
+            &a.original_name,
+            None,
+        )?;
         Ok(())
     }
 }
@@ -134,7 +163,12 @@ mod tests {
     use crate::test_util::store;
 
     fn project(s: &mut Store, name: &str) -> i64 {
-        s.create_project(NewProject { name: name.into(), ..Default::default() }).unwrap().id
+        s.create_project(NewProject {
+            name: name.into(),
+            ..Default::default()
+        })
+        .unwrap()
+        .id
     }
 
     #[test]
@@ -149,9 +183,15 @@ mod tests {
         assert_eq!(a.original_name, "skisse.png");
         assert_eq!(a.sha256, b.sha256);
         assert_eq!(a.size, 14);
-        assert_eq!(fs::read(s.attachment_path(a.id).unwrap()).unwrap(), b"fake png bytes");
+        assert_eq!(
+            fs::read(s.attachment_path(a.id).unwrap()).unwrap(),
+            b"fake png bytes"
+        );
         assert_eq!(s.list_attachments(p, None).unwrap().len(), 2);
-        let blobs: i64 = s.conn.query_row("SELECT count(*) FROM files", [], |r| r.get(0)).unwrap();
+        let blobs: i64 = s
+            .conn
+            .query_row("SELECT count(*) FROM files", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(blobs, 1);
     }
 
@@ -159,7 +199,13 @@ mod tests {
     fn attachments_can_be_filtered_by_task() {
         let (mut s, dir) = store();
         let p = project(&mut s, "P");
-        let t = s.create_task(NewTask { project_id: p, title: "T".into(), ..Default::default() }).unwrap();
+        let t = s
+            .create_task(NewTask {
+                project_id: p,
+                title: "T".into(),
+                ..Default::default()
+            })
+            .unwrap();
         let src = dir.path().join("a.txt");
         fs::write(&src, b"a").unwrap();
         s.attach_file(p, None, &src).unwrap();
@@ -172,12 +218,27 @@ mod tests {
         let (mut s, dir) = store();
         let p1 = project(&mut s, "P1");
         let p2 = project(&mut s, "P2");
-        let t2 = s.create_task(NewTask { project_id: p2, title: "T".into(), ..Default::default() }).unwrap();
-        assert!(matches!(s.attach_file(p1, None, &dir.path().join("nope")), Err(Error::NotFound(_))));
-        assert!(matches!(s.attach_file(p1, None, dir.path()), Err(Error::Invalid(_))));
+        let t2 = s
+            .create_task(NewTask {
+                project_id: p2,
+                title: "T".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(matches!(
+            s.attach_file(p1, None, &dir.path().join("nope")),
+            Err(Error::NotFound(_))
+        ));
+        assert!(matches!(
+            s.attach_file(p1, None, dir.path()),
+            Err(Error::Invalid(_))
+        ));
         let src = dir.path().join("a.txt");
         fs::write(&src, b"a").unwrap();
-        assert!(matches!(s.attach_file(p1, Some(t2.id), &src), Err(Error::Invalid(_))));
+        assert!(matches!(
+            s.attach_file(p1, Some(t2.id), &src),
+            Err(Error::Invalid(_))
+        ));
     }
 
     #[test]

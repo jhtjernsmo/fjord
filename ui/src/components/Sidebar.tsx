@@ -1,4 +1,4 @@
-import { Command, House, Keyboard, Languages, Plus } from 'lucide-react'
+import { Command, House, Keyboard, Languages, Plus, Settings } from 'lucide-react'
 import type { ProjectSummary } from '../api'
 import { useApp } from '../data'
 import { LOCALES } from '../i18n'
@@ -13,6 +13,7 @@ interface Props {
   onNewProject: () => void
   onPalette: () => void
   onHelp: () => void
+  onSettings: () => void
 }
 
 export function ProgressRing({ done, total, color }: { done: number; total: number; color: string }) {
@@ -20,7 +21,7 @@ export function ProgressRing({ done, total, color }: { done: number; total: numb
   return <span className="ring" style={{ ['--p' as string]: percent, ['--c' as string]: color }} title={`${percent} %`} />
 }
 
-export function Sidebar({ projects, activeId, onHome, onSelect, onNewProject, onPalette, onHelp }: Props) {
+export function Sidebar({ projects, activeId, onHome, onSelect, onNewProject, onPalette, onHelp, onSettings }: Props) {
   const { keymap, t, locale, setLocale } = useApp()
   const keys = (id: string) => displayKeys(keymap.bindings[id], keymap.leader)
   const nextLocale = LOCALES[(LOCALES.findIndex((l) => l.id === locale) + 1) % LOCALES.length]
@@ -64,6 +65,11 @@ export function Sidebar({ projects, activeId, onHome, onSelect, onNewProject, on
       </nav>
 
       <div className="sidebar-footer">
+        <button className="nav-item" onClick={onSettings}>
+          <Settings size={15} strokeWidth={1.6} />
+          <span className="name">{t('settings.title')}</span>
+          <kbd>{keys('settings.open')}</kbd>
+        </button>
         <button className="nav-item" onClick={onHelp}>
           <Keyboard size={15} strokeWidth={1.6} />
           <span className="name">{t('app.allShortcuts')}</span>

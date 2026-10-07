@@ -1,7 +1,7 @@
 // Secondary project tabs: notes, files and activity.
 import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
-import { NotebookText, Paperclip, Plus } from 'lucide-react'
+import { ArchiveRestore, NotebookText, Paperclip, Plus } from 'lucide-react'
 import { api, relativeTime } from '../api'
 import type { Note } from '../api'
 import { useApp, useLive } from '../data'
@@ -110,6 +110,37 @@ export function ActivityView({ projectId }: { projectId: number }) {
   return (
     <div className="page">
       <ActivityList items={items ?? []} />
+    </div>
+  )
+}
+
+export function ArchiveView({ projectId }: { projectId: number }) {
+  const { run, t, locale } = useApp()
+  const [tasks] = useLive(() => api.listArchivedTasks(projectId), [projectId])
+  return (
+    <div className="page">
+      <div className="section-title" style={{ marginBottom: 10 }}>
+        {t('archive.tasks')}
+      </div>
+      {tasks && tasks.length > 0 ? (
+        <div className="archive-list">
+          {tasks.map((task) => (
+            <div className="archive-row" key={task.id}>
+              <span className="mono dim">#{task.id}</span>
+              <span className="archive-title">{task.title}</span>
+              <span className="dim">{task.archived_at ? relativeTime(task.archived_at, t, locale) : ''}</span>
+              <button
+                className="btn"
+                onClick={() => run(api.archiveTask(task.id, false), t('archive.restored', { name: task.title }))}
+              >
+                <ArchiveRestore size={14} /> {t('archive.restore')}
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="empty-state">{t('archive.none')}</div>
+      )}
     </div>
   )
 }

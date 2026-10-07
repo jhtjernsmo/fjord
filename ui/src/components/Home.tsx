@@ -1,6 +1,6 @@
 // Overview: greeting, stats, project cards and activity across all projects.
 import { motion } from 'motion/react'
-import { Plus } from 'lucide-react'
+import { ArchiveRestore, Plus } from 'lucide-react'
 import { api, describeActivity, relativeTime } from '../api'
 import type { Activity, ProjectSummary } from '../api'
 import { useApp, useLive } from '../data'
@@ -45,8 +45,10 @@ interface Props {
 }
 
 export function Home({ actor, projects, onOpen, onNewProject }: Props) {
-  const { t } = useApp()
+  const { t, run } = useApp()
   const [activity] = useLive(() => api.recentActivity(null, 15), [])
+  const [allProjects] = useLive(() => api.listProjects(true), [])
+  const archived = (allProjects ?? []).filter((p) => p.archived_at)
   const open = projects.reduce((n, p) => n + p.task_count - p.done_count, 0)
   const done = projects.reduce((n, p) => n + p.done_count, 0)
   const overdue = projects.reduce((n, p) => n + p.overdue_count, 0)
@@ -128,6 +130,25 @@ export function Home({ actor, projects, onOpen, onNewProject }: Props) {
         </div>
         <ActivityList items={activity ?? []} projects={projects} />
       </div>
+
+      {archived.length > 0 && (
+        <div>
+          <div className="section-title" style={{ marginBottom: 8 }}>
+            {t('archive.projects')}
+          </div>
+          <div className="archive-list">
+            {archived.map((p) => (
+              <div className="archive-row" key={p.id}>
+                <ProjectGlyph glyph={p.icon} color={p.color} />
+                <span className="archive-title">{p.name}</span>
+                <button className="btn" onClick={() => run(api.archiveProject(p.id, false), t('archive.restored', { name: p.name }))}>
+                  <ArchiveRestore size={14} /> {t('archive.restore')}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

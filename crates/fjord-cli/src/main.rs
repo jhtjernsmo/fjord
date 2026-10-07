@@ -1,15 +1,20 @@
 //! `fjord` — command-line access to Fjord, for humans, scripts and AI agents.
 
+mod mcp;
 mod output;
 
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use fjord_core::{NewProject, NewTask, ProjectPatch, Store, TaskPatch};
+use fjord_core::{NewProject, NewTask, ProjectPatch, StatusPatch, Store, TaskPatch};
 
 #[derive(Parser)]
-#[command(name = "fjord", version, about = "Local-first project management — CLI")]
+#[command(
+    name = "fjord",
+    version,
+    about = "Local-first project management — CLI"
+)]
 struct Cli {
     /// Who is making changes (shown in the activity log). Default: $FJORD_ACTOR or $USER.
     #[arg(long, global = true)]
@@ -32,6 +37,11 @@ enum Command {
     /// Manage tasks
     #[command(subcommand, alias = "t")]
     Task(TaskCmd),
+    /// Manage board columns
+    #[command(subcommand, alias = "c")]
+    Column(ColumnCmd),
+    /// Run as an MCP server on stdio (for AI agents; actor defaults to "claude")
+    Mcp,
     /// Attach a file to a project (optionally to a task)
     Attach {
         project: String,
@@ -145,6 +155,46 @@ enum TaskCmd {
     Archive { id: i64 },
     /// Restore an archived task
     Restore { id: i64 },
+    /// List archived tasks of a project
+    Archived { project: String },
+}
+
+#[derive(Subcommand)]
+enum ColumnCmd {
+    /// List columns of a project
+    #[command(alias = "ls")]
+    List { project: String },
+    /// Add a column at the end
+    Add {
+        project: String,
+        name: String,
+        #[arg(long)]
+        color: Option<String>,
+        /// Tasks in this column count as done
+        #[arg(long)]
+        done: bool,
+    },
+    /// Rename / recolor a column (name or id)
+    Edit {
+        project: String,
+        column: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        color: Option<String>,
+        #[arg(long)]
+        done: Option<bool>,
+    },
+    /// Move a column to a 0-based position
+    #[command(alias = "mv")]
+    Move {
+        project: String,
+        column: String,
+        position: usize,
+    },
+    /// Remove an empty column
+    #[command(alias = "rm")]
+    Remove { project: String, column: String },
 }
 
 fn default_actor() -> String {
@@ -162,14 +212,28 @@ fn main() {
 
 fn run(cli: Cli) -> Result<()> {
     let dir = cli.data_dir.clone().unwrap_or_else(Store::default_dir);
-    let actor = cli.actor.clone().unwrap_or_else(default_actor);
-    let mut store = Store::open(&dir, &actor).with_context(|| format!("could not open {}", dir.display()))?;
+    let is_mcp = matches!(cli.command, Command::Mcp);
+    let actor = cli.actor.clone().unwrap_or_else(|| {
+        if is_mcp {
+            "claude".into()
+        } else {
+            default_actor()
+        }
+    });
+    let mut store =
+        Store::open(&dir, &actor).with_context(|| format!("could not open {}", dir.display()))?;
     let out = output::Printer { json: cli.json };
 
     match cli.command {
         Command::Project(cmd) => project(&mut store, &out, cmd),
         Command::Task(cmd) => task(&mut store, &out, cmd),
-        Command::Attach { project, path, task } => {
+        Command::Column(cmd) => column(&mut store, &out, cmd),
+        Command::Mcp => mcp::serve(&mut store),
+        Command::Attach {
+            project,
+            path,
+            task,
+        } => {
             let p = store.find_project(&project)?;
             out.attachment(&store.attach_file(p.id, task, &path)?)
         }
@@ -177,13 +241,20 @@ fn run(cli: Cli) -> Result<()> {
             let p = store.find_project(&project)?;
             out.attachments(&store.list_attachments(p.id, task)?)
         }
-        Command::Note { project, title, body } => {
+        Command::Note {
+            project,
+            title,
+            body,
+        } => {
             let p = store.find_project(&project)?;
             out.note(&store.add_note(p.id, &title, &body)?)
         }
         Command::Search { query } => out.search(&store.search(&query.join(" "))?),
         Command::Log { project, limit } => {
-            let project_id = project.map(|p| store.find_project(&p)).transpose()?.map(|p| p.id);
+            let project_id = project
+                .map(|p| store.find_project(&p))
+                .transpose()?
+                .map(|p| p.id);
             out.activity(&store.recent_activity(project_id, limit)?)
         }
     }
@@ -192,17 +263,39 @@ fn run(cli: Cli) -> Result<()> {
 fn project(store: &mut Store, out: &output::Printer, cmd: ProjectCmd) -> Result<()> {
     match cmd {
         ProjectCmd::List { all } => out.projects(&store.list_projects(all)?),
-        ProjectCmd::Add { name, desc, color, icon } => {
+        ProjectCmd::Add {
+            name,
+            desc,
+            color,
+            icon,
+        } => {
             let locale = std::env::var("LANG").ok();
-            out.project(&store.create_project(NewProject { name, locale, description: desc, color, icon })?)
+            out.project(&store.create_project(NewProject {
+                name,
+                locale,
+                description: desc,
+                color,
+                icon,
+            })?)
         }
         ProjectCmd::Show { project } => {
             let p = store.find_project(&project)?;
             out.board(&p, &store.list_statuses(p.id)?, &store.list_tasks(p.id)?)
         }
-        ProjectCmd::Edit { project, name, desc, color, icon } => {
+        ProjectCmd::Edit {
+            project,
+            name,
+            desc,
+            color,
+            icon,
+        } => {
             let p = store.find_project(&project)?;
-            let patch = ProjectPatch { name, description: desc, color, icon };
+            let patch = ProjectPatch {
+                name,
+                description: desc,
+                color,
+                icon,
+            };
             out.project(&store.update_project(p.id, patch)?)
         }
         ProjectCmd::Archive { project } => {
@@ -218,16 +311,48 @@ fn project(store: &mut Store, out: &output::Printer, cmd: ProjectCmd) -> Result<
 
 fn task(store: &mut Store, out: &output::Printer, cmd: TaskCmd) -> Result<()> {
     match cmd {
-        TaskCmd::Add { project, title, body, priority, due, status } => {
+        TaskCmd::Add {
+            project,
+            title,
+            body,
+            priority,
+            due,
+            status,
+        } => {
             let p = store.find_project(&project)?;
-            let status_id = status.map(|s| store.find_status(p.id, &s)).transpose()?.map(|s| s.id);
-            let new = NewTask { project_id: p.id, title, body_md: body, priority, due_at: due, status_id };
+            let status_id = status
+                .map(|s| store.find_status(p.id, &s))
+                .transpose()?
+                .map(|s| s.id);
+            let new = NewTask {
+                project_id: p.id,
+                title,
+                body_md: body,
+                priority,
+                due_at: due,
+                status_id,
+            };
             out.task(&store.create_task(new)?)
         }
         TaskCmd::Show { id } => out.task(&store.get_task(id)?),
-        TaskCmd::Edit { id, title, body, priority, due, no_due } => {
+        TaskCmd::Edit {
+            id,
+            title,
+            body,
+            priority,
+            due,
+            no_due,
+        } => {
             let due_at = if no_due { Some(None) } else { due.map(Some) };
-            out.task(&store.update_task(id, TaskPatch { title, body_md: body, priority, due_at })?)
+            out.task(&store.update_task(
+                id,
+                TaskPatch {
+                    title,
+                    body_md: body,
+                    priority,
+                    due_at,
+                },
+            )?)
         }
         TaskCmd::Move { id, status } => {
             let t = store.get_task(id)?;
@@ -245,5 +370,60 @@ fn task(store: &mut Store, out: &output::Printer, cmd: TaskCmd) -> Result<()> {
         }
         TaskCmd::Archive { id } => out.task(&store.set_task_archived(id, true)?),
         TaskCmd::Restore { id } => out.task(&store.set_task_archived(id, false)?),
+        TaskCmd::Archived { project } => {
+            let p = store.find_project(&project)?;
+            out.tasks(&store.list_archived_tasks(p.id)?)
+        }
+    }
+}
+
+fn column(store: &mut Store, out: &output::Printer, cmd: ColumnCmd) -> Result<()> {
+    match cmd {
+        ColumnCmd::List { project } => {
+            let p = store.find_project(&project)?;
+            out.statuses(&store.list_statuses(p.id)?)
+        }
+        ColumnCmd::Add {
+            project,
+            name,
+            color,
+            done,
+        } => {
+            let p = store.find_project(&project)?;
+            out.statuses(&[store.create_status(p.id, &name, color.as_deref(), done)?])
+        }
+        ColumnCmd::Edit {
+            project,
+            column,
+            name,
+            color,
+            done,
+        } => {
+            let p = store.find_project(&project)?;
+            let s = store.find_status(p.id, &column)?;
+            out.statuses(&[store.update_status(
+                s.id,
+                StatusPatch {
+                    name,
+                    color,
+                    is_done: done,
+                },
+            )?])
+        }
+        ColumnCmd::Move {
+            project,
+            column,
+            position,
+        } => {
+            let p = store.find_project(&project)?;
+            let s = store.find_status(p.id, &column)?;
+            out.statuses(&store.move_status(s.id, position)?)
+        }
+        ColumnCmd::Remove { project, column } => {
+            let p = store.find_project(&project)?;
+            let s = store.find_status(p.id, &column)?;
+            store.delete_status(s.id)?;
+            out.statuses(&store.list_statuses(p.id)?)
+        }
     }
 }

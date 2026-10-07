@@ -125,6 +125,13 @@ export const api = {
   moveTask: (id: number, statusId: number, beforeTaskId: number | null = null) =>
     invoke<Task>('move_task', { id, statusId, beforeTaskId }),
   archiveTask: (id: number, archived: boolean) => invoke<Task>('archive_task', { id, archived }),
+  listArchivedTasks: (projectId: number) => invoke<Task[]>('list_archived_tasks', { projectId }),
+  createStatus: (projectId: number, name: string, color: string | null, isDone: boolean) =>
+    invoke<Status>('create_status', { projectId, name, color, isDone }),
+  updateStatus: (id: number, patch: { name?: string; color?: string; is_done?: boolean }) =>
+    invoke<Status>('update_status', { id, patch }),
+  moveStatus: (id: number, index: number) => invoke<Status[]>('move_status', { id, index }),
+  deleteStatus: (id: number) => invoke<void>('delete_status', { id }),
   listAttachments: (projectId: number, taskId: number | null = null) =>
     invoke<Attachment[]>('list_attachments', { projectId, taskId }),
   attachFiles: (projectId: number, taskId: number | null, paths: string[]) =>

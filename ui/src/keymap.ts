@@ -28,6 +28,8 @@ export const DEFAULT_ACTIONS: ActionDef[] = [
   { id: 'view.activity', group: 'view', scope: 'global', keys: '<leader>a' },
   { id: 'task.new', group: 'task', scope: 'global', keys: '<leader>t' },
   { id: 'lang.toggle', group: 'general', scope: 'global', keys: '<leader>L' },
+  { id: 'settings.open', group: 'general', scope: 'global', keys: '<leader>,' },
+  { id: 'view.archive', group: 'view', scope: 'global', keys: '<leader>A' },
   { id: 'board.left', group: 'board', scope: 'board', keys: 'h' },
   { id: 'board.right', group: 'board', scope: 'board', keys: 'l' },
   { id: 'board.down', group: 'board', scope: 'board', keys: 'j' },
@@ -43,6 +45,7 @@ export const DEFAULT_ACTIONS: ActionDef[] = [
   { id: 'task.toggleDone', group: 'board', scope: 'board', keys: 'x' },
   { id: 'task.archive', group: 'board', scope: 'board', keys: 'd d' },
   { id: 'task.priority', group: 'board', scope: 'board', keys: 'p' },
+  { id: 'board.filter', group: 'board', scope: 'board', keys: '/' },
 ]
 
 export interface KeymapConfig {

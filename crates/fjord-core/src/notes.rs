@@ -24,7 +24,11 @@ fn fts_query(input: &str) -> Option<String> {
         .filter(|w| !w.is_empty())
         .map(|w| format!("\"{w}\"*"))
         .collect();
-    if terms.is_empty() { None } else { Some(terms.join(" ")) }
+    if terms.is_empty() {
+        None
+    } else {
+        Some(terms.join(" "))
+    }
 }
 
 impl Store {
@@ -77,7 +81,9 @@ impl Store {
     /// Full-text search across tasks, notes and file names (prefix matching,
     /// diacritics-insensitive). Archived tasks/projects are excluded.
     pub fn search(&self, query: &str) -> Result<Vec<SearchHit>> {
-        let Some(fts) = fts_query(query) else { return Ok(Vec::new()) };
+        let Some(fts) = fts_query(query) else {
+            return Ok(Vec::new());
+        };
         let mut stmt = self.conn.prepare(
             "SELECT f.kind, f.ref_id, f.project_id, f.title,
                     snippet(search_fts, 4, '[', ']', '…', 12)
@@ -129,7 +135,10 @@ mod tests {
 
     #[test]
     fn fts_query_quotes_terms_and_drops_quotes() {
-        assert_eq!(fts_query("push varsel").as_deref(), Some("\"push\"* \"varsel\"*"));
+        assert_eq!(
+            fts_query("push varsel").as_deref(),
+            Some("\"push\"* \"varsel\"*")
+        );
         assert_eq!(fts_query(" \"\" "), None);
         assert_eq!(fts_query("a\"b OR").as_deref(), Some("\"ab\"* \"OR\"*"));
     }
@@ -137,7 +146,12 @@ mod tests {
     #[test]
     fn search_finds_tasks_notes_and_files_by_prefix_without_diacritics() {
         let (mut s, dir) = store();
-        let p = s.create_project(NewProject { name: "Bokost".into(), ..Default::default() }).unwrap();
+        let p = s
+            .create_project(NewProject {
+                name: "Bokost".into(),
+                ..Default::default()
+            })
+            .unwrap();
         s.create_task(NewTask {
             project_id: p.id,
             title: "Fiks push-varsler".into(),
@@ -145,7 +159,8 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        s.add_note(p.id, "Møtenotater", "Lansering før påske").unwrap();
+        s.add_note(p.id, "Møtenotater", "Lansering før påske")
+            .unwrap();
         let file = dir.path().join("varsel-logg.txt");
         std::fs::write(&file, b"x").unwrap();
         s.attach_file(p.id, None, &file).unwrap();
@@ -165,9 +180,27 @@ mod tests {
     #[test]
     fn search_follows_edits_and_skips_archived() {
         let (mut s, _dir) = store();
-        let p = s.create_project(NewProject { name: "P".into(), ..Default::default() }).unwrap();
-        let t = s.create_task(NewTask { project_id: p.id, title: "gammel".into(), ..Default::default() }).unwrap();
-        s.update_task(t.id, TaskPatch { title: Some("ny tittel".into()), ..Default::default() }).unwrap();
+        let p = s
+            .create_project(NewProject {
+                name: "P".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        let t = s
+            .create_task(NewTask {
+                project_id: p.id,
+                title: "gammel".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        s.update_task(
+            t.id,
+            TaskPatch {
+                title: Some("ny tittel".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
         assert!(s.search("gammel").unwrap().is_empty());
         assert_eq!(s.search("tittel").unwrap().len(), 1);
         s.set_task_archived(t.id, true).unwrap();
@@ -177,10 +210,18 @@ mod tests {
     #[test]
     fn activity_records_actor_newest_first() {
         let (mut s, _dir) = store();
-        let p = s.create_project(NewProject { name: "P".into(), ..Default::default() }).unwrap();
+        let p = s
+            .create_project(NewProject {
+                name: "P".into(),
+                ..Default::default()
+            })
+            .unwrap();
         s.add_note(p.id, "N", "").unwrap();
         let log = s.recent_activity(Some(p.id), 10).unwrap();
-        assert_eq!(log.iter().map(|a| a.action.as_str()).collect::<Vec<_>>(), ["note.create", "project.create"]);
+        assert_eq!(
+            log.iter().map(|a| a.action.as_str()).collect::<Vec<_>>(),
+            ["note.create", "project.create"]
+        );
         assert!(log.iter().all(|a| a.actor == "tester"));
         assert!(s.change_counter().unwrap() >= 2);
     }

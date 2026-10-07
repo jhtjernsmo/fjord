@@ -51,6 +51,13 @@ pub struct Status {
     pub is_done: bool,
 }
 
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct StatusPatch {
+    pub name: Option<String>,
+    pub color: Option<String>,
+    pub is_done: Option<bool>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Task {
     pub id: i64,
@@ -91,7 +98,9 @@ pub struct TaskPatch {
 }
 
 /// Distinguishes a JSON field that is present (even as `null`) from one that is missing.
-fn present_or_null<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Option<String>>, D::Error> {
+fn present_or_null<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<Option<Option<String>>, D::Error> {
     Option::<String>::deserialize(d).map(Some)
 }
 
@@ -111,10 +120,18 @@ mod tests {
 
     #[test]
     fn ui_payloads_deserialize_with_defaults() {
-        let task: NewTask = serde_json::from_str(r#"{"project_id":1,"title":"x","status_id":11}"#).unwrap();
-        assert_eq!((task.priority, task.body_md.as_str(), task.status_id), (0, "", Some(11)));
-        let project: NewProject = serde_json::from_str(r##"{"name":"Bokost","color":"#00d4b0","icon":"💸"}"##).unwrap();
-        assert_eq!((project.description.as_str(), project.icon.as_deref()), ("", Some("💸")));
+        let task: NewTask =
+            serde_json::from_str(r#"{"project_id":1,"title":"x","status_id":11}"#).unwrap();
+        assert_eq!(
+            (task.priority, task.body_md.as_str(), task.status_id),
+            (0, "", Some(11))
+        );
+        let project: NewProject =
+            serde_json::from_str(r##"{"name":"Bokost","color":"#00d4b0","icon":"💸"}"##).unwrap();
+        assert_eq!(
+            (project.description.as_str(), project.icon.as_deref()),
+            ("", Some("💸"))
+        );
     }
 }
 

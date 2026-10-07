@@ -27,7 +27,11 @@ impl Store {
 
     /// In-memory database with files in `files_dir`; meant for tests.
     pub fn open_in_memory(files_dir: &Path, actor: &str) -> Result<Self> {
-        Self::init(Connection::open_in_memory()?, files_dir.to_path_buf(), actor)
+        Self::init(
+            Connection::open_in_memory()?,
+            files_dir.to_path_buf(),
+            actor,
+        )
     }
 
     fn init(mut conn: Connection, files_dir: PathBuf, actor: &str) -> Result<Self> {
@@ -38,7 +42,11 @@ impl Store {
         schema::configure(&conn)?;
         schema::migrate(&mut conn)?;
         std::fs::create_dir_all(&files_dir)?;
-        Ok(Self { conn, files_dir, actor: actor.to_string() })
+        Ok(Self {
+            conn,
+            files_dir,
+            actor: actor.to_string(),
+        })
     }
 
     pub fn actor(&self) -> &str {
@@ -62,7 +70,11 @@ impl Store {
     /// Bumps whenever anything changes; lets the GUI cheaply poll for
     /// changes made by other processes (CLI/agent).
     pub fn change_counter(&self) -> Result<i64> {
-        Ok(self.conn.query_row("SELECT coalesce(max(id), 0) FROM activity", [], |r| r.get(0))?)
+        Ok(self
+            .conn
+            .query_row("SELECT coalesce(max(id), 0) FROM activity", [], |r| {
+                r.get(0)
+            })?)
     }
 
     pub(crate) fn log(

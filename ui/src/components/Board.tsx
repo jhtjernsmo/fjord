@@ -19,6 +19,8 @@ import type { Board as BoardData, Status, Task } from '../api'
 import { useActions, useApp } from '../data'
 import type { MessageKey } from '../i18n'
 import { AgentTag } from './Icons'
+import { AddColumn, ColumnHeader, EMPTY_FILTER, FilterBar, isFiltering } from './Columns'
+import type { BoardFilter } from './Columns'
 
 const PRIORITY_ICON = ['', '↓', '→', '↑']
 const DRAG_ACTIVATION_PX = 5
@@ -93,6 +95,8 @@ function CardBody({ task, statuses, className = '' }: { task: Task; statuses: St
 
 function Column(props: {
   status: Status
+  index: number
+  columnCount: number
   tasks: Task[]
   statuses: Status[]
   focused: boolean
@@ -107,11 +111,7 @@ function Column(props: {
   const [draft, setDraft] = useState('')
   return (
     <section className={`column ${props.focused ? 'focused' : ''} ${props.over ? 'over' : ''}`}>
-      <header className="column-head">
-        <span className="dot" style={{ background: props.status.color }} />
-        {props.status.name}
-        <span className="count">{props.tasks.length}</span>
-      </header>
+      <ColumnHeader status={props.status} count={props.tasks.length} index={props.index} columnCount={props.columnCount} />
       <SortableContext items={props.tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <div className="column-body" ref={setNodeRef}>
           {props.tasks.map((t) => (
@@ -142,7 +142,19 @@ function Column(props: {
 
 export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysEnabled }: Props) {
   const { run, t } = useApp()
-  const { statuses, tasks } = board
+  const { statuses, tasks: allTasks } = board
+  const [filter, setFilter] = useState<BoardFilter>(EMPTY_FILTER)
+  const filterRef = useRef<HTMLInputElement>(null)
+  const tasks = useMemo(() => {
+    if (!isFiltering(filter)) return allTasks
+    const needle = filter.text.trim().toLowerCase()
+    return allTasks.filter(
+      (t) =>
+        t.priority >= filter.minPriority &&
+        (!filter.agentOnly || t.created_by === 'claude') &&
+        (!needle || t.title.toLowerCase().includes(needle) || t.body_md.toLowerCase().includes(needle)),
+    )
+  }, [allTasks, filter])
   const columns = useMemo(
     () => statuses.map((s) => ({ status: s, tasks: tasks.filter((t) => t.status_id === s.id) })),
     [statuses, tasks],
@@ -219,6 +231,7 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
       },
       'task.archive': () => current && run(api.archiveTask(current.id, true), t('toast.archivedTask', { name: current.title })),
       'task.priority': () => current && run(api.updateTask(current.id, { priority: (current.priority + 1) % 4 })),
+      'board.filter': () => filterRef.current?.focus(),
   }
   useActions(keysEnabled ? boardActions : {}, 'board')
 
@@ -244,11 +257,14 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
+      <FilterBar filter={filter} onChange={setFilter} shown={tasks.length} total={allTasks.length} inputRef={filterRef} />
       <div className="board">
         {columns.map((c, ci) => (
           <Column
             key={c.status.id}
             status={c.status}
+            index={ci}
+            columnCount={columns.length}
             tasks={c.tasks}
             statuses={statuses}
             focused={ci === col}
@@ -259,6 +275,7 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
             onAdd={(title) => run(api.createTask({ project_id: board.project.id, title, status_id: c.status.id }))}
           />
         ))}
+        <AddColumn projectId={board.project.id} />
       </div>
       <DragOverlay>{dragging && <CardBody task={dragging} statuses={statuses} className="overlay" />}</DragOverlay>
     </DndContext>

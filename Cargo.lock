@@ -1146,6 +1146,7 @@ dependencies = [
  "fjord-core",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

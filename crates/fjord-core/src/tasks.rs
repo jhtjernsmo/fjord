@@ -38,12 +38,24 @@ fn validate_due(due: Option<String>) -> Result<Option<String>> {
         return Ok(None);
     };
     let parts: Vec<&str> = d.split('-').collect();
-    let number = |i: usize| parts.get(i).and_then(|p| p.parse::<u32>().ok()).unwrap_or(0);
+    let number = |i: usize| {
+        parts
+            .get(i)
+            .and_then(|p| p.parse::<u32>().ok())
+            .unwrap_or(0)
+    };
     let valid = parts.len() == 3
-        && [4, 2, 2].iter().zip(&parts).all(|(len, p)| p.len() == *len && p.chars().all(|c| c.is_ascii_digit()))
+        && [4, 2, 2]
+            .iter()
+            .zip(&parts)
+            .all(|(len, p)| p.len() == *len && p.chars().all(|c| c.is_ascii_digit()))
         && (1..=12).contains(&number(1))
         && (1..=31).contains(&number(2));
-    if valid { Ok(Some(d)) } else { Err(Error::Invalid(format!("due date «{d}» must be YYYY-MM-DD"))) }
+    if valid {
+        Ok(Some(d))
+    } else {
+        Err(Error::Invalid(format!("due date «{d}» must be YYYY-MM-DD")))
+    }
 }
 
 impl Store {
@@ -74,7 +86,11 @@ impl Store {
 
     pub fn get_task(&self, id: i64) -> Result<Task> {
         self.conn
-            .query_row(&format!("SELECT {TASK_COLS} FROM tasks WHERE id = ?1"), [id], task_from_row)
+            .query_row(
+                &format!("SELECT {TASK_COLS} FROM tasks WHERE id = ?1"),
+                [id],
+                task_from_row,
+            )
             .optional()?
             .ok_or_else(|| Error::NotFound(format!("task {id}")))
     }
@@ -85,6 +101,17 @@ impl Store {
             "SELECT {TASK_COLS} FROM tasks
              WHERE project_id = ?1 AND archived_at IS NULL
              ORDER BY status_id, position"
+        ))?;
+        let rows = stmt.query_map([project_id], task_from_row)?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Archived tasks of a project, most recently archived first.
+    pub fn list_archived_tasks(&self, project_id: i64) -> Result<Vec<Task>> {
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {TASK_COLS} FROM tasks
+             WHERE project_id = ?1 AND archived_at IS NOT NULL
+             ORDER BY archived_at DESC, id DESC"
         ))?;
         let rows = stmt.query_map([project_id], task_from_row)?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
@@ -105,15 +132,32 @@ impl Store {
             "UPDATE tasks SET title = ?1, body_md = ?2, priority = ?3, due_at = ?4,
                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
              WHERE id = ?5",
-            params![title, patch.body_md.unwrap_or(current.body_md), priority, due, id],
+            params![
+                title,
+                patch.body_md.unwrap_or(current.body_md),
+                priority,
+                due,
+                id
+            ],
         )?;
         self.touch_project(current.project_id)?;
-        self.log(Some(current.project_id), Some(id), "task.update", &title, None)?;
+        self.log(
+            Some(current.project_id),
+            Some(id),
+            "task.update",
+            &title,
+            None,
+        )?;
         self.get_task(id)
     }
 
     /// Moves a task to `status_id`, placed before `before_task_id` or last.
-    pub fn move_task(&mut self, id: i64, status_id: i64, before_task_id: Option<i64>) -> Result<Task> {
+    pub fn move_task(
+        &mut self,
+        id: i64,
+        status_id: i64,
+        before_task_id: Option<i64>,
+    ) -> Result<Task> {
         let task = self.get_task(id)?;
         let status_id = self.status_in_project(task.project_id, status_id)?;
         let position = match before_task_id {
@@ -126,10 +170,19 @@ impl Store {
              WHERE id = ?3",
             params![status_id, position, id],
         )?;
-        let status: String =
-            self.conn.query_row("SELECT name FROM statuses WHERE id = ?1", [status_id], |r| r.get(0))?;
+        let status: String = self.conn.query_row(
+            "SELECT name FROM statuses WHERE id = ?1",
+            [status_id],
+            |r| r.get(0),
+        )?;
         self.touch_project(task.project_id)?;
-        self.log(Some(task.project_id), Some(id), "task.move", &task.title, Some(&status))?;
+        self.log(
+            Some(task.project_id),
+            Some(id),
+            "task.move",
+            &task.title,
+            Some(&status),
+        )?;
         self.get_task(id)
     }
 
@@ -141,7 +194,11 @@ impl Store {
              WHERE id = ?2",
             params![archived, id],
         )?;
-        let action = if archived { "task.archive" } else { "task.restore" };
+        let action = if archived {
+            "task.archive"
+        } else {
+            "task.restore"
+        };
         self.touch_project(task.project_id)?;
         self.log(Some(task.project_id), Some(id), action, &task.title, None)?;
         self.get_task(id)
@@ -197,15 +254,29 @@ mod tests {
     use crate::test_util::store;
 
     fn project(s: &mut Store) -> i64 {
-        s.create_project(NewProject { name: "P".into(), ..Default::default() }).unwrap().id
+        s.create_project(NewProject {
+            name: "P".into(),
+            ..Default::default()
+        })
+        .unwrap()
+        .id
     }
 
     fn task(s: &mut Store, project_id: i64, title: &str) -> Task {
-        s.create_task(NewTask { project_id, title: title.into(), ..Default::default() }).unwrap()
+        s.create_task(NewTask {
+            project_id,
+            title: title.into(),
+            ..Default::default()
+        })
+        .unwrap()
     }
 
     fn titles(s: &Store, project_id: i64) -> Vec<String> {
-        s.list_tasks(project_id).unwrap().into_iter().map(|t| t.title).collect()
+        s.list_tasks(project_id)
+            .unwrap()
+            .into_iter()
+            .map(|t| t.title)
+            .collect()
     }
 
     #[test]
@@ -231,17 +302,33 @@ mod tests {
             due_at: due.map(Into::into),
             ..Default::default()
         };
-        assert!(matches!(s.create_task(new("", 0, None)), Err(Error::Invalid(_))));
-        assert!(matches!(s.create_task(new("x", 7, None)), Err(Error::Invalid(_))));
-        assert!(matches!(s.create_task(new("x", 0, Some("31.12.2026"))), Err(Error::Invalid(_))));
-        assert!(matches!(s.create_task(new("x", 0, Some("2026-13-01"))), Err(Error::Invalid(_))));
+        assert!(matches!(
+            s.create_task(new("", 0, None)),
+            Err(Error::Invalid(_))
+        ));
+        assert!(matches!(
+            s.create_task(new("x", 7, None)),
+            Err(Error::Invalid(_))
+        ));
+        assert!(matches!(
+            s.create_task(new("x", 0, Some("31.12.2026"))),
+            Err(Error::Invalid(_))
+        ));
+        assert!(matches!(
+            s.create_task(new("x", 0, Some("2026-13-01"))),
+            Err(Error::Invalid(_))
+        ));
         assert!(s.create_task(new("x", 3, Some("2026-12-31"))).is_ok());
     }
 
     #[test]
     fn task_in_unknown_project_is_not_found() {
         let (mut s, _dir) = store();
-        let err = s.create_task(NewTask { project_id: 999, title: "x".into(), ..Default::default() });
+        let err = s.create_task(NewTask {
+            project_id: 999,
+            title: "x".into(),
+            ..Default::default()
+        });
         assert!(matches!(err, Err(Error::NotFound(_))));
     }
 
@@ -277,7 +364,10 @@ mod tests {
         let p2 = project(&mut s);
         let t = task(&mut s, p1, "A");
         let foreign = s.list_statuses(p2).unwrap()[0].id;
-        assert!(matches!(s.move_task(t.id, foreign, None), Err(Error::NotFound(_))));
+        assert!(matches!(
+            s.move_task(t.id, foreign, None),
+            Err(Error::NotFound(_))
+        ));
     }
 
     #[test]
@@ -285,11 +375,32 @@ mod tests {
         let (mut s, _dir) = store();
         let p = project(&mut s);
         let t = s
-            .create_task(NewTask { project_id: p, title: "A".into(), due_at: Some("2026-01-01".into()), ..Default::default() })
+            .create_task(NewTask {
+                project_id: p,
+                title: "A".into(),
+                due_at: Some("2026-01-01".into()),
+                ..Default::default()
+            })
             .unwrap();
-        let kept = s.update_task(t.id, TaskPatch { priority: Some(2), ..Default::default() }).unwrap();
+        let kept = s
+            .update_task(
+                t.id,
+                TaskPatch {
+                    priority: Some(2),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
         assert_eq!(kept.due_at.as_deref(), Some("2026-01-01"));
-        let cleared = s.update_task(t.id, TaskPatch { due_at: Some(None), ..Default::default() }).unwrap();
+        let cleared = s
+            .update_task(
+                t.id,
+                TaskPatch {
+                    due_at: Some(None),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
         assert_eq!(cleared.due_at, None);
     }
 
@@ -297,8 +408,13 @@ mod tests {
     fn overdue_open_tasks_are_counted() {
         let (mut s, _dir) = store();
         let p = project(&mut s);
-        s.create_task(NewTask { project_id: p, title: "late".into(), due_at: Some("2000-01-01".into()), ..Default::default() })
-            .unwrap();
+        s.create_task(NewTask {
+            project_id: p,
+            title: "late".into(),
+            due_at: Some("2000-01-01".into()),
+            ..Default::default()
+        })
+        .unwrap();
         assert_eq!(s.list_projects(false).unwrap()[0].overdue_count, 1);
     }
 
@@ -309,5 +425,9 @@ mod tests {
         let t = task(&mut s, p, "A");
         s.set_task_archived(t.id, true).unwrap();
         assert!(s.list_tasks(p).unwrap().is_empty());
+        assert_eq!(s.list_archived_tasks(p).unwrap()[0].id, t.id);
+        s.set_task_archived(t.id, false).unwrap();
+        assert_eq!(s.list_tasks(p).unwrap().len(), 1);
+        assert!(s.list_archived_tasks(p).unwrap().is_empty());
     }
 }

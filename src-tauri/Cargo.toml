@@ -3,6 +3,7 @@ name = "fjord-app"
 version = "0.1.0"
 description = "Fjord — local project management for Linux"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/jhtjernsmo/fjord"
 edition = "2024"
 rust-version = "1.90"
 

@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import type { NewProject } from '../api'
 import { useApp } from '../data'
+import { LOCALES } from '../i18n'
+import type { MessageKey } from '../i18n'
+import { X } from 'lucide-react'
 import { PROJECT_GLYPHS, ProjectGlyph } from './Icons'
 
 const COLORS = ['#7c9cff', '#00d4b0', '#3fb950', '#f5a524', '#ff7a1a', '#ff6b6b', '#e86bff', '#a78bfa']
@@ -87,4 +90,76 @@ export function NewProjectDialog({ onCancel, onCreate }: Props) {
       </form>
     </div>
   )
+}
+
+export type Theme = 'system' | 'dark' | 'light'
+export const THEMES: Theme[] = ['system', 'dark', 'light']
+
+export function SettingsDialog({ theme, onTheme, onClose }: { theme: Theme; onTheme: (t: Theme) => void; onClose: () => void }) {
+  const { t, locale, setLocale } = useApp()
+  return (
+    <div className="overlay" onMouseDown={onClose}>
+      <div className="dialog" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-label={t('settings.title')}>
+        <h2 className="dialog-title">
+          {t('settings.title')}
+          <button className="icon-btn push-right" onClick={onClose} aria-label={t('task.close')}>
+            <X size={16} />
+          </button>
+        </h2>
+        <div className="row">
+          {t('settings.theme')}
+          <div className="segmented">
+            {THEMES.map((th) => (
+              <button key={th} className={theme === th ? 'on' : ''} onClick={() => onTheme(th)}>
+                {t(`settings.theme.${th}` as MessageKey)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="row">
+          {t('settings.language')}
+          <div className="segmented">
+            {LOCALES.map((l) => (
+              <button key={l.id} className={locale === l.id ? 'on' : ''} onClick={() => setLocale(l.id)}>
+                {l.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="row">
+          {t('settings.keys')}
+          <span className="hint">{t('settings.keysHint')}</span>
+        </div>
+        <div className="row">
+          {t('settings.agents')}
+          <span className="hint mono">{t('settings.agentsHint')}</span>
+        </div>
+        <div className="row">
+          {t('settings.data')}
+          <span className="hint">{t('settings.dataHint')}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const THEME_KEY = 'fjord.theme'
+
+export function loadTheme(): Theme {
+  try {
+    const v = localStorage.getItem(THEME_KEY)
+    return v === 'dark' || v === 'light' ? v : 'system'
+  } catch {
+    return 'system'
+  }
+}
+
+export function applyTheme(theme: Theme): void {
+  if (theme === 'system') delete document.documentElement.dataset.theme
+  else document.documentElement.dataset.theme = theme
+  try {
+    localStorage.setItem(THEME_KEY, theme)
+  } catch {
+    /* non-fatal */
+  }
 }
