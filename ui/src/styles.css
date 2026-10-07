@@ -508,3 +508,5 @@ kbd {
 .github-account { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .github-account .ok { color: var(--ok); }
 .hint.warn { color: var(--warn, #d9a441); display: inline-flex; align-items: center; gap: 5px; }
+
+.beta { font: 500 10px var(--mono); text-transform: uppercase; letter-spacing: .05em; color: var(--accent); border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent); border-radius: 4px; padding: 0 5px; margin-left: 6px; vertical-align: 1px; }

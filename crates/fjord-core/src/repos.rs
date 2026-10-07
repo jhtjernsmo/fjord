@@ -4,7 +4,7 @@
 use rusqlite::{OptionalExtension, params};
 
 use crate::error::{Error, Result};
-use crate::models::{ProjectRepo, Task};
+use crate::models::{ProjectRepo, RemoteHost, Task};
 use crate::store::{Store, require_text};
 
 impl Store {
@@ -13,16 +13,26 @@ impl Store {
         &mut self,
         project_id: i64,
         path: &str,
-        github: Option<(&str, &str)>,
+        host: Option<&RemoteHost>,
     ) -> Result<ProjectRepo> {
         let path = require_text(path, "repository path")?;
         let project = self.get_project(project_id)?;
-        let (owner, repo) = github.unzip();
+        let (gh_owner, gh_repo, az_org, az_project, az_repo) = match host {
+            Some(RemoteHost::GitHub { owner, repo }) => (Some(owner), Some(repo), None, None, None),
+            Some(RemoteHost::AzureDevOps { org, project, repo }) => {
+                (None, None, Some(org), Some(project), Some(repo))
+            }
+            None => (None, None, None, None, None),
+        };
         self.conn.execute(
-            "INSERT INTO project_repos (project_id, path, github_owner, github_repo)
-             VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT(project_id) DO UPDATE SET path = ?2, github_owner = ?3, github_repo = ?4",
-            params![project_id, path, owner, repo],
+            "INSERT INTO project_repos
+                 (project_id, path, github_owner, github_repo, azure_org, azure_project, azure_repo)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(project_id) DO UPDATE SET path = ?2, github_owner = ?3, github_repo = ?4,
+                 azure_org = ?5, azure_project = ?6, azure_repo = ?7",
+            params![
+                project_id, path, gh_owner, gh_repo, az_org, az_project, az_repo
+            ],
         )?;
         self.log(
             Some(project_id),
@@ -39,7 +49,8 @@ impl Store {
         Ok(self
             .conn
             .query_row(
-                "SELECT project_id, path, github_owner, github_repo, auto_move
+                "SELECT project_id, path, github_owner, github_repo, auto_move,
+                        azure_org, azure_project, azure_repo
                  FROM project_repos WHERE project_id = ?1",
                 [project_id],
                 |row| {
@@ -49,6 +60,9 @@ impl Store {
                         github_owner: row.get(2)?,
                         github_repo: row.get(3)?,
                         auto_move: row.get(4)?,
+                        azure_org: row.get(5)?,
+                        azure_project: row.get(6)?,
+                        azure_repo: row.get(7)?,
                     })
                 },
             )
@@ -136,14 +150,39 @@ mod tests {
         let (p, _) = setup(&mut s);
         assert!(s.get_project_repo(p).unwrap().is_none());
         let r = s
-            .set_project_repo(p, "/code/bokost", Some(("jhtjernsmo", "bokost")))
+            .set_project_repo(
+                p,
+                "/code/bokost",
+                Some(&RemoteHost::GitHub {
+                    owner: "jhtjernsmo".into(),
+                    repo: "bokost".into(),
+                }),
+            )
             .unwrap();
         assert_eq!(
             (r.github_owner.as_deref(), r.auto_move),
             (Some("jhtjernsmo"), true)
         );
+        let azure = RemoteHost::AzureDevOps {
+            org: "contoso".into(),
+            project: "Mobile App".into(),
+            repo: "bokost".into(),
+        };
+        let r = s.set_project_repo(p, "/code/bokost", Some(&azure)).unwrap();
+        assert_eq!(
+            (
+                r.github_owner.as_deref(),
+                r.azure_org.as_deref(),
+                r.azure_project.as_deref()
+            ),
+            (None, Some("contoso"), Some("Mobile App")),
+            "relinking to Azure clears the GitHub remote"
+        );
         let r = s.set_project_repo(p, "/code/other", None).unwrap();
-        assert_eq!((r.path.as_str(), r.github_repo), ("/code/other", None));
+        assert_eq!(
+            (r.path.as_str(), r.github_repo, r.azure_repo),
+            ("/code/other", None, None)
+        );
         s.set_repo_auto_move(p, false).unwrap();
         assert!(!s.get_project_repo(p).unwrap().unwrap().auto_move);
         s.unlink_project_repo(p).unwrap();

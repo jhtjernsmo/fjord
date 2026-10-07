@@ -192,7 +192,7 @@ fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "link_repo",
-            "Link a project to the git repository at a local path (GitHub is detected from origin).",
+            "Link a project to the git repository at a local path (GitHub or Azure DevOps is detected from origin).",
             json!({ "project": project, "path": { "type": "string" } }),
             &["project", "path"],
         ),

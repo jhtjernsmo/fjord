@@ -89,8 +89,18 @@ impl Printer {
         if self.json {
             return print_json(o);
         }
-        let gh = match (&o.repo.github_owner, &o.repo.github_repo) {
-            (Some(a), Some(b)) => format!("  github.com/{a}/{b}"),
+        let r = &o.repo;
+        let gh = match (
+            &r.github_owner,
+            &r.github_repo,
+            &r.azure_org,
+            &r.azure_project,
+            &r.azure_repo,
+        ) {
+            (Some(a), Some(b), ..) => format!("  github.com/{a}/{b}"),
+            (_, _, Some(org), Some(project), Some(repo)) => {
+                format!("  dev.azure.com/{org}/{project}/_git/{repo}")
+            }
             _ => String::new(),
         };
         println!("{}{gh}", o.repo.path);
