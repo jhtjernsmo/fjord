@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { CircleCheck, CircleDashed, CircleX, ExternalLink, FolderGit2, GitBranch, GitMerge, GitPullRequest, RefreshCw, Unlink } from 'lucide-react'
-import { api, errorMessage, relativeTime } from '../api'
+import { api, errorMessage, relativeTime, remoteOf } from '../api'
 import type { Checks, LinkedPullRequest, ProjectRepo } from '../api'
 import { useApp, useLive } from '../data'
 import type { MessageKey } from '../i18n'
@@ -98,7 +98,7 @@ export function GitView({ projectId, onOpenTask }: { projectId: number; onOpenTa
   const prs = usePullRequests(projectId)
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
-  const hasGithub = !!repo?.github_owner
+  const hasGithub = !!remoteOf(repo)
 
   const sync = useCallback(
     async (quiet = false) => {
@@ -206,16 +206,17 @@ export function GitView({ projectId, onOpenTask }: { projectId: number; onOpenTa
 
 function RepoHeader({ repo }: { repo: ProjectRepo }) {
   const { run, t } = useApp()
-  const github = repo.github_owner ? `https://github.com/${repo.github_owner}/${repo.github_repo}` : null
+  const remote = remoteOf(repo)
   return (
     <div className="repo-header">
       <FolderGit2 size={18} />
       <span className="mono grow path-text" title={repo.path}>
         {repo.path}
       </span>
-      {github && (
-        <button className="btn ghost" onClick={() => run(api.openUrl(github))}>
-          <ExternalLink size={13} /> {repo.github_owner}/{repo.github_repo}
+      {remote && (
+        <button className="btn ghost" onClick={() => run(api.openUrl(remote.url))} title={remote.url}>
+          <ExternalLink size={13} /> {remote.label}
+          {remote.kind === 'azure' && <span className="beta">Azure DevOps</span>}
         </button>
       )}
       <label className="toggle-label" title={t('git.autoMoveHint')}>

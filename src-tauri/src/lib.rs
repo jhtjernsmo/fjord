@@ -83,6 +83,9 @@ pub fn run() {
             git_commands::github_account,
             git_commands::connect_github,
             git_commands::disconnect_github,
+            git_commands::azure_account,
+            git_commands::connect_azure,
+            git_commands::disconnect_azure,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Fjord");

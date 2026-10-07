@@ -144,8 +144,25 @@ pub struct ProjectRepo {
     pub path: String,
     pub github_owner: Option<String>,
     pub github_repo: Option<String>,
+    pub azure_org: Option<String>,
+    pub azure_project: Option<String>,
+    pub azure_repo: Option<String>,
     /// Move tasks along the board when branches/PRs change.
     pub auto_move: bool,
+}
+
+/// Where a repository's pull requests live, detected from its `origin` remote.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RemoteHost {
+    GitHub {
+        owner: String,
+        repo: String,
+    },
+    AzureDevOps {
+        org: String,
+        project: String,
+        repo: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

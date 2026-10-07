@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+base64 = "0.22"
 fjord-core = { version = "0.2.1", path = "../fjord-core" }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
 serde = { version = "1.0.229", features = ["derive"] }

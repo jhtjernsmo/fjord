@@ -174,6 +174,12 @@ const MIGRATIONS: &[&str] = &[
         DELETE FROM note_links WHERE note_id = old.id;
     END;
     "#,
+    // v5: Azure DevOps remotes next to GitHub ones
+    r#"
+    ALTER TABLE project_repos ADD COLUMN azure_org TEXT;
+    ALTER TABLE project_repos ADD COLUMN azure_project TEXT;
+    ALTER TABLE project_repos ADD COLUMN azure_repo TEXT;
+    "#,
 ];
 
 pub fn configure(conn: &Connection) -> Result<()> {

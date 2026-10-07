@@ -159,6 +159,8 @@ pub enum TokenSource {
     Env,
     Saved,
     GhCli,
+    /// Azure CLI (`az login`).
+    Cli,
 }
 
 /// Finds a token without ever printing or storing it.
@@ -189,7 +191,7 @@ pub struct GitHubAccount {
     pub private_repos: bool,
 }
 
-fn agent() -> ureq::Agent {
+pub(crate) fn agent() -> ureq::Agent {
     ureq::Agent::config_builder()
         .timeout_global(Some(TIMEOUT))
         .build()
