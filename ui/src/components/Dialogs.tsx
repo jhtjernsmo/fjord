@@ -6,6 +6,7 @@ import { LOCALES } from '../i18n'
 import type { MessageKey } from '../i18n'
 import { X } from 'lucide-react'
 import { PROJECT_GLYPHS, ProjectGlyph } from './Icons'
+import { setUpdateCheckEnabled, updateCheckEnabled, useUpdater } from './Updater'
 
 const COLORS = ['#7c9cff', '#00d4b0', '#3fb950', '#f5a524', '#ff7a1a', '#ff6b6b', '#e86bff', '#a78bfa']
 
@@ -168,6 +169,7 @@ export function SettingsDialog({ theme, onTheme, onClose }: { theme: Theme; onTh
             ))}
           </div>
         </div>
+        <UpdateSettings />
         <div className="row">
           {t('settings.keys')}
           <span className="hint">{t('settings.keysHint')}</span>
@@ -206,4 +208,37 @@ export function applyTheme(theme: Theme): void {
   } catch {
     /* non-fatal */
   }
+}
+
+function UpdateSettings() {
+  const { t } = useApp()
+  const [auto, setAuto] = useState(updateCheckEnabled)
+  const { update, checking, runCheck, install } = useUpdater()
+  return (
+    <div className="row">
+      {t('update.settings')}
+      <label className="toggle-label">
+        <input
+          type="checkbox"
+          checked={auto}
+          onChange={(e) => {
+            setAuto(e.target.checked)
+            setUpdateCheckEnabled(e.target.checked)
+          }}
+        />
+        {t('update.auto')}
+      </label>
+      <div className="user-row">
+        <button className="btn" disabled={checking} onClick={() => runCheck(true)}>
+          {t('update.checkNow')}
+        </button>
+        {update && (
+          <button className="btn primary" onClick={install}>
+            {t('update.install')} ({update.version})
+          </button>
+        )}
+      </div>
+      <span className="hint">{t('update.hint')}</span>
+    </div>
+  )
 }

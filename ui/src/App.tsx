@@ -8,6 +8,7 @@ import { useActions, useApp, useLive } from './data'
 import { NavContext } from './nav'
 import type { Nav } from './nav'
 import { Notespace } from './components/Notespace'
+import { UpdateBanner } from './components/Updater'
 import { LOCALES } from './i18n'
 import type { MessageKey } from './i18n'
 import { ProjectGlyph } from './components/Icons'
@@ -181,6 +182,7 @@ export default function App() {
       />
 
       <main className="main">
+        <UpdateBanner />
         {view.kind === 'notes' && (
           <>
             <header className="header">
