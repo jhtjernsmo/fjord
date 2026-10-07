@@ -1,6 +1,7 @@
 //! Tauri shell: exposes fjord-core to the React UI as commands.
 
 mod commands;
+mod git_commands;
 
 use std::sync::Mutex;
 
@@ -13,6 +14,7 @@ pub struct AppState(pub Mutex<Store>);
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let store = Store::open(&Store::default_dir(), &default_actor())?;
             app.manage(AppState(Mutex::new(store)));
@@ -47,6 +49,15 @@ pub fn run() {
             commands::recent_activity,
             commands::load_keymap,
             commands::data_paths,
+            git_commands::get_project_repo,
+            git_commands::link_repo,
+            git_commands::unlink_repo,
+            git_commands::set_repo_auto_move,
+            git_commands::git_overview,
+            git_commands::start_branch,
+            git_commands::sync_pull_requests,
+            git_commands::open_pull_request,
+            git_commands::open_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Fjord");

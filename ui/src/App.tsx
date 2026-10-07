@@ -14,18 +14,19 @@ import { applyTheme, loadTheme, NewProjectDialog, SettingsDialog } from './compo
 import type { Theme } from './components/Dialogs'
 import { Home } from './components/Home'
 import { ActivityView, ArchiveView, FilesView, NotesView } from './components/ProjectViews'
+import { GitView } from './components/GitView'
 import { Sidebar } from './components/Sidebar'
 import { TaskPanel } from './components/TaskPanel'
 import { HelpSheet, WhichKey } from './components/WhichKey'
 
-type Tab = 'board' | 'notes' | 'files' | 'activity' | 'archive'
+type Tab = 'board' | 'notes' | 'files' | 'git' | 'activity' | 'archive'
 type View = { kind: 'home' } | { kind: 'project'; id: number; tab: Tab }
 
-const TABS: Tab[] = ['board', 'notes', 'files', 'activity', 'archive']
+const TABS: Tab[] = ['board', 'notes', 'files', 'git', 'activity', 'archive']
 
 const GLOBAL_ACTIONS = [
   'palette.open', 'help.toggle', 'panel.close', 'go.home', 'project.pick', 'project.new', 'project.archive',
-  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'view.archive',
+  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'view.archive', 'view.git',
 ]
 
 export default function App() {
@@ -111,6 +112,7 @@ export default function App() {
       'view.files': () => setTab('files'),
       'view.activity': () => setTab('activity'),
       'view.archive': () => setTab('archive'),
+      'view.git': () => setTab('git'),
       'settings.open': () => setSettings(true),
       'task.new': () => {
         if (!projectId) {
@@ -184,6 +186,7 @@ export default function App() {
             {view.tab === 'files' && <FilesView projectId={activeBoard.project.id} />}
             {view.tab === 'activity' && <ActivityView projectId={activeBoard.project.id} />}
             {view.tab === 'archive' && <ArchiveView projectId={activeBoard.project.id} />}
+            {view.tab === 'git' && <GitView projectId={activeBoard.project.id} onOpenTask={setTaskId} />}
             {taskId !== null && (
               <TaskPanel key={taskId} taskId={taskId} statuses={activeBoard.statuses} onClose={() => setTaskId(null)} />
             )}

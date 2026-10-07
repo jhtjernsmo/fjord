@@ -118,6 +118,17 @@ const MIGRATIONS: &[&str] = &[
         DELETE FROM search_fts WHERE kind = 'file' AND ref_id = old.id;
     END;
     "#,
+    // v2: link projects to a git repository; remember each task's branch
+    r#"
+    CREATE TABLE project_repos (
+        project_id   INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+        path         TEXT NOT NULL,
+        github_owner TEXT,
+        github_repo  TEXT,
+        auto_move    INTEGER NOT NULL DEFAULT 1
+    );
+    ALTER TABLE tasks ADD COLUMN branch TEXT;
+    "#,
 ];
 
 pub fn configure(conn: &Connection) -> Result<()> {

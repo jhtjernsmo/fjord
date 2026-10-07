@@ -72,6 +72,8 @@ pub struct Task {
     pub created_at: String,
     pub updated_at: String,
     pub archived_at: Option<String>,
+    /// Git branch started for this task, if the project is linked to a repo.
+    pub branch: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -133,6 +135,17 @@ mod tests {
             ("", Some("💸"))
         );
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProjectRepo {
+    pub project_id: i64,
+    /// Absolute path to the repository's working tree.
+    pub path: String,
+    pub github_owner: Option<String>,
+    pub github_repo: Option<String>,
+    /// Move tasks along the board when branches/PRs change.
+    pub auto_move: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

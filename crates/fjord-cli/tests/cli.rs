@@ -166,3 +166,62 @@ fn mcp_server_speaks_json_rpc_over_stdio() {
     drop(stdin);
     assert!(child.wait().unwrap().success());
 }
+
+#[test]
+fn git_link_branch_and_status() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path().join("data");
+    let repo = dir.path().join("repo");
+    std::fs::create_dir(&repo).unwrap();
+    let git = |args: &[&str]| {
+        assert!(
+            Command::new("git")
+                .arg("-C")
+                .arg(&repo)
+                .args(args)
+                .status()
+                .unwrap()
+                .success()
+        )
+    };
+    git(&["init", "-q", "-b", "main"]);
+    git(&["config", "user.email", "t@example.com"]);
+    git(&["config", "user.name", "T"]);
+    git(&["config", "commit.gpgsign", "false"]);
+    std::fs::write(repo.join("a.txt"), "a").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "init"]);
+    git(&[
+        "remote",
+        "add",
+        "origin",
+        "https://github.com/jhtjernsmo/demo.git",
+    ]);
+
+    ok_json(&d, &["project", "add", "Demo"]);
+    let task = ok_json(&d, &["task", "add", "demo", "Fix push"]);
+    let id = task["id"].as_i64().unwrap().to_string();
+
+    let linked = ok_json(&d, &["git", "link", "demo", repo.to_str().unwrap()]);
+    assert_eq!(
+        (
+            linked["github_owner"].as_str(),
+            linked["github_repo"].as_str()
+        ),
+        (Some("jhtjernsmo"), Some("demo"))
+    );
+
+    let started = ok_json(&d, &["git", "branch", &id]);
+    assert_eq!(started["branch"], format!("fjord/{id}-fix-push"));
+    assert_eq!(started["created"], true);
+
+    let status = ok_json(&d, &["git", "status", "demo"]);
+    assert_eq!(status["current_branch"], format!("fjord/{id}-fix-push"));
+    assert_eq!(status["commits"][0]["subject"], "init");
+
+    ok_json(&d, &["git", "auto-move", "demo", "off"]);
+    ok_json(&d, &["git", "unlink", "demo"]);
+    let unlinked = fjord(&d, &["git", "status", "demo"]);
+    assert!(!unlinked.status.success());
+    assert!(String::from_utf8_lossy(&unlinked.stderr).contains("not linked"));
+}
