@@ -1,10 +1,8 @@
 <div align="center">
 
-```
-  /\    /\
- /  \  /  \
-/    \/    \  fjord
-```
+<img src="docs/icon-256.png" alt="Fjord" width="112" height="112">
+
+# Fjord
 
 **Local-first project management — Linux first, also on Windows & macOS. Built for the keyboard, friendly to the mouse, and open to AI agents.**
 

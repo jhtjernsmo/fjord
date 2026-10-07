@@ -4,6 +4,7 @@ import { useApp } from '../data'
 import { LOCALES } from '../i18n'
 import { displayKeys } from '../keymap'
 import { ProjectGlyph } from './Icons'
+import iconUrl from '../assets/icon.svg'
 
 interface Props {
   projects: ProjectSummary[]
@@ -28,7 +29,7 @@ export function Sidebar({ projects, activeId, onHome, onSelect, onNewProject, on
   return (
     <aside className="sidebar">
       <div className="brand">
-        <span className="brand-mark">◆</span> fjord
+        <img className="brand-icon" src={iconUrl} alt="" width={28} height={28} /> fjord
       </div>
       <button className={`nav-item ${activeId === null ? 'active' : ''}`} onClick={onHome}>
         <House size={16} strokeWidth={1.6} />
