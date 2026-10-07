@@ -225,3 +225,25 @@ fn git_link_branch_and_status() {
     assert!(!unlinked.status.success());
     assert!(String::from_utf8_lossy(&unlinked.stderr).contains("not linked"));
 }
+
+#[test]
+fn delete_requires_confirmation_or_yes() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok_json(d, &["project", "add", "P"]);
+    let t = ok_json(d, &["task", "add", "p", "Gone soon"]);
+    let id = t["id"].as_i64().unwrap().to_string();
+    // stdin isn't a terminal in tests, so without --yes it must refuse.
+    let refused = fjord(d, &["task", "delete", &id]);
+    assert!(!refused.status.success());
+    assert!(String::from_utf8_lossy(&refused.stderr).contains("--yes"));
+    ok_json(d, &["task", "delete", &id, "--yes"]);
+    assert!(!fjord(d, &["task", "show", &id]).status.success());
+    ok_json(d, &["project", "delete", "p", "--yes"]);
+    assert!(
+        ok_json(d, &["project", "ls", "--all"])
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+}

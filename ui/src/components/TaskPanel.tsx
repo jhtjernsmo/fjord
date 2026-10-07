@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
 import { motion } from 'motion/react'
-import { Archive, CircleCheck, ExternalLink, GitBranch, GitPullRequest, X } from 'lucide-react'
+import { Archive, CircleCheck, ExternalLink, GitBranch, GitPullRequest, Trash2, X } from 'lucide-react'
+import { useContextMenus, useEntityActions } from './actions'
 import { api, formatBytes, relativeTime } from '../api'
 import type { Attachment, Status, Task, TaskPatch } from '../api'
 import { useApp, useLive } from '../data'
@@ -14,6 +15,7 @@ const PRIORITY_LEVELS = [0, 1, 2, 3]
 
 export function FileTile({ file, onDetach }: { file: Attachment; onDetach?: () => void }) {
   const { run, t } = useApp()
+  const { fileMenu } = useContextMenus()
   const [preview, setPreview] = useState<string | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -26,7 +28,7 @@ export function FileTile({ file, onDetach }: { file: Attachment; onDetach?: () =
     }
   }, [file.id])
   return (
-    <div className="file">
+    <div className="file" onContextMenu={fileMenu(file)}>
       <button className="thumb" onClick={() => run(api.openAttachment(file.id))} title={t('file.open')}>
         {preview ? <img src={preview} alt={file.original_name} /> : <FileTypeIcon name={file.original_name} />}
       </button>
@@ -57,6 +59,7 @@ interface Props {
 
 export function TaskPanel({ taskId, statuses, onClose }: Props) {
   const { run, t, locale } = useApp()
+  const { deleteTask } = useEntityActions()
   const projectId = statuses[0].project_id
   // undefined while loading, null if the task disappeared (e.g. archived elsewhere).
   const [task] = useLive(async () => (await api.getBoard(projectId)).tasks.find((x) => x.id === taskId) ?? null, [taskId])
@@ -100,6 +103,9 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
           <span className="spacer" />
           <button className="btn ghost" onClick={() => run(api.archiveTask(task.id, true), t('task.archived')).then(onClose)}>
             <Archive size={14} /> {t('task.archive')}
+          </button>
+          <button className="btn danger-ghost" onClick={() => deleteTask(task, onClose)} title={t('menu.delete')} aria-label={t('menu.delete')}>
+            <Trash2 size={14} />
           </button>
           <button className="btn ghost" onClick={onClose} aria-label={t('task.close')}>
             <X size={14} /> <kbd>Esc</kbd>

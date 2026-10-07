@@ -97,8 +97,25 @@ export type Theme = 'system' | 'dark' | 'light'
 export const THEMES: Theme[] = ['system', 'dark', 'light']
 
 export function SettingsDialog({ theme, onTheme, onClose }: { theme: Theme; onTheme: (t: Theme) => void; onClose: () => void }) {
-  const { t, locale, setLocale } = useApp()
+  const { t, locale, setLocale, run, toast, refresh } = useApp()
   const [paths, setPaths] = useState<{ data: string; keymap: string } | null>(null)
+  const [userName, setUserName] = useState('')
+  const [savedName, setSavedName] = useState('')
+  const [rewrite, setRewrite] = useState(true)
+  useEffect(() => {
+    api.actor().then((a) => {
+      setUserName(a)
+      setSavedName(a)
+    })
+  }, [])
+  const saveName = async () => {
+    const name = await run(api.renameUser(userName, rewrite))
+    if (name) {
+      setSavedName(name)
+      toast(t('settings.saved'), 'success')
+      refresh()
+    }
+  }
   useEffect(() => {
     api.dataPaths().then(setPaths).catch(() => setPaths(null))
   }, [])
@@ -111,6 +128,26 @@ export function SettingsDialog({ theme, onTheme, onClose }: { theme: Theme; onTh
             <X size={16} />
           </button>
         </h2>
+        <div className="row">
+          {t('settings.user')}
+          <form
+            className="user-row"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (userName.trim() && userName.trim() !== savedName) saveName()
+            }}
+          >
+            <input className="input grow" value={userName} onChange={(e) => setUserName(e.target.value)} aria-label={t('settings.user')} />
+            <button className="btn primary" disabled={!userName.trim() || userName.trim() === savedName}>
+              {t('settings.save')}
+            </button>
+          </form>
+          <label className="toggle-label">
+            <input type="checkbox" checked={rewrite} onChange={(e) => setRewrite(e.target.checked)} />
+            {t('settings.rewrite')}
+          </label>
+          <span className="hint">{t('settings.userHint')}</span>
+        </div>
         <div className="row">
           {t('settings.theme')}
           <div className="segmented">

@@ -189,6 +189,10 @@ export const api = {
   moveTask: (id: number, statusId: number, beforeTaskId: number | null = null) =>
     invoke<Task>('move_task', { id, statusId, beforeTaskId }),
   archiveTask: (id: number, archived: boolean) => invoke<Task>('archive_task', { id, archived }),
+  deleteTask: (id: number) => invoke<void>('delete_task', { id }),
+  deleteProject: (id: number) => invoke<void>('delete_project', { id }),
+  deleteNote: (id: number) => invoke<void>('delete_note', { id }),
+  renameUser: (name: string, rewriteHistory: boolean) => invoke<string>('rename_user', { name, rewriteHistory }),
   listArchivedTasks: (projectId: number) => invoke<Task[]>('list_archived_tasks', { projectId }),
   createStatus: (projectId: number, name: string, color: string | null, isDone: boolean) =>
     invoke<Status>('create_status', { projectId, name, color, isDone }),

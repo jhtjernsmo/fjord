@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
-import { Paperclip } from 'lucide-react'
+import { Ellipsis, Paperclip } from 'lucide-react'
+import { useContextMenus } from './components/actions'
 import { api } from './api'
 import type { SearchHit } from './api'
 import { useActions, useApp, useLive } from './data'
@@ -31,6 +32,7 @@ const GLOBAL_ACTIONS = [
 
 export default function App() {
   const { run, toast, t, locale, setLocale } = useApp()
+  const { projectMenu } = useContextMenus()
   const [view, setView] = useState<View>({ kind: 'home' })
   const [taskId, setTaskId] = useState<number | null>(null)
   const [palette, setPalette] = useState<PaletteMode | null>(null)
@@ -172,6 +174,14 @@ export default function App() {
                   </button>
                 ))}
               </nav>
+              <button
+                className="icon-btn header-menu"
+                aria-label={t('menu.project')}
+                title={t('menu.project')}
+                onClick={projectMenu(activeBoard.project, { onOpen: () => undefined, onGone: () => setView({ kind: 'home' }) })}
+              >
+                <Ellipsis size={16} />
+              </button>
             </header>
             {view.tab === 'board' && (
               <Board

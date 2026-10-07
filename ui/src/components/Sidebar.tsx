@@ -5,6 +5,7 @@ import { LOCALES } from '../i18n'
 import { displayKeys } from '../keymap'
 import { ProjectGlyph } from './Icons'
 import iconUrl from '../assets/icon.svg'
+import { useContextMenus } from './actions'
 
 interface Props {
   projects: ProjectSummary[]
@@ -24,6 +25,7 @@ export function ProgressRing({ done, total, color }: { done: number; total: numb
 
 export function Sidebar({ projects, activeId, onHome, onSelect, onNewProject, onPalette, onHelp, onSettings }: Props) {
   const { keymap, t, locale, setLocale } = useApp()
+  const { projectMenu } = useContextMenus()
   const keys = (id: string) => displayKeys(keymap.bindings[id], keymap.leader)
   const nextLocale = LOCALES[(LOCALES.findIndex((l) => l.id === locale) + 1) % LOCALES.length]
   return (
@@ -54,6 +56,7 @@ export function Sidebar({ projects, activeId, onHome, onSelect, onNewProject, on
             key={p.id}
             className={`nav-item ${p.id === activeId ? 'active' : ''}`}
             onClick={() => onSelect(p.id)}
+            onContextMenu={projectMenu(p, { onOpen: () => onSelect(p.id), onGone: p.id === activeId ? onHome : undefined })}
             title={p.description || p.name}
           >
             <ProjectGlyph glyph={p.icon} color={p.color} />

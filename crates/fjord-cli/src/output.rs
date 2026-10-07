@@ -61,6 +61,9 @@ fn describe(a: &Activity) -> String {
         "repo.link" => format!("linked “{subject}” to {detail}"),
         "repo.unlink" => format!("unlinked the repository from “{subject}”"),
         "task.branch" => format!("started branch {detail} for “{subject}”"),
+        "task.delete" => format!("deleted “{subject}”"),
+        "project.delete" => format!("deleted project “{subject}”"),
+        "note.delete" => format!("deleted note “{subject}”"),
         other => format!("{other} “{subject}”"),
     }
 }

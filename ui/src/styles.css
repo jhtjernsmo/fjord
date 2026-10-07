@@ -66,8 +66,9 @@ kbd {
 }
 
 /* ---------- layout ---------- */
-.app { display: grid; grid-template-columns: 260px 1fr; height: 100%; }
-.main { display: flex; flex-direction: column; min-width: 0; position: relative; }
+/* Rows are capped at the window height so panels scroll inside instead of growing the page. */
+.app { display: grid; grid-template-columns: 260px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); height: 100vh; overflow: hidden; }
+.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; position: relative; }
 
 /* ---------- sidebar ---------- */
 .sidebar {
@@ -446,3 +447,24 @@ kbd {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .brand-icon { display: block; border-radius: 7px; }
+
+/* ---------- context menus & destructive actions ---------- */
+.sidebar { overflow: hidden; }
+.context-menu { position: fixed; top: 0; z-index: 300; }
+.menu > button.on { background: var(--panel-2); }
+.menu-sep { height: 1px; background: var(--line); margin: 4px 2px; }
+.btn.danger-solid { background: var(--danger); border-color: transparent; color: #fff; font-weight: 600; }
+.btn.danger-solid:hover { box-shadow: 0 8px 22px -10px var(--danger); }
+.btn.danger-ghost { background: transparent; color: var(--danger); border-color: transparent; }
+.btn.danger-ghost:hover { border-color: color-mix(in oklab, var(--danger) 40%, transparent); }
+.show-more { align-self: flex-start; margin-top: 8px; color: var(--muted); font-size: 12.5px; }
+.show-more:hover { color: var(--text); }
+.header-menu { margin-left: 6px; }
+.user-row { display: flex; gap: 8px; }
+.loading-line { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.context-menu { right: auto; width: max-content; max-width: 320px; }
+.menu button[role^='menuitem'] { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; text-align: left; font-size: 13px; width: 100%; }
+.menu button[role^='menuitem']:hover:not(:disabled), .menu button[role^='menuitem'].on { background: var(--panel-2); }
+.menu button[role^='menuitem']:disabled { opacity: 0.4; cursor: default; }
+.menu button[role^='menuitem'].danger { color: var(--danger); }
+.btn:disabled { opacity: 0.45; cursor: default; transform: none; box-shadow: none; }

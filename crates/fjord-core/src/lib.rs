@@ -8,6 +8,7 @@ mod notes;
 mod projects;
 mod repos;
 mod schema;
+mod settings;
 mod statuses;
 mod store;
 mod tasks;

@@ -3,12 +3,13 @@
 mod commands;
 mod git_commands;
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use fjord_core::{Store, default_actor};
 use tauri::Manager;
 
-pub struct AppState(pub Mutex<Store>);
+/// Shared so slow work (git, network) can run on worker threads.
+pub struct AppState(pub Arc<Mutex<Store>>);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -16,8 +17,14 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let store = Store::open(&Store::default_dir(), &default_actor())?;
-            app.manage(AppState(Mutex::new(store)));
+            let mut store = Store::open(&Store::default_dir(), &default_actor())?;
+            // A name chosen in Settings wins over the OS user name ($FJORD_ACTOR still wins over both).
+            if std::env::var_os("FJORD_ACTOR").is_none()
+                && let Some(name) = store.user_name()?
+            {
+                store.set_actor(&name)?;
+            }
+            app.manage(AppState(Arc::new(Mutex::new(store))));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -49,6 +56,10 @@ pub fn run() {
             commands::recent_activity,
             commands::load_keymap,
             commands::data_paths,
+            commands::delete_task,
+            commands::delete_project,
+            commands::delete_note,
+            commands::rename_user,
             git_commands::get_project_repo,
             git_commands::link_repo,
             git_commands::unlink_repo,

@@ -112,6 +112,13 @@ enum ProjectCmd {
     Archive { project: String },
     /// Restore an archived project
     Restore { project: String },
+    /// Permanently delete a project and everything in it
+    Delete {
+        project: String,
+        /// Don't ask for confirmation
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -160,6 +167,13 @@ enum TaskCmd {
     Restore { id: i64 },
     /// List archived tasks of a project
     Archived { project: String },
+    /// Permanently delete a task
+    Delete {
+        id: i64,
+        /// Don't ask for confirmation
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -226,6 +240,22 @@ enum ColumnCmd {
     Remove { project: String, column: String },
 }
 
+/// Asks y/N on the terminal; refuses when stdin isn't interactive.
+fn confirm(question: &str) -> Result<bool> {
+    use std::io::{BufRead, IsTerminal, Write};
+    if !std::io::stdin().is_terminal() {
+        anyhow::bail!("refusing to delete without confirmation; pass --yes");
+    }
+    eprint!("{question} [y/N] ");
+    std::io::stderr().flush()?;
+    let mut answer = String::new();
+    std::io::stdin().lock().read_line(&mut answer)?;
+    Ok(matches!(
+        answer.trim().to_lowercase().as_str(),
+        "y" | "yes" | "j" | "ja"
+    ))
+}
+
 fn main() {
     if let Err(err) = run(Cli::parse()) {
         eprintln!("fjord: {err:#}");
@@ -245,6 +275,14 @@ fn run(cli: Cli) -> Result<()> {
     });
     let mut store =
         Store::open(&dir, &actor).with_context(|| format!("could not open {}", dir.display()))?;
+    // A user name set in the app applies to the CLI too, unless an actor was given explicitly.
+    if cli.actor.is_none()
+        && !is_mcp
+        && std::env::var_os("FJORD_ACTOR").is_none()
+        && let Some(name) = store.user_name()?
+    {
+        store.set_actor(&name)?;
+    }
     let out = output::Printer { json: cli.json };
 
     match cli.command {
@@ -330,6 +368,19 @@ fn project(store: &mut Store, out: &output::Printer, cmd: ProjectCmd) -> Result<
             let p = store.find_project(&project)?;
             out.project(&store.set_project_archived(p.id, false)?)
         }
+        ProjectCmd::Delete { project, yes } => {
+            let p = store.find_project(&project)?;
+            if !yes
+                && !confirm(&format!(
+                    "Permanently delete project «{}» and everything in it?",
+                    p.name
+                ))?
+            {
+                return out.message("Cancelled.");
+            }
+            store.delete_project(p.id)?;
+            out.message("Deleted.")
+        }
     }
 }
 
@@ -394,6 +445,14 @@ fn task(store: &mut Store, out: &output::Printer, cmd: TaskCmd) -> Result<()> {
         }
         TaskCmd::Archive { id } => out.task(&store.set_task_archived(id, true)?),
         TaskCmd::Restore { id } => out.task(&store.set_task_archived(id, false)?),
+        TaskCmd::Delete { id, yes } => {
+            let t = store.get_task(id)?;
+            if !yes && !confirm(&format!("Permanently delete task #{} «{}»?", t.id, t.title))? {
+                return out.message("Cancelled.");
+            }
+            store.delete_task(id)?;
+            out.message("Deleted.")
+        }
         TaskCmd::Archived { project } => {
             let p = store.find_project(&project)?;
             out.tasks(&store.list_archived_tasks(p.id)?)
