@@ -16,6 +16,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let mut store = Store::open(&Store::default_dir(), &default_actor())?;
             // A name chosen in Settings wins over the OS user name ($FJORD_ACTOR still wins over both).

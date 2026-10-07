@@ -95,6 +95,10 @@ cargo install --path crates/fjord-cli  # optional: puts `fjord` on your PATH
 
 For development with hot reload: `npx --prefix ui tauri dev`.
 
+### Updates
+
+From 0.2.1 on, Fjord checks GitHub Releases on startup and offers **Update & restart** (Windows, macOS and the Linux AppImage; `.deb`/`.rpm` update via your package manager). Updates are signed and verified before installing; the check can be turned off in Settings.
+
 ## Keyboard
 
 Press `?` in the app to see every shortcut. Press the leader key (`Space`) and wait a moment to see
