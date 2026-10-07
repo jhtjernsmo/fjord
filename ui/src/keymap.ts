@@ -1,4 +1,4 @@
-// LazyVim-inspired keymap engine: leader key, multi-key sequences, scopes,
+// Keymap engine: leader key, multi-key sequences, scopes,
 // and user overrides from ~/.config/fjord/keymap.json. The mouse always works
 // too — the keyboard is an option, never a requirement.
 
