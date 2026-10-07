@@ -6,7 +6,7 @@ use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
 
 use anyhow::{Context, Result, anyhow, bail};
-use fjord_core::{NewProject, NewTask, Store, TaskPatch};
+use fjord_core::{NewProject, NewTask, Note, Store, TaskPatch, parse_links};
 use serde_json::{Value, json};
 
 const PROTOCOL_VERSION: &str = "2025-06-18";
@@ -148,8 +148,29 @@ fn tool_definitions() -> Vec<Value> {
         tool(
             "add_note",
             "Add a markdown note — to a project, or to the global notespace if project is omitted. Link with [[Project]], [[#12]] (task) or [[Note title]].",
-            json!({ "project": project, "title": { "type": "string" }, "body": { "type": "string" } }),
+            json!({ "project": project, "title": { "type": "string" }, "body": { "type": "string" },
+                    "folder": { "type": "string", "description": "e.g. product/ideas" }, "pinned": { "type": "boolean" } }),
             &["title"],
+        ),
+        tool(
+            "list_notes",
+            "List notes (without bodies; use get_note). project: only that project's notes; free_only: only notespace notes without a project; otherwise all.",
+            json!({ "project": project, "free_only": { "type": "boolean" } }),
+            &[],
+        ),
+        tool(
+            "get_note",
+            "Read a note: markdown body plus its [[links]] resolved to projects/tasks/notes.",
+            json!({ "id": { "type": "integer" } }),
+            &["id"],
+        ),
+        tool(
+            "update_note",
+            "Edit a note. Only given fields change. append adds text to the end of the body. project: id/slug to move into a project, null to move to the notespace.",
+            json!({ "id": { "type": "integer" }, "title": { "type": "string" }, "body": { "type": "string", "description": "Replaces the whole body" },
+                    "append": { "type": "string" }, "folder": { "type": "string", "description": "e.g. product/ideas; empty = none" },
+                    "pinned": { "type": "boolean" }, "project": { "type": ["string", "null"] } }),
+            &["id"],
         ),
         tool(
             "backlinks",
@@ -238,6 +259,43 @@ fn opt_str(args: &Value, key: &str) -> Option<String> {
     args.get(key).and_then(Value::as_str).map(str::to_string)
 }
 
+fn note_summary(n: &Note) -> Value {
+    json!({ "id": n.id, "title": n.title, "project_id": n.project_id, "folder": n.folder,
+            "pinned": n.pinned, "updated_at": n.updated_at })
+}
+
+fn update_note(store: &mut Store, args: &Value) -> Result<Note> {
+    let id = int_arg(args, "id")?;
+    let mut note = store.get_note(id)?;
+    if args.get("title").is_some() || args.get("body").is_some() || args.get("append").is_some() {
+        let title = opt_str(args, "title").unwrap_or(note.title);
+        let mut body = opt_str(args, "body").unwrap_or(note.body_md);
+        if let Some(extra) = opt_str(args, "append") {
+            if !body.is_empty() && !body.ends_with('\n') {
+                body.push('\n');
+            }
+            body.push_str(&extra);
+        }
+        note = store.update_note(id, &title, &body)?;
+    }
+    if let Some(folder) = opt_str(args, "folder") {
+        note = store.set_note_folder(id, &folder)?;
+    }
+    if let Some(pinned) = args.get("pinned").and_then(Value::as_bool) {
+        note = store.set_note_pinned(id, pinned)?;
+    }
+    match args.get("project") {
+        None => {}
+        Some(Value::Null) => note = store.move_note(id, None)?,
+        Some(v) => {
+            let p = v.as_str().context("project must be a string or null")?;
+            let pid = store.find_project(p)?.id;
+            note = store.move_note(id, Some(pid))?;
+        }
+    }
+    Ok(note)
+}
+
 fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
     let value = match name {
         "list_projects" => {
@@ -313,12 +371,39 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
                 Some(p) => Some(store.find_project(&p)?.id),
                 None => None,
             };
-            serde_json::to_value(store.create_note(
+            let mut note = store.create_note(
                 project_id,
                 str_arg(args, "title")?,
                 &opt_str(args, "body").unwrap_or_default(),
-            )?)?
+            )?;
+            if let Some(folder) = opt_str(args, "folder") {
+                note = store.set_note_folder(note.id, &folder)?;
+            }
+            if let Some(true) = args.get("pinned").and_then(Value::as_bool) {
+                note = store.set_note_pinned(note.id, true)?;
+            }
+            serde_json::to_value(note)?
         }
+        "list_notes" => {
+            let notes = match opt_str(args, "project") {
+                Some(p) => store.list_notes(store.find_project(&p)?.id)?,
+                None => store.list_all_notes(
+                    args.get("free_only")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false),
+                )?,
+            };
+            Value::Array(notes.iter().map(note_summary).collect())
+        }
+        "get_note" => {
+            let note = store.get_note(int_arg(args, "id")?)?;
+            let links = parse_links(&note.body_md)
+                .into_iter()
+                .map(|text| Ok(json!({ "text": text, "target": store.resolve_link(&text)? })))
+                .collect::<Result<Vec<_>>>()?;
+            json!({ "note": note, "links": links })
+        }
+        "update_note" => serde_json::to_value(update_note(store, args)?)?,
         "backlinks" => {
             serde_json::to_value(store.backlinks(str_arg(args, "kind")?, int_arg(args, "id")?)?)?
         }
@@ -403,7 +488,7 @@ mod tests {
         );
         let tools =
             handle_line(&mut s, r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#).unwrap();
-        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 18);
+        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 21);
         let unknown = handle_line(&mut s, r#"{"jsonrpc":"2.0","id":3,"method":"nope"}"#).unwrap();
         assert_eq!(unknown["error"]["code"], -32601);
         let bad = handle_line(&mut s, "{not json").unwrap();
@@ -466,6 +551,83 @@ mod tests {
         let cleared = call(&mut s, 3, "update_task", json!({ "id": id, "due": null }));
         assert_eq!(
             cleared["structuredContent"]["result"]["due_at"],
+            Value::Null
+        );
+    }
+
+    #[test]
+    fn agent_reads_and_edits_notespace() {
+        let (mut s, _d) = store();
+        call(&mut s, 1, "create_project", json!({ "name": "Bokost" }));
+        let t = call(
+            &mut s,
+            2,
+            "create_task",
+            json!({ "project": "bokost", "title": "Fix push" }),
+        );
+        let task_id = t["structuredContent"]["result"]["id"].as_i64().unwrap();
+        let n = call(
+            &mut s,
+            3,
+            "add_note",
+            json!({ "title": "Plan", "body": "Work on [[Bokost]]", "folder": "inbox" }),
+        );
+        assert_eq!(n["structuredContent"]["result"]["folder"], "inbox");
+        assert_eq!(n["structuredContent"]["result"]["project_id"], Value::Null);
+        let id = n["structuredContent"]["result"]["id"].as_i64().unwrap();
+
+        let free = call(&mut s, 4, "list_notes", json!({ "free_only": true }));
+        assert_eq!(free["structuredContent"]["result"][0]["title"], "Plan");
+        assert!(
+            free["structuredContent"]["result"][0]
+                .get("body_md")
+                .is_none()
+        );
+
+        let edited = call(
+            &mut s,
+            5,
+            "update_note",
+            json!({ "id": id, "append": format!("- [[#{task_id}]]"), "folder": "work", "pinned": true }),
+        );
+        let note = &edited["structuredContent"]["result"];
+        assert_eq!(
+            note["body_md"],
+            format!("Work on [[Bokost]]\n- [[#{task_id}]]")
+        );
+        assert_eq!(
+            (note["folder"].as_str(), note["pinned"].as_bool()),
+            (Some("work"), Some(true))
+        );
+
+        let read = call(&mut s, 6, "get_note", json!({ "id": id }));
+        let links = &read["structuredContent"]["result"]["links"];
+        assert_eq!(links[0]["target"]["kind"], "project");
+        assert_eq!(links[1]["target"]["id"], task_id);
+        let back = call(
+            &mut s,
+            7,
+            "backlinks",
+            json!({ "kind": "task", "id": task_id }),
+        );
+        assert_eq!(back["structuredContent"]["result"][0]["id"], id);
+
+        call(
+            &mut s,
+            8,
+            "update_note",
+            json!({ "id": id, "project": "bokost" }),
+        );
+        let in_project = call(&mut s, 9, "list_notes", json!({ "project": "bokost" }));
+        assert_eq!(in_project["structuredContent"]["result"][0]["id"], id);
+        let moved_back = call(
+            &mut s,
+            10,
+            "update_note",
+            json!({ "id": id, "project": null }),
+        );
+        assert_eq!(
+            moved_back["structuredContent"]["result"]["project_id"],
             Value::Null
         );
     }
