@@ -157,8 +157,10 @@ Link a project to a repository in the **Git** tab (or `fjord git link <project> 
 - moves a task to done when its PR is merged (on **Sync**), unless you turn auto-move off.
 
 Git runs through your installed `git`, so your config, hooks and credentials apply. GitHub access
-comes from `gh auth login` or `GITHUB_TOKEN`; Fjord never stores a token. Public repositories can be
-read without one.
+(needed for private repositories and opening PRs) comes from, in order: `GITHUB_TOKEN`/`GH_TOKEN`, a
+personal access token connected in **Settings → GitHub**, or `gh auth login`. A connected token is
+checked with GitHub and kept in the OS credential store (Windows Credential Manager, macOS Keychain,
+Secret Service on Linux), never in Fjord's database or files. Public repositories can be read without one.
 
 | | |
 |---|---|

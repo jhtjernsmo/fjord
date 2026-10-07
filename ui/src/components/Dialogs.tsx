@@ -6,6 +6,7 @@ import { LOCALES } from '../i18n'
 import type { MessageKey } from '../i18n'
 import { X } from 'lucide-react'
 import { PROJECT_GLYPHS, ProjectGlyph } from './Icons'
+import { GitHubSettings } from './GitHubSettings'
 import { setUpdateCheckEnabled, updateCheckEnabled, useUpdater } from './Updater'
 
 const COLORS = ['#7c9cff', '#00d4b0', '#3fb950', '#f5a524', '#ff7a1a', '#ff6b6b', '#e86bff', '#a78bfa']
@@ -169,6 +170,7 @@ export function SettingsDialog({ theme, onTheme, onClose }: { theme: Theme; onTh
             ))}
           </div>
         </div>
+        <GitHubSettings />
         <UpdateSettings />
         <div className="row">
           {t('settings.keys')}

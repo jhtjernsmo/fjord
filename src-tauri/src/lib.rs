@@ -80,6 +80,9 @@ pub fn run() {
             git_commands::sync_pull_requests,
             git_commands::open_pull_request,
             git_commands::open_url,
+            git_commands::github_account,
+            git_commands::connect_github,
+            git_commands::disconnect_github,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Fjord");
