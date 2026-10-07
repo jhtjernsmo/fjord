@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
+import { Paperclip } from 'lucide-react'
 import { api } from './api'
 import type { SearchHit } from './api'
 import { useActions, useApp, useLive } from './data'
+import { LOCALES } from './i18n'
+import type { MessageKey } from './i18n'
+import { ProjectGlyph } from './components/Icons'
 import { Board } from './components/Board'
 import { CommandPalette } from './components/CommandPalette'
 import type { PaletteMode } from './components/CommandPalette'
@@ -16,20 +20,15 @@ import { HelpSheet, WhichKey } from './components/WhichKey'
 type Tab = 'board' | 'notes' | 'files' | 'activity'
 type View = { kind: 'home' } | { kind: 'project'; id: number; tab: Tab }
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'board', label: 'Tavle' },
-  { id: 'notes', label: 'Notater' },
-  { id: 'files', label: 'Filer' },
-  { id: 'activity', label: 'Aktivitet' },
-]
+const TABS: Tab[] = ['board', 'notes', 'files', 'activity']
 
 const GLOBAL_ACTIONS = [
   'palette.open', 'help.toggle', 'panel.close', 'go.home', 'project.pick', 'project.new', 'project.archive',
-  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new',
+  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle',
 ]
 
 export default function App() {
-  const { run, toast } = useApp()
+  const { run, toast, t, locale, setLocale } = useApp()
   const [view, setView] = useState<View>({ kind: 'home' })
   const [taskId, setTaskId] = useState<number | null>(null)
   const [palette, setPalette] = useState<PaletteMode | null>(null)
@@ -66,19 +65,19 @@ export default function App() {
       else if (payload.type === 'drop') {
         setDropping(false)
         if (!projectId) {
-          toast('Åpne et prosjekt før du slipper filer', 'info')
+          toast(t('drop.needProject'), 'info')
           return
         }
         const results = await run(api.attachFiles(projectId, taskId, payload.paths))
         const ok = results?.filter((r) => r.attachment).length ?? 0
         results?.filter((r) => r.error).forEach((r) => toast(`${r.path}: ${r.error}`, 'error'))
-        if (ok > 0) toast(`📎 ${ok} fil${ok === 1 ? '' : 'er'} lagt ved`, 'success')
+        if (ok > 0) toast(t('drop.attached', { n: ok }), 'success')
       }
     })
     return () => {
       unlisten.then((fn) => fn())
     }
-  }, [projectId, taskId, run, toast])
+  }, [projectId, taskId, run, toast, t])
 
   const runAction = (id: string) => {
     const actions: Record<string, () => void> = {
@@ -98,7 +97,7 @@ export default function App() {
       'project.new': () => setNewProject(true),
       'project.archive': () => {
         if (!activeBoard) return
-        run(api.archiveProject(activeBoard.project.id, true), `Arkiverte «${activeBoard.project.name}»`)
+        run(api.archiveProject(activeBoard.project.id, true), t('toast.archivedProject', { name: activeBoard.project.name }))
         setView({ kind: 'home' })
       },
       'search.open': () => setPalette('search'),
@@ -108,13 +107,14 @@ export default function App() {
       'view.activity': () => setTab('activity'),
       'task.new': () => {
         if (!projectId) {
-          toast('Velg et prosjekt først', 'info')
+          toast(t('toast.pickProject'), 'info')
           return
         }
         setTaskId(null)
         setView({ kind: 'project', id: projectId, tab: 'board' })
         setQuickAddSignal((n) => n + 1)
       },
+      'lang.toggle': () => setLocale(LOCALES[(LOCALES.findIndex((l) => l.id === locale) + 1) % LOCALES.length].id),
     }
     actions[id]?.()
   }
@@ -151,14 +151,14 @@ export default function App() {
           <>
             <header className="header">
               <h1>
-                <span>{activeBoard.project.icon}</span>
+                <ProjectGlyph glyph={activeBoard.project.icon} color={activeBoard.project.color} size="lg" />
                 {activeBoard.project.name}
               </h1>
               <span className="desc">{activeBoard.project.description}</span>
               <nav className="tabs">
-                {TABS.map((t) => (
-                  <button key={t.id} className={`tab ${view.tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
-                    {t.label}
+                {TABS.map((tab) => (
+                  <button key={tab} className={`tab ${view.tab === tab ? 'active' : ''}`} onClick={() => setTab(tab)}>
+                    {t(`tab.${tab}` as MessageKey)}
                   </button>
                 ))}
               </nav>
@@ -181,7 +181,11 @@ export default function App() {
           </>
         )}
 
-        {dropping && <div className="drop-overlay">📎 Slipp for å legge ved {taskId ? 'oppgaven' : 'prosjektet'}</div>}
+        {dropping && (
+          <div className="drop-overlay">
+            <Paperclip size={22} /> {taskId ? t('drop.task') : t('drop.project')}
+          </div>
+        )}
       </main>
 
       {palette && (
@@ -198,7 +202,7 @@ export default function App() {
         <NewProjectDialog
           onCancel={() => setNewProject(false)}
           onCreate={async (input) => {
-            const p = await run(api.createProject(input), `Opprettet «${input.name}»`)
+            const p = await run(api.createProject(input), t('toast.created', { name: input.name }))
             setNewProject(false)
             if (p) openProject(p.id)
           }}

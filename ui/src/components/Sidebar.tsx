@@ -1,6 +1,9 @@
+import { Command, House, Keyboard, Languages, Plus } from 'lucide-react'
 import type { ProjectSummary } from '../api'
 import { useApp } from '../data'
+import { LOCALES } from '../i18n'
 import { displayKeys } from '../keymap'
+import { ProjectGlyph } from './Icons'
 
 interface Props {
   projects: ProjectSummary[]
@@ -18,28 +21,29 @@ export function ProgressRing({ done, total, color }: { done: number; total: numb
 }
 
 export function Sidebar({ projects, activeId, onHome, onSelect, onNewProject, onPalette, onHelp }: Props) {
-  const { keymap } = useApp()
+  const { keymap, t, locale, setLocale } = useApp()
   const keys = (id: string) => displayKeys(keymap.bindings[id], keymap.leader)
+  const nextLocale = LOCALES[(LOCALES.findIndex((l) => l.id === locale) + 1) % LOCALES.length]
   return (
     <aside className="sidebar">
       <div className="brand">
-        <span className="brand-mark">◆</span> Fjord
+        <span className="brand-mark">◆</span> fjord
       </div>
       <button className={`nav-item ${activeId === null ? 'active' : ''}`} onClick={onHome}>
-        <span>🏠</span>
-        <span className="name">Oversikt</span>
+        <House size={16} strokeWidth={1.6} />
+        <span className="name">{t('app.overview')}</span>
         <kbd>{keys('go.home')}</kbd>
       </button>
       <button className="nav-item" onClick={onPalette}>
-        <span>⌘</span>
-        <span className="name">Kommandoer</span>
+        <Command size={16} strokeWidth={1.6} />
+        <span className="name">{t('app.commands')}</span>
         <kbd>{keys('palette.open')}</kbd>
       </button>
 
       <div className="nav-section">
-        Prosjekter
-        <button onClick={onNewProject} title="Nytt prosjekt" aria-label="Nytt prosjekt">
-          +
+        {t('app.projects')}
+        <button onClick={onNewProject} title={t('app.newProject')} aria-label={t('app.newProject')}>
+          <Plus size={15} />
         </button>
       </div>
       <nav className="project-list">
@@ -50,22 +54,25 @@ export function Sidebar({ projects, activeId, onHome, onSelect, onNewProject, on
             onClick={() => onSelect(p.id)}
             title={p.description || p.name}
           >
-            <span>{p.icon}</span>
+            <ProjectGlyph glyph={p.icon} color={p.color} />
             <span className="name">{p.name}</span>
             {p.overdue_count > 0 && <span className="chip overdue">{p.overdue_count}</span>}
             <ProgressRing done={p.done_count} total={p.task_count} color={p.color} />
           </button>
         ))}
-        {projects.length === 0 && <div className="nav-item">Ingen prosjekter ennå</div>}
+        {projects.length === 0 && <div className="nav-item">{t('app.noProjects')}</div>}
       </nav>
 
       <div className="sidebar-footer">
-        <span>
-          Leder-tast <kbd>{displayKeys('<leader>', keymap.leader)}</kbd>
-        </span>
-        <button className="nav-item" onClick={onHelp} style={{ padding: '4px 0' }}>
-          <span className="name">Alle hurtigtaster</span>
+        <button className="nav-item" onClick={onHelp}>
+          <Keyboard size={15} strokeWidth={1.6} />
+          <span className="name">{t('app.allShortcuts')}</span>
           <kbd>{keys('help.toggle')}</kbd>
+        </button>
+        <button className="nav-item" onClick={() => setLocale(nextLocale.id)} title={t('app.language')}>
+          <Languages size={15} strokeWidth={1.6} />
+          <span className="name">{LOCALES.find((l) => l.id === locale)?.label}</span>
+          <kbd>{keys('lang.toggle')}</kbd>
         </button>
       </div>
     </aside>

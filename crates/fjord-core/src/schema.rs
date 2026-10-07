@@ -13,7 +13,7 @@ const MIGRATIONS: &[&str] = &[
         slug        TEXT NOT NULL UNIQUE,
         description TEXT NOT NULL DEFAULT '',
         color       TEXT NOT NULL DEFAULT '#7c9cff',
-        icon        TEXT NOT NULL DEFAULT '📁',
+        icon        TEXT NOT NULL DEFAULT '>_',
         created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         archived_at TEXT
@@ -75,7 +75,8 @@ const MIGRATIONS: &[&str] = &[
         task_id    INTEGER,
         actor      TEXT NOT NULL,
         action     TEXT NOT NULL,
-        summary    TEXT NOT NULL,
+        subject    TEXT NOT NULL,
+        detail     TEXT,
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     );
     CREATE INDEX activity_project ON activity(project_id, created_at);

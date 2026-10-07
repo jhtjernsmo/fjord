@@ -70,12 +70,13 @@ impl Store {
         project_id: Option<i64>,
         task_id: Option<i64>,
         action: &str,
-        summary: &str,
+        subject: &str,
+        detail: Option<&str>,
     ) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO activity (project_id, task_id, actor, action, summary)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![project_id, task_id, self.actor, action, summary],
+            "INSERT INTO activity (project_id, task_id, actor, action, subject, detail)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![project_id, task_id, self.actor, action, subject, detail],
         )?;
         Ok(())
     }

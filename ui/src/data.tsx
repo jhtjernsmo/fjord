@@ -2,6 +2,8 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { api, errorMessage } from './api'
+import { initialLocale, saveLocale, translator } from './i18n'
+import type { Locale, Translate } from './i18n'
 import { buildKeymap, eventToken, isTypingTarget, match } from './keymap'
 import type { Continuation, KeymapConfig, Scope } from './keymap'
 
@@ -27,6 +29,9 @@ interface AppContextValue {
   register: (id: string, scope: Scope, fn: Handler) => () => void
   pendingKeys: string[]
   whichKey: Continuation[] | null
+  locale: Locale
+  setLocale: (locale: Locale) => void
+  t: Translate
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -43,6 +48,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [keymap, setKeymap] = useState<KeymapConfig>(() => buildKeymap(null))
   const [pendingKeys, setPendingKeys] = useState<string[]>([])
   const [whichKey, setWhichKey] = useState<Continuation[] | null>(null)
+  const [locale, setLocaleState] = useState<Locale>(initialLocale)
+  const t = useMemo(() => translator(locale), [locale])
+  const setLocale = useCallback((next: Locale) => {
+    saveLocale(next)
+    setLocaleState(next)
+  }, [])
   const lastCounter = useRef<number | null>(null)
   const handlers = useRef(new Map<string, { scope: Scope; fn: Handler }[]>())
   const pendingRef = useRef<string[]>([])
@@ -86,6 +97,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const id = window.setInterval(tick, POLL_MS)
     return () => window.clearInterval(id)
   }, [refresh])
+
+  useEffect(() => {
+    document.documentElement.lang = locale
+  }, [locale])
 
   useEffect(() => {
     api
@@ -153,8 +168,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [keymap])
 
   const value = useMemo(
-    () => ({ version, refresh, toast, run, keymap, register, pendingKeys, whichKey }),
-    [version, refresh, toast, run, keymap, register, pendingKeys, whichKey],
+    () => ({ version, refresh, toast, run, keymap, register, pendingKeys, whichKey, locale, setLocale, t }),
+    [version, refresh, toast, run, keymap, register, pendingKeys, whichKey, locale, setLocale, t],
   )
 
   return (

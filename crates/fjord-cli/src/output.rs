@@ -4,7 +4,7 @@ use anyhow::Result;
 use fjord_core::{Activity, Attachment, Note, Project, ProjectSummary, SearchHit, Status, Task};
 use serde::Serialize;
 
-const PRIORITY: [&str; 4] = ["", "↓ lav", "→ middels", "↑ høy"];
+const PRIORITY: [&str; 4] = ["", "↓ low", "→ medium", "↑ high"];
 
 pub struct Printer {
     pub json: bool,
@@ -27,9 +27,31 @@ fn task_line(t: &Task) -> String {
         line.push_str(&format!("  {}", PRIORITY[t.priority as usize]));
     }
     if let Some(due) = &t.due_at {
-        line.push_str(&format!("  📅 {due}"));
+        line.push_str(&format!("  due {due}"));
     }
     line
+}
+
+/// English sentence for an activity entry (the GUI localizes its own).
+fn describe(a: &Activity) -> String {
+    let subject = &a.subject;
+    let detail = a.detail.as_deref().unwrap_or("");
+    match a.action.as_str() {
+        "project.create" => format!("created project “{subject}”"),
+        "project.update" => format!("updated project “{subject}”"),
+        "project.archive" => format!("archived project “{subject}”"),
+        "project.restore" => format!("restored project “{subject}”"),
+        "task.create" => format!("added “{subject}”"),
+        "task.update" => format!("updated “{subject}”"),
+        "task.move" => format!("moved “{subject}” to {detail}"),
+        "task.archive" => format!("archived “{subject}”"),
+        "task.restore" => format!("restored “{subject}”"),
+        "file.attach" => format!("attached “{subject}”"),
+        "file.detach" => format!("removed file “{subject}”"),
+        "note.create" => format!("wrote note “{subject}”"),
+        "note.update" => format!("updated note “{subject}”"),
+        other => format!("{other} “{subject}”"),
+    }
 }
 
 impl Printer {
@@ -38,12 +60,12 @@ impl Printer {
             return print_json(list);
         }
         if list.is_empty() {
-            println!("Ingen prosjekter ennå. Lag et med: fjord project add \"Navn\"");
+            println!("No projects yet. Create one with: fjord project add \"Name\"");
         }
         for s in list {
             let p = &s.project;
-            let archived = if p.archived_at.is_some() { "  (arkivert)" } else { "" };
-            let overdue = if s.overdue_count > 0 { format!("  ⚠ {} forfalt", s.overdue_count) } else { String::new() };
+            let archived = if p.archived_at.is_some() { "  (archived)" } else { "" };
+            let overdue = if s.overdue_count > 0 { format!("  ! {} overdue", s.overdue_count) } else { String::new() };
             println!(
                 "{} {:<24} {} {}/{}{}{}  [{}]",
                 p.icon,
@@ -114,7 +136,7 @@ impl Printer {
         if self.json {
             return print_json(a);
         }
-        println!("📎 #{} {} ({} B)", a.id, a.original_name, a.size);
+        println!("[file] #{} {} ({} B)", a.id, a.original_name, a.size);
         Ok(())
     }
 
@@ -123,7 +145,7 @@ impl Printer {
             return print_json(list);
         }
         if list.is_empty() {
-            println!("Ingen filer.");
+            println!("No files.");
         }
         list.iter().try_for_each(|a| self.attachment(a))
     }
@@ -132,7 +154,7 @@ impl Printer {
         if self.json {
             return print_json(n);
         }
-        println!("📝 #{} {}", n.id, n.title);
+        println!("[note] #{} {}", n.id, n.title);
         Ok(())
     }
 
@@ -141,13 +163,13 @@ impl Printer {
             return print_json(hits);
         }
         if hits.is_empty() {
-            println!("Ingen treff.");
+            println!("No matches.");
         }
         for h in hits {
             let icon = match h.kind.as_str() {
-                "task" => "☐",
-                "note" => "📝",
-                _ => "📎",
+                "task" => "[task]",
+                "note" => "[note]",
+                _ => "[file]",
             };
             println!("{icon} #{} {}  {}", h.ref_id, h.title, h.snippet);
         }
@@ -159,9 +181,8 @@ impl Printer {
             return print_json(list);
         }
         for a in list {
-            let who = if a.actor == "claude" { "🤖 claude" } else { a.actor.as_str() };
             let when = a.created_at.get(..16).unwrap_or(&a.created_at).replace('T', " ");
-            println!("{when}  {who} {}", a.summary);
+            println!("{when}  {} {}", a.actor, describe(a));
         }
         Ok(())
     }

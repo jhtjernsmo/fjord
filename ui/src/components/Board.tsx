@@ -13,9 +13,12 @@ import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import confetti from 'canvas-confetti'
-import { api, isOverdue, PRIORITIES } from '../api'
+import { AlignLeft, CalendarDays } from 'lucide-react'
+import { api, isOverdue } from '../api'
 import type { Board as BoardData, Status, Task } from '../api'
 import { useActions, useApp } from '../data'
+import type { MessageKey } from '../i18n'
+import { AgentTag } from './Icons'
 
 const PRIORITY_ICON = ['', '↓', '→', '↑']
 const DRAG_ACTIVATION_PX = 5
@@ -54,24 +57,34 @@ function TaskCard({ task, statuses, cursor, onOpen }: { task: Task; statuses: St
 }
 
 function CardBody({ task, statuses, className = '' }: { task: Task; statuses: Status[]; className?: string }) {
+  const { t } = useApp()
   const done = statuses.find((s) => s.id === task.status_id)?.is_done
+  const priority = t(`priority.${task.priority}` as MessageKey)
   return (
     <div className={`card ${done ? 'done' : ''} ${className}`}>
       {task.created_by === 'claude' && (
-        <span className="agent-badge" title="Laget av Claude">
-          🤖
+        <span className="agent-badge">
+          <AgentTag title={t('board.byAgent')} />
         </span>
       )}
       <div className="card-title">{task.title}</div>
       {(task.priority > 0 || task.due_at || task.body_md) && (
         <div className="card-meta">
           {task.priority > 0 && (
-            <span className={`prio-${task.priority}`} title={`Prioritet: ${PRIORITIES[task.priority]}`}>
-              {PRIORITY_ICON[task.priority]} {PRIORITIES[task.priority]}
+            <span className={`prio-${task.priority}`} title={`${t('task.priority')}: ${priority}`}>
+              {PRIORITY_ICON[task.priority]} {priority}
             </span>
           )}
-          {task.due_at && <span className={`chip ${isOverdue(task, statuses) ? 'overdue' : ''}`}>📅 {task.due_at.slice(5)}</span>}
-          {task.body_md && <span title="Har beskrivelse">≡</span>}
+          {task.due_at && (
+            <span className={`chip ${isOverdue(task, statuses) ? 'overdue' : ''}`}>
+              <CalendarDays size={11} strokeWidth={1.8} /> {task.due_at.slice(5)}
+            </span>
+          )}
+          {task.body_md && (
+            <span title={t('board.hasDescription')}>
+              <AlignLeft size={12} strokeWidth={1.8} />
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -90,6 +103,7 @@ function Column(props: {
   onAdd: (title: string) => void
 }) {
   const { setNodeRef } = useDroppable({ id: `col-${props.status.id}` })
+  const { t } = useApp()
   const [draft, setDraft] = useState('')
   return (
     <section className={`column ${props.focused ? 'focused' : ''} ${props.over ? 'over' : ''}`}>
@@ -118,8 +132,8 @@ function Column(props: {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && (e.currentTarget.blur(), setDraft(''))}
-          placeholder="+ Legg til oppgave"
-          aria-label={`Ny oppgave i ${props.status.name}`}
+          placeholder={t('board.addTask')}
+          aria-label={t('board.newTaskIn', { column: props.status.name })}
         />
       </form>
     </section>
@@ -127,7 +141,7 @@ function Column(props: {
 }
 
 export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysEnabled }: Props) {
-  const { run } = useApp()
+  const { run, t } = useApp()
   const { statuses, tasks } = board
   const columns = useMemo(
     () => statuses.map((s) => ({ status: s, tasks: tasks.filter((t) => t.status_id === s.id) })),
@@ -203,7 +217,7 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
         const target = isDone ? 0 : columns.findIndex((c) => c.status.is_done)
         if (target >= 0) moveToColumn(current, target)
       },
-      'task.archive': () => current && run(api.archiveTask(current.id, true), `Arkiverte «${current.title}»`),
+      'task.archive': () => current && run(api.archiveTask(current.id, true), t('toast.archivedTask', { name: current.title })),
       'task.priority': () => current && run(api.updateTask(current.id, { priority: (current.priority + 1) % 4 })),
   }
   useActions(keysEnabled ? boardActions : {}, 'board')

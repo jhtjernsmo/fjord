@@ -1,31 +1,35 @@
 // Overview: greeting, stats, project cards and activity across all projects.
 import { motion } from 'motion/react'
-import { api, relativeTime } from '../api'
+import { Plus } from 'lucide-react'
+import { api, describeActivity, relativeTime } from '../api'
 import type { Activity, ProjectSummary } from '../api'
-import { useLive } from '../data'
+import { useApp, useLive } from '../data'
+import type { MessageKey } from '../i18n'
+import { AgentTag, ProjectGlyph } from './Icons'
 
-function greeting(): string {
+function greetingKey(): MessageKey {
   const h = new Date().getHours()
-  if (h < 5) return 'God natt'
-  if (h < 10) return 'God morgen'
-  if (h < 18) return 'God dag'
-  return 'God kveld'
+  if (h < 5) return 'greeting.night'
+  if (h < 10) return 'greeting.morning'
+  if (h < 18) return 'greeting.day'
+  return 'greeting.evening'
 }
 
 export function ActivityList({ items, projects }: { items: Activity[]; projects?: ProjectSummary[] }) {
-  if (items.length === 0) return <div className="empty-state">Ingen aktivitet ennå.</div>
+  const { t, locale } = useApp()
+  if (items.length === 0) return <div className="empty-state">{t('activity.none')}</div>
   return (
     <div className="activity">
       {items.map((a) => {
         const project = projects?.find((p) => p.id === a.project_id)
         return (
           <div className="act" key={a.id}>
-            <span className={`who ${a.actor === 'claude' ? 'agent' : ''}`}>{a.actor === 'claude' ? '🤖 claude' : a.actor}</span>
+            <span className="who">{a.actor === 'claude' ? <AgentTag /> : a.actor}</span>
             <span className="what">
-              {a.summary}
-              {project && <> · {project.icon} {project.name}</>}
+              {describeActivity(a, t)}
+              {project && <span className="act-project"> · {project.name}</span>}
             </span>
-            <span className="when">{relativeTime(a.created_at)}</span>
+            <span className="when">{relativeTime(a.created_at, t, locale)}</span>
           </div>
         )
       })}
@@ -41,6 +45,7 @@ interface Props {
 }
 
 export function Home({ actor, projects, onOpen, onNewProject }: Props) {
+  const { t } = useApp()
   const [activity] = useLive(() => api.recentActivity(null, 15), [])
   const open = projects.reduce((n, p) => n + p.task_count - p.done_count, 0)
   const done = projects.reduce((n, p) => n + p.done_count, 0)
@@ -51,36 +56,36 @@ export function Home({ actor, projects, onOpen, onNewProject }: Props) {
     <div className="home">
       <div className="hello">
         <h2>
-          {greeting()}, {name} 👋
+          {t(greetingKey())}, {name}
         </h2>
-        <p>{open === 0 ? 'Ingen åpne oppgaver. Nyt det!' : `Du har ${open} åpne oppgaver fordelt på ${projects.length} prosjekter.`}</p>
+        <p>{open === 0 ? t('home.noOpen') : t('home.open', { open, projects: projects.length })}</p>
       </div>
 
       <div className="stats">
         <div className="stat">
           <div className="n">{projects.length}</div>
-          <div className="l">Aktive prosjekter</div>
+          <div className="l">{t('home.activeProjects')}</div>
         </div>
         <div className="stat">
           <div className="n">{open}</div>
-          <div className="l">Åpne oppgaver</div>
+          <div className="l">{t('home.openTasks')}</div>
         </div>
         <div className="stat">
           <div className="n">{done}</div>
-          <div className="l">Fullført</div>
+          <div className="l">{t('home.completed')}</div>
         </div>
         <div className={`stat ${overdue > 0 ? 'alert' : ''}`}>
           <div className="n">{overdue}</div>
-          <div className="l">Forfalt</div>
+          <div className="l">{t('home.overdue')}</div>
         </div>
       </div>
 
       {projects.length === 0 ? (
         <div className="empty-state">
-          <span className="big">🏔️</span>
-          <div>Velkommen til Fjord! Lag ditt første prosjekt for å komme i gang.</div>
+          <pre className="ascii-logo">{'  /\\    /\\\n /  \\  /  \\\n/    \\/    \\  fjord'}</pre>
+          <div>{t('home.welcome')}</div>
           <button className="btn primary" onClick={onNewProject}>
-            + Nytt prosjekt
+            <Plus size={14} /> {t('app.newProject')}
           </button>
         </div>
       ) : (
@@ -98,7 +103,7 @@ export function Home({ actor, projects, onOpen, onNewProject }: Props) {
                 transition={{ delay: i * 0.04 }}
               >
                 <div className="top">
-                  <span className="icon">{p.icon}</span>
+                  <ProjectGlyph glyph={p.icon} color={p.color} size="lg" />
                   {p.name}
                 </div>
                 <div className="d">{p.description}</div>
@@ -106,10 +111,10 @@ export function Home({ actor, projects, onOpen, onNewProject }: Props) {
                   <div style={{ width: `${pct}%` }} />
                 </div>
                 <div className="foot">
-                  <span>
-                    {p.done_count}/{p.task_count} ferdig
+                  <span>{t('home.done', { done: p.done_count, total: p.task_count })}</span>
+                  <span className={p.overdue_count > 0 ? 'overdue-text' : ''}>
+                    {p.overdue_count > 0 ? `! ${t('home.overdueCount', { n: p.overdue_count })}` : `${pct} %`}
                   </span>
-                  <span>{p.overdue_count > 0 ? `⚠ ${p.overdue_count} forfalt` : `${pct} %`}</span>
                 </div>
               </motion.button>
             )
@@ -119,7 +124,7 @@ export function Home({ actor, projects, onOpen, onNewProject }: Props) {
 
       <div>
         <div className="section-title" style={{ marginBottom: 8 }}>
-          Siste aktivitet
+          {t('home.recent')}
         </div>
         <ActivityList items={activity ?? []} projects={projects} />
       </div>

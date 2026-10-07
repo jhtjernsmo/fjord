@@ -1,6 +1,7 @@
 // Secondary project tabs: notes, files and activity.
 import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
+import { NotebookText, Paperclip, Plus } from 'lucide-react'
 import { api, relativeTime } from '../api'
 import type { Note } from '../api'
 import { useApp, useLive } from '../data'
@@ -8,7 +9,7 @@ import { ActivityList } from './Home'
 import { FileTile } from './TaskPanel'
 
 export function NotesView({ projectId }: { projectId: number }) {
-  const { run } = useApp()
+  const { run, t, locale } = useApp()
   const [notes] = useLive(() => api.listNotes(projectId), [projectId])
   const [activeId, setActiveId] = useState<number | null>(null)
   const active: Note | undefined = notes?.find((n) => n.id === activeId) ?? notes?.[0]
@@ -22,7 +23,7 @@ export function NotesView({ projectId }: { projectId: number }) {
   }, [active?.id, active?.title, active?.body_md])
 
   const create = async () => {
-    const note = await run(api.addNote(projectId, 'Nytt notat', ''))
+    const note = await run(api.addNote(projectId, t('notes.untitled'), ''))
     if (note) {
       setActiveId(note.id)
       setEditing(true)
@@ -35,24 +36,24 @@ export function NotesView({ projectId }: { projectId: number }) {
       <div className="notes">
         <div className="note-list">
           <button className="btn primary" onClick={create}>
-            + Nytt notat
+            <Plus size={14} /> {t('notes.new').replace('+ ', '')}
           </button>
           {(notes ?? []).map((n) => (
             <button key={n.id} className={`nav-item ${n.id === active?.id ? 'active' : ''}`} onClick={() => setActiveId(n.id)}>
-              <span>📝</span>
+              <NotebookText size={15} strokeWidth={1.6} />
               <span className="name">{n.title}</span>
-              <span className="sub" style={{ fontSize: 11, color: 'var(--dim)' }}>
-                {relativeTime(n.updated_at)}
-              </span>
+              <span className="note-time">{relativeTime(n.updated_at, t, locale)}</span>
             </button>
           ))}
         </div>
         {active ? (
           <div className="note-editor">
-            <input className="title-input" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={save} aria-label="Tittel" />
+            <input className="title-input" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={save} aria-label={t('task.title')} />
             <div className="section-title">
-              Innhold
-              <button onClick={() => (editing ? (save(), setEditing(false)) : setEditing(true))}>{editing ? 'Lagre' : 'Rediger'}</button>
+              {t('notes.content')}
+              <button onClick={() => (editing ? (save(), setEditing(false)) : setEditing(true))}>
+                {editing ? t('task.save') : t('task.edit')}
+              </button>
             </div>
             {editing ? (
               <textarea
@@ -68,12 +69,12 @@ export function NotesView({ projectId }: { projectId: number }) {
               />
             ) : (
               <div className={`markdown ${active.body_md ? '' : 'empty'}`} onClick={() => setEditing(true)}>
-                {active.body_md ? <Markdown>{active.body_md}</Markdown> : 'Tomt notat. Klikk for å skrive.'}
+                {active.body_md ? <Markdown>{active.body_md}</Markdown> : t('notes.empty')}
               </div>
             )}
           </div>
         ) : (
-          <div className="empty-state">Ingen notater ennå.</div>
+          <div className="empty-state">{t('notes.none')}</div>
         )}
       </div>
     </div>
@@ -81,12 +82,12 @@ export function NotesView({ projectId }: { projectId: number }) {
 }
 
 export function FilesView({ projectId }: { projectId: number }) {
-  const { run } = useApp()
+  const { run, t } = useApp()
   const [files] = useLive(() => api.listAttachments(projectId), [projectId])
   return (
     <div className="page">
       <div className="dropzone" style={{ marginBottom: 16 }}>
-        Dra filer inn i vinduet for å legge dem ved prosjektet
+        {t('files.dropProject')}
       </div>
       {files && files.length > 0 ? (
         <div className="files">
@@ -96,7 +97,8 @@ export function FilesView({ projectId }: { projectId: number }) {
         </div>
       ) : (
         <div className="empty-state">
-          <span className="big">📎</span>Ingen filer ennå.
+          <Paperclip size={36} strokeWidth={1.2} />
+          {t('files.none')}
         </div>
       )}
     </div>

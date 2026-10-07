@@ -37,7 +37,7 @@ impl Store {
         )?;
         let id = self.conn.last_insert_rowid();
         self.touch_project(project_id)?;
-        self.log(Some(project_id), None, "note.create", &format!("skrev notatet «{title}»"))?;
+        self.log(Some(project_id), None, "note.create", &title, None)?;
         self.get_note(id)
     }
 
@@ -50,7 +50,7 @@ impl Store {
             params![title, body_md, id],
         )?;
         self.touch_project(note.project_id)?;
-        self.log(Some(note.project_id), None, "note.update", &format!("oppdaterte notatet «{title}»"))?;
+        self.log(Some(note.project_id), None, "note.update", &title, None)?;
         self.get_note(id)
     }
 
@@ -102,7 +102,7 @@ impl Store {
     /// Newest first; `project_id = None` gives activity across all projects.
     pub fn recent_activity(&self, project_id: Option<i64>, limit: i64) -> Result<Vec<Activity>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, project_id, task_id, actor, action, summary, created_at FROM activity
+            "SELECT id, project_id, task_id, actor, action, subject, detail, created_at FROM activity
              WHERE ?1 IS NULL OR project_id = ?1 ORDER BY id DESC LIMIT ?2",
         )?;
         let rows = stmt.query_map(params![project_id, limit], |row| {
@@ -112,8 +112,9 @@ impl Store {
                 task_id: row.get(2)?,
                 actor: row.get(3)?,
                 action: row.get(4)?,
-                summary: row.get(5)?,
-                created_at: row.get(6)?,
+                subject: row.get(5)?,
+                detail: row.get(6)?,
+                created_at: row.get(7)?,
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)

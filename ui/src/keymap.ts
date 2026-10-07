@@ -6,42 +6,43 @@ export type Scope = 'global' | 'board'
 
 export interface ActionDef {
   id: string
-  label: string
-  group: string
+  /** i18n group key suffix, e.g. 'board' -> 'group.board' */
+  group: 'general' | 'go' | 'project' | 'search' | 'view' | 'task' | 'board'
   scope: Scope
   keys: string
 }
 
 /** Default bindings. `<leader>` expands to the configured leader key. */
 export const DEFAULT_ACTIONS: ActionDef[] = [
-  { id: 'palette.open', label: 'Kommandopalett', group: 'Generelt', scope: 'global', keys: 'ctrl+k' },
-  { id: 'help.toggle', label: 'Vis hurtigtaster', group: 'Generelt', scope: 'global', keys: '?' },
-  { id: 'panel.close', label: 'Lukk', group: 'Generelt', scope: 'global', keys: 'esc' },
-  { id: 'go.home', label: 'Hjem / oversikt', group: 'Gå til', scope: 'global', keys: '<leader>h' },
-  { id: 'project.pick', label: 'Bytt prosjekt', group: 'Prosjekt', scope: 'global', keys: '<leader>p' },
-  { id: 'project.new', label: 'Nytt prosjekt', group: 'Prosjekt', scope: 'global', keys: '<leader>n' },
-  { id: 'project.archive', label: 'Arkiver prosjekt', group: 'Prosjekt', scope: 'global', keys: '<leader>P a' },
-  { id: 'search.open', label: 'Søk overalt', group: 'Søk', scope: 'global', keys: '<leader>f' },
-  { id: 'view.board', label: 'Tavle', group: 'Visning', scope: 'global', keys: '<leader>b' },
-  { id: 'view.notes', label: 'Notater', group: 'Visning', scope: 'global', keys: '<leader>o' },
-  { id: 'view.files', label: 'Filer', group: 'Visning', scope: 'global', keys: '<leader>F' },
-  { id: 'view.activity', label: 'Aktivitet', group: 'Visning', scope: 'global', keys: '<leader>a' },
-  { id: 'task.new', label: 'Ny oppgave', group: 'Oppgave', scope: 'global', keys: '<leader>t' },
-  { id: 'board.left', label: 'Kolonne til venstre', group: 'Tavle', scope: 'board', keys: 'h' },
-  { id: 'board.right', label: 'Kolonne til høyre', group: 'Tavle', scope: 'board', keys: 'l' },
-  { id: 'board.down', label: 'Neste oppgave', group: 'Tavle', scope: 'board', keys: 'j' },
-  { id: 'board.up', label: 'Forrige oppgave', group: 'Tavle', scope: 'board', keys: 'k' },
-  { id: 'board.first', label: 'Første i kolonnen', group: 'Tavle', scope: 'board', keys: 'g g' },
-  { id: 'board.last', label: 'Siste i kolonnen', group: 'Tavle', scope: 'board', keys: 'G' },
-  { id: 'task.moveLeft', label: 'Flytt oppgave venstre', group: 'Tavle', scope: 'board', keys: 'H' },
-  { id: 'task.moveRight', label: 'Flytt oppgave høyre', group: 'Tavle', scope: 'board', keys: 'L' },
-  { id: 'task.moveDown', label: 'Flytt oppgave ned', group: 'Tavle', scope: 'board', keys: 'J' },
-  { id: 'task.moveUp', label: 'Flytt oppgave opp', group: 'Tavle', scope: 'board', keys: 'K' },
-  { id: 'task.open', label: 'Åpne oppgave', group: 'Tavle', scope: 'board', keys: 'enter' },
-  { id: 'task.newHere', label: 'Ny oppgave i kolonnen', group: 'Tavle', scope: 'board', keys: 'o' },
-  { id: 'task.toggleDone', label: 'Ferdig / ikke ferdig', group: 'Tavle', scope: 'board', keys: 'x' },
-  { id: 'task.archive', label: 'Arkiver oppgave', group: 'Tavle', scope: 'board', keys: 'd d' },
-  { id: 'task.priority', label: 'Bytt prioritet', group: 'Tavle', scope: 'board', keys: 'p' },
+  { id: 'palette.open', group: 'general', scope: 'global', keys: 'ctrl+k' },
+  { id: 'help.toggle', group: 'general', scope: 'global', keys: '?' },
+  { id: 'panel.close', group: 'general', scope: 'global', keys: 'esc' },
+  { id: 'go.home', group: 'go', scope: 'global', keys: '<leader>h' },
+  { id: 'project.pick', group: 'project', scope: 'global', keys: '<leader>p' },
+  { id: 'project.new', group: 'project', scope: 'global', keys: '<leader>n' },
+  { id: 'project.archive', group: 'project', scope: 'global', keys: '<leader>P a' },
+  { id: 'search.open', group: 'search', scope: 'global', keys: '<leader>f' },
+  { id: 'view.board', group: 'view', scope: 'global', keys: '<leader>b' },
+  { id: 'view.notes', group: 'view', scope: 'global', keys: '<leader>o' },
+  { id: 'view.files', group: 'view', scope: 'global', keys: '<leader>F' },
+  { id: 'view.activity', group: 'view', scope: 'global', keys: '<leader>a' },
+  { id: 'task.new', group: 'task', scope: 'global', keys: '<leader>t' },
+  { id: 'lang.toggle', group: 'general', scope: 'global', keys: '<leader>L' },
+  { id: 'board.left', group: 'board', scope: 'board', keys: 'h' },
+  { id: 'board.right', group: 'board', scope: 'board', keys: 'l' },
+  { id: 'board.down', group: 'board', scope: 'board', keys: 'j' },
+  { id: 'board.up', group: 'board', scope: 'board', keys: 'k' },
+  { id: 'board.first', group: 'board', scope: 'board', keys: 'g g' },
+  { id: 'board.last', group: 'board', scope: 'board', keys: 'G' },
+  { id: 'task.moveLeft', group: 'board', scope: 'board', keys: 'H' },
+  { id: 'task.moveRight', group: 'board', scope: 'board', keys: 'L' },
+  { id: 'task.moveDown', group: 'board', scope: 'board', keys: 'J' },
+  { id: 'task.moveUp', group: 'board', scope: 'board', keys: 'K' },
+  { id: 'task.open', group: 'board', scope: 'board', keys: 'enter' },
+  { id: 'task.newHere', group: 'board', scope: 'board', keys: 'o' },
+  { id: 'task.toggleDone', group: 'board', scope: 'board', keys: 'x' },
+  { id: 'task.archive', group: 'board', scope: 'board', keys: 'd d' },
+  { id: 'task.priority', group: 'board', scope: 'board', keys: 'p' },
 ]
 
 export interface KeymapConfig {
@@ -143,6 +144,3 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable
 }
 
-export function actionLabel(id: string): string {
-  return DEFAULT_ACTIONS.find((a) => a.id === id)?.label ?? id
-}

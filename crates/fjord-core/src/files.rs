@@ -92,7 +92,7 @@ impl Store {
         let id = tx.last_insert_rowid();
         tx.commit()?;
         self.touch_project(project_id)?;
-        self.log(Some(project.id), task_id, "file.attach", &format!("la ved filen «{name}»"))?;
+        self.log(Some(project.id), task_id, "file.attach", &name, None)?;
         self.get_attachment(id)
     }
 
@@ -122,7 +122,7 @@ impl Store {
     pub fn detach_file(&mut self, id: i64) -> Result<()> {
         let a = self.get_attachment(id)?;
         self.conn.execute("DELETE FROM attachments WHERE id = ?1", [id])?;
-        self.log(Some(a.project_id), a.task_id, "file.detach", &format!("fjernet filen «{}»", a.original_name))?;
+        self.log(Some(a.project_id), a.task_id, "file.detach", &a.original_name, None)?;
         Ok(())
     }
 }

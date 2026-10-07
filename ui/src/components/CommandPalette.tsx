@@ -1,15 +1,19 @@
-// ⌘K palette with three modes: commands, projects and full-text search.
+// Ctrl+K palette with three modes: commands, projects and full-text search.
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import { ChevronRight, NotebookText, Paperclip, SquareCheck } from 'lucide-react'
 import { api, errorMessage } from '../api'
 import type { ProjectSummary, SearchHit } from '../api'
 import { useApp } from '../data'
+import type { MessageKey } from '../i18n'
 import { DEFAULT_ACTIONS, displayKeys } from '../keymap'
+import { ProjectGlyph } from './Icons'
 
 export type PaletteMode = 'commands' | 'projects' | 'search'
 
 interface Item {
   key: string
-  icon: string
+  icon: ReactNode
   label: string
   sub?: string
   run: () => void
@@ -25,14 +29,23 @@ interface Props {
 }
 
 const SEARCH_DEBOUNCE_MS = 120
-const MODE_LABEL: Record<PaletteMode, string> = { commands: 'Kommandoer', projects: 'Prosjekter', search: 'Søk i alt' }
-const HIT_ICON: Record<SearchHit['kind'], string> = { task: '☐', note: '📝', file: '📎' }
+const MODE_LABEL: Record<PaletteMode, MessageKey> = {
+  commands: 'palette.commands',
+  projects: 'palette.projects',
+  search: 'palette.search',
+}
+const HIT_ICON: Record<SearchHit['kind'], ReactNode> = {
+  task: <SquareCheck size={15} strokeWidth={1.6} />,
+  note: <NotebookText size={15} strokeWidth={1.6} />,
+  file: <Paperclip size={15} strokeWidth={1.6} />,
+}
+const HIDDEN_COMMANDS = new Set(['palette.open', 'panel.close'])
 
 function fuzzy(text: string, query: string): boolean {
-  const t = text.toLowerCase()
+  const haystack = text.toLowerCase()
   let i = 0
   for (const ch of query.toLowerCase()) {
-    i = t.indexOf(ch, i)
+    i = haystack.indexOf(ch, i)
     if (i < 0) return false
     i++
   }
@@ -40,7 +53,7 @@ function fuzzy(text: string, query: string): boolean {
 }
 
 export function CommandPalette({ mode, projects, onClose, onAction, onProject, onHit }: Props) {
-  const { keymap, toast } = useApp()
+  const { keymap, toast, t } = useApp()
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<SearchHit[]>([])
   const [index, setIndex] = useState(0)
@@ -49,7 +62,10 @@ export function CommandPalette({ mode, projects, onClose, onAction, onProject, o
   useEffect(() => {
     if (mode !== 'search') return
     const id = window.setTimeout(() => {
-      api.search(query).then(setHits).catch((err) => toast(errorMessage(err), 'error'))
+      api
+        .search(query)
+        .then(setHits)
+        .catch((err) => toast(errorMessage(err), 'error'))
     }, SEARCH_DEBOUNCE_MS)
     return () => window.clearTimeout(id)
   }, [mode, query, toast])
@@ -57,12 +73,13 @@ export function CommandPalette({ mode, projects, onClose, onAction, onProject, o
   const items: Item[] = useMemo(() => {
     const projectName = (id: number) => projects.find((p) => p.id === id)?.name ?? ''
     if (mode === 'commands') {
-      return DEFAULT_ACTIONS.filter((a) => a.scope === 'global' && a.id !== 'palette.open' && a.id !== 'panel.close')
-        .filter((a) => fuzzy(`${a.group} ${a.label}`, query))
-        .map((a) => ({
+      return DEFAULT_ACTIONS.filter((a) => a.scope === 'global' && !HIDDEN_COMMANDS.has(a.id))
+        .map((a) => ({ a, label: t(`action.${a.id}` as MessageKey) }))
+        .filter(({ a, label }) => fuzzy(`${t(`group.${a.group}` as MessageKey)} ${label}`, query))
+        .map(({ a, label }) => ({
           key: a.id,
-          icon: '›',
-          label: a.label,
+          icon: <ChevronRight size={15} strokeWidth={1.6} />,
+          label,
           sub: displayKeys(keymap.bindings[a.id], keymap.leader),
           run: () => onAction(a.id),
         }))
@@ -70,16 +87,22 @@ export function CommandPalette({ mode, projects, onClose, onAction, onProject, o
     if (mode === 'projects') {
       return projects
         .filter((p) => fuzzy(p.name, query))
-        .map((p) => ({ key: `p${p.id}`, icon: p.icon, label: p.name, sub: `${p.done_count}/${p.task_count}`, run: () => onProject(p.id) }))
+        .map((p) => ({
+          key: `p${p.id}`,
+          icon: <ProjectGlyph glyph={p.icon} color={p.color} />,
+          label: p.name,
+          sub: `${p.done_count}/${p.task_count}`,
+          run: () => onProject(p.id),
+        }))
     }
     return hits.map((h) => ({
       key: `${h.kind}${h.ref_id}`,
       icon: HIT_ICON[h.kind],
       label: h.title,
-      sub: `${projectName(h.project_id)} ${h.snippet ? `· ${h.snippet}` : ''}`,
+      sub: `${projectName(h.project_id)}${h.snippet ? ` · ${h.snippet}` : ''}`,
       run: () => onHit(h),
     }))
-  }, [mode, query, hits, projects, keymap, onAction, onProject, onHit])
+  }, [mode, query, hits, projects, keymap, onAction, onProject, onHit, t])
 
   useEffect(() => setIndex(0), [query, mode])
   useEffect(() => {
@@ -94,12 +117,12 @@ export function CommandPalette({ mode, projects, onClose, onAction, onProject, o
 
   return (
     <div className="overlay" onMouseDown={onClose}>
-      <div className="palette" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-label={MODE_LABEL[mode]}>
-        <div className="mode">{MODE_LABEL[mode]}</div>
+      <div className="palette" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-label={t(MODE_LABEL[mode])}>
+        <div className="mode">{t(MODE_LABEL[mode])}</div>
         <input
           autoFocus
           value={query}
-          placeholder={mode === 'search' ? 'Søk i oppgaver, notater og filer…' : 'Skriv for å filtrere…'}
+          placeholder={mode === 'search' ? t('palette.searchPlaceholder') : t('palette.filter')}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             const down = e.key === 'ArrowDown' || (e.ctrlKey && (e.key === 'j' || e.key === 'n'))
@@ -116,13 +139,15 @@ export function CommandPalette({ mode, projects, onClose, onAction, onProject, o
         <ul ref={listRef}>
           {items.map((item, i) => (
             <li key={item.key} className={i === index ? 'on' : ''} onMouseEnter={() => setIndex(i)} onClick={() => choose(item)}>
-              <span>{item.icon}</span>
+              <span className="li-icon">{item.icon}</span>
               <span className="label">{item.label}</span>
               {item.sub && <span className="sub">{item.sub}</span>}
             </li>
           ))}
         </ul>
-        {items.length === 0 && <div className="none">{mode === 'search' && !query ? 'Begynn å skrive…' : 'Ingen treff'}</div>}
+        {items.length === 0 && (
+          <div className="none">{mode === 'search' && !query ? t('palette.startTyping') : t('palette.noMatches')}</div>
+        )}
       </div>
     </div>
   )

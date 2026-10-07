@@ -1,5 +1,7 @@
 // Typed wrappers around the Tauri commands in src-tauri/src/commands.rs.
 import { invoke } from '@tauri-apps/api/core'
+import { dateLocale } from './i18n'
+import type { Locale, MessageKey, Translate } from './i18n'
 
 export interface Project {
   id: number
@@ -80,7 +82,8 @@ export interface Activity {
   task_id: number | null
   actor: string
   action: string
-  summary: string
+  subject: string
+  detail: string | null
   created_at: string
 }
 
@@ -94,6 +97,7 @@ export interface SearchHit {
 
 export interface NewProject {
   name: string
+  locale?: string
   description?: string
   color?: string
   icon?: string
@@ -136,8 +140,6 @@ export const api = {
   loadKeymap: () => invoke<unknown>('load_keymap'),
 }
 
-export const PRIORITIES = ['Ingen', 'Lav', 'Middels', 'Høy'] as const
-
 export function errorMessage(err: unknown): string {
   if (typeof err === 'string') return err
   if (err instanceof Error) return err.message
@@ -150,12 +152,17 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-export function relativeTime(iso: string): string {
+export function relativeTime(iso: string, t: Translate, locale: Locale): string {
   const seconds = (Date.now() - new Date(iso).getTime()) / 1000
-  if (seconds < 60) return 'nå nettopp'
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} min siden`
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)} t siden`
-  return new Date(iso).toLocaleDateString('no-NO', { day: 'numeric', month: 'short' })
+  if (seconds < 60) return t('time.now')
+  if (seconds < 3600) return t('time.min', { n: Math.floor(seconds / 60) })
+  if (seconds < 86400) return t('time.hour', { n: Math.floor(seconds / 3600) })
+  return new Date(iso).toLocaleDateString(dateLocale(locale), { day: 'numeric', month: 'short' })
+}
+
+export function describeActivity(a: Activity, t: Translate): string {
+  const key = `act.${a.action}` as MessageKey
+  return t(key, { s: a.subject, d: a.detail ?? '' })
 }
 
 export function todayIso(): string {

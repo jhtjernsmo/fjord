@@ -2,38 +2,32 @@
 import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
 import { motion } from 'motion/react'
-import { api, formatBytes, PRIORITIES, relativeTime } from '../api'
-import type { Attachment, Status } from '../api'
+import { Archive, CircleCheck, X } from 'lucide-react'
+import { api, formatBytes, relativeTime } from '../api'
+import type { Attachment, Status, TaskPatch } from '../api'
 import { useApp, useLive } from '../data'
+import type { MessageKey } from '../i18n'
+import { AgentTag, FileTypeIcon } from './Icons'
 
-const FILE_ICONS: [RegExp, string][] = [
-  [/\.(pdf)$/i, '📕'],
-  [/\.(png|jpe?g|gif|webp|svg)$/i, '🖼️'],
-  [/\.(zip|tar|gz|7z|rar)$/i, '🗜️'],
-  [/\.(mp4|mov|webm|mkv)$/i, '🎬'],
-  [/\.(mp3|wav|flac|ogg)$/i, '🎵'],
-  [/\.(md|txt|rtf)$/i, '📝'],
-  [/\.(js|ts|tsx|rs|py|swift|kt|java|json|html|css)$/i, '💻'],
-]
-
-export function fileIcon(name: string): string {
-  return FILE_ICONS.find(([re]) => re.test(name))?.[1] ?? '📄'
-}
+const PRIORITY_LEVELS = [0, 1, 2, 3]
 
 export function FileTile({ file, onDetach }: { file: Attachment; onDetach?: () => void }) {
-  const { run } = useApp()
+  const { run, t } = useApp()
   const [preview, setPreview] = useState<string | null>(null)
   useEffect(() => {
     let cancelled = false
-    api.previewAttachment(file.id).then((url) => !cancelled && setPreview(url)).catch(() => undefined)
+    api
+      .previewAttachment(file.id)
+      .then((url) => !cancelled && setPreview(url))
+      .catch(() => undefined)
     return () => {
       cancelled = true
     }
   }, [file.id])
   return (
     <div className="file">
-      <button className="thumb" onClick={() => run(api.openAttachment(file.id))} title="Åpne">
-        {preview ? <img src={preview} alt={file.original_name} /> : fileIcon(file.original_name)}
+      <button className="thumb" onClick={() => run(api.openAttachment(file.id))} title={t('file.open')}>
+        {preview ? <img src={preview} alt={file.original_name} /> : <FileTypeIcon name={file.original_name} />}
       </button>
       <div className="meta">
         <div className="fname" title={file.original_name}>
@@ -41,11 +35,11 @@ export function FileTile({ file, onDetach }: { file: Attachment; onDetach?: () =
         </div>
         <div className="sub">
           <span>
-            {formatBytes(file.size)} · {file.added_by === 'claude' ? '🤖' : file.added_by}
+            {formatBytes(file.size)} · {file.added_by === 'claude' ? <AgentTag /> : file.added_by}
           </span>
           {onDetach && (
-            <button onClick={onDetach} title="Fjern fra oppgaven" aria-label="Fjern fil">
-              ✕
+            <button onClick={onDetach} title={t('file.remove')} aria-label={t('file.remove')}>
+              <X size={12} />
             </button>
           )}
         </div>
@@ -61,13 +55,11 @@ interface Props {
 }
 
 export function TaskPanel({ taskId, statuses, onClose }: Props) {
-  const { run } = useApp()
-  const [board] = useLive(async () => {
-    const all = await api.getBoard(statuses[0].project_id)
-    return all.tasks.find((t) => t.id === taskId) ?? null
-  }, [taskId])
-  const [files] = useLive(() => api.listAttachments(statuses[0].project_id, taskId), [taskId])
-  const task = board ?? null
+  const { run, t, locale } = useApp()
+  const projectId = statuses[0].project_id
+  // undefined while loading, null if the task disappeared (e.g. archived elsewhere).
+  const [task] = useLive(async () => (await api.getBoard(projectId)).tasks.find((x) => x.id === taskId) ?? null, [taskId])
+  const [files] = useLive(() => api.listAttachments(projectId, taskId), [taskId])
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [editing, setEditing] = useState(false)
@@ -79,13 +71,15 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, task?.title, task?.body_md])
 
-  if (board === null) {
-    return null
-  }
-  if (!task) return <motion.aside className="panel" initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} />
+  useEffect(() => {
+    if (task === null) onClose()
+  }, [task, onClose])
 
-  const save = (patch: Parameters<typeof api.updateTask>[1]) => run(api.updateTask(task.id, patch))
+  if (!task) return null
+
+  const save = (patch: TaskPatch) => run(api.updateTask(task.id, patch))
   const status = statuses.find((s) => s.id === task.status_id)
+  const creator = task.created_by === 'claude' ? <AgentTag /> : task.created_by
 
   return (
     <>
@@ -95,19 +89,19 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
         initial={{ x: 60, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 420, damping: 36 }}
-        aria-label="Oppgavedetaljer"
+        aria-label={task.title}
       >
         <div className="panel-head">
-          <span>#{task.id}</span>
+          <span className="mono">#{task.id}</span>
           <span>
-            · laget av {task.created_by === 'claude' ? '🤖 claude' : task.created_by} · {relativeTime(task.created_at)}
+            {creator} · {relativeTime(task.created_at, t, locale)}
           </span>
           <span className="spacer" />
-          <button className="btn ghost" onClick={() => run(api.archiveTask(task.id, true), 'Oppgaven er arkivert').then(onClose)}>
-            Arkiver
+          <button className="btn ghost" onClick={() => run(api.archiveTask(task.id, true), t('task.archived')).then(onClose)}>
+            <Archive size={14} /> {t('task.archive')}
           </button>
-          <button className="btn ghost" onClick={onClose} aria-label="Lukk">
-            ✕ <kbd>Esc</kbd>
+          <button className="btn ghost" onClick={onClose} aria-label={t('task.close')}>
+            <X size={14} /> <kbd>Esc</kbd>
           </button>
         </div>
         <div className="panel-body">
@@ -117,16 +111,12 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
             onChange={(e) => setTitle(e.target.value)}
             onBlur={() => title.trim() && title !== task.title && save({ title })}
             onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-            aria-label="Tittel"
+            aria-label={t('task.title')}
           />
 
           <div className="fields">
-            <label>Status</label>
-            <select
-              className="input"
-              value={task.status_id}
-              onChange={(e) => run(api.moveTask(task.id, Number(e.target.value)))}
-            >
+            <label>{t('task.status')}</label>
+            <select className="input" value={task.status_id} onChange={(e) => run(api.moveTask(task.id, Number(e.target.value)))}>
               {statuses.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -134,26 +124,27 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
               ))}
             </select>
 
-            <label>Prioritet</label>
-            <div className="segmented" role="radiogroup" aria-label="Prioritet">
-              {PRIORITIES.map((p, i) => (
-                <button key={p} className={task.priority === i ? 'on' : ''} onClick={() => save({ priority: i })} role="radio" aria-checked={task.priority === i}>
-                  {p}
+            <label>{t('task.priority')}</label>
+            <div className="segmented" role="radiogroup" aria-label={t('task.priority')}>
+              {PRIORITY_LEVELS.map((level) => (
+                <button
+                  key={level}
+                  className={task.priority === level ? 'on' : ''}
+                  onClick={() => save({ priority: level })}
+                  role="radio"
+                  aria-checked={task.priority === level}
+                >
+                  {t(`priority.${level}` as MessageKey)}
                 </button>
               ))}
             </div>
 
-            <label>Frist</label>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input
-                type="date"
-                className="input"
-                value={task.due_at ?? ''}
-                onChange={(e) => save({ due_at: e.target.value || null })}
-              />
+            <label>{t('task.due')}</label>
+            <div className="row-inline">
+              <input type="date" className="input" value={task.due_at ?? ''} onChange={(e) => save({ due_at: e.target.value || null })} />
               {task.due_at && (
                 <button className="btn ghost" onClick={() => save({ due_at: null })}>
-                  Fjern
+                  {t('task.clear')}
                 </button>
               )}
             </div>
@@ -161,9 +152,9 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
 
           <div>
             <div className="section-title">
-              Beskrivelse
+              {t('task.description')}
               <button onClick={() => (editing ? (save({ body_md: body }), setEditing(false)) : setEditing(true))}>
-                {editing ? 'Lagre' : 'Rediger'}
+                {editing ? t('task.save') : t('task.edit')}
               </button>
             </div>
             {editing ? (
@@ -177,28 +168,32 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
                   setEditing(false)
                 }}
                 onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), e.currentTarget.blur())}
-                placeholder="Markdown støttes: **fet**, - lister, `kode` …"
+                placeholder={t('task.descriptionPlaceholder')}
               />
             ) : (
               <div className={`markdown ${task.body_md ? '' : 'empty'}`} onClick={() => setEditing(true)}>
-                {task.body_md ? <Markdown>{task.body_md}</Markdown> : 'Klikk for å legge til en beskrivelse'}
+                {task.body_md ? <Markdown>{task.body_md}</Markdown> : t('task.addDescription')}
               </div>
             )}
           </div>
 
           <div>
-            <div className="section-title">Filer ({files?.length ?? 0})</div>
+            <div className="section-title">{t('task.files', { n: files?.length ?? 0 })}</div>
             <div className="files" style={{ marginTop: 10 }}>
               {(files ?? []).map((f) => (
                 <FileTile key={f.id} file={f} onDetach={() => run(api.detachFile(f.id))} />
               ))}
             </div>
             <div className="dropzone" style={{ marginTop: 10 }}>
-              Dra filer hit for å legge dem ved «{task.title}»
+              {t('task.dropHere', { title: task.title })}
             </div>
           </div>
 
-          {status?.is_done && <div className="chip" style={{ alignSelf: 'flex-start' }}>✅ Ferdig</div>}
+          {status?.is_done && (
+            <div className="chip done-chip">
+              <CircleCheck size={13} /> {t('task.done')}
+            </div>
+          )}
         </div>
       </motion.aside>
     </>

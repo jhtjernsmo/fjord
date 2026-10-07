@@ -9,7 +9,7 @@ use clap::{Parser, Subcommand};
 use fjord_core::{NewProject, NewTask, ProjectPatch, Store, TaskPatch};
 
 #[derive(Parser)]
-#[command(name = "fjord", version, about = "Lokal prosjektstyring — CLI")]
+#[command(name = "fjord", version, about = "Local-first project management — CLI")]
 struct Cli {
     /// Who is making changes (shown in the activity log). Default: $FJORD_ACTOR or $USER.
     #[arg(long, global = true)]
@@ -193,7 +193,8 @@ fn project(store: &mut Store, out: &output::Printer, cmd: ProjectCmd) -> Result<
     match cmd {
         ProjectCmd::List { all } => out.projects(&store.list_projects(all)?),
         ProjectCmd::Add { name, desc, color, icon } => {
-            out.project(&store.create_project(NewProject { name, description: desc, color, icon })?)
+            let locale = std::env::var("LANG").ok();
+            out.project(&store.create_project(NewProject { name, locale, description: desc, color, icon })?)
         }
         ProjectCmd::Show { project } => {
             let p = store.find_project(&project)?;

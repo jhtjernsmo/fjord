@@ -25,6 +25,8 @@ pub struct ProjectSummary {
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct NewProject {
     pub name: String,
+    /// "no"/"nb"/"nn" gives Norwegian column names; anything else English.
+    pub locale: Option<String>,
     #[serde(default)]
     pub description: String,
     pub color: Option<String>,
@@ -143,8 +145,12 @@ pub struct Activity {
     pub project_id: Option<i64>,
     pub task_id: Option<i64>,
     pub actor: String,
+    /// e.g. "task.move"; UIs turn action + subject + detail into a sentence.
     pub action: String,
-    pub summary: String,
+    /// Name of the thing acted on (task title, file name, …).
+    pub subject: String,
+    /// Extra context, e.g. the target status of a move.
+    pub detail: Option<String>,
     pub created_at: String,
 }
 

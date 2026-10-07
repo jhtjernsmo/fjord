@@ -12,7 +12,7 @@ mod tasks;
 
 pub use error::{Error, Result};
 pub use models::*;
-pub use projects::slugify;
+pub use projects::{slugify, status_names};
 pub use store::Store;
 
 #[cfg(test)]

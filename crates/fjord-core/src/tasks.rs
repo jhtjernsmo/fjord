@@ -68,7 +68,7 @@ impl Store {
         )?;
         let id = self.conn.last_insert_rowid();
         self.touch_project(project.id)?;
-        self.log(Some(project.id), Some(id), "task.create", &format!("la til oppgaven «{title}»"))?;
+        self.log(Some(project.id), Some(id), "task.create", &title, None)?;
         self.get_task(id)
     }
 
@@ -108,7 +108,7 @@ impl Store {
             params![title, patch.body_md.unwrap_or(current.body_md), priority, due, id],
         )?;
         self.touch_project(current.project_id)?;
-        self.log(Some(current.project_id), Some(id), "task.update", &format!("oppdaterte «{title}»"))?;
+        self.log(Some(current.project_id), Some(id), "task.update", &title, None)?;
         self.get_task(id)
     }
 
@@ -129,7 +129,7 @@ impl Store {
         let status: String =
             self.conn.query_row("SELECT name FROM statuses WHERE id = ?1", [status_id], |r| r.get(0))?;
         self.touch_project(task.project_id)?;
-        self.log(Some(task.project_id), Some(id), "task.move", &format!("flyttet «{}» til {status}", task.title))?;
+        self.log(Some(task.project_id), Some(id), "task.move", &task.title, Some(&status))?;
         self.get_task(id)
     }
 
@@ -141,9 +141,9 @@ impl Store {
              WHERE id = ?2",
             params![archived, id],
         )?;
-        let verb = if archived { "arkiverte" } else { "gjenopprettet" };
+        let action = if archived { "task.archive" } else { "task.restore" };
         self.touch_project(task.project_id)?;
-        self.log(Some(task.project_id), Some(id), "task.archive", &format!("{verb} «{}»", task.title))?;
+        self.log(Some(task.project_id), Some(id), action, &task.title, None)?;
         self.get_task(id)
     }
 
@@ -250,7 +250,7 @@ mod tests {
         let (mut s, _dir) = store();
         let p = project(&mut s);
         let t = task(&mut s, p, "Ship it");
-        let done = s.find_status(p, "Ferdig").unwrap();
+        let done = s.find_status(p, "Done").unwrap();
         let moved = s.move_task(t.id, done.id, None).unwrap();
         assert_eq!(moved.status_id, done.id);
         let summary = &s.list_projects(false).unwrap()[0];

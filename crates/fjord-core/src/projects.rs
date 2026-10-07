@@ -4,12 +4,19 @@ use crate::error::{Error, Result};
 use crate::models::{NewProject, Project, ProjectPatch, ProjectSummary, Status};
 use crate::store::{Store, require_text};
 
-/// (name, color, is_done) for every new project's board.
-const DEFAULT_STATUSES: &[(&str, &str, bool)] = &[
-    ("Å gjøre", "#8b8f98", false),
-    ("Pågår", "#f5a524", false),
-    ("Ferdig", "#3fb950", true),
-];
+/// (color, is_done) of every new project's columns; names come from `status_names`.
+const DEFAULT_STATUSES: &[(&str, bool)] = &[("#8b8f98", false), ("#f5a524", false), ("#3fb950", true)];
+const DEFAULT_ICON: &str = ">_";
+
+/// Column names for a locale; English unless Norwegian is asked for.
+pub fn status_names(locale: Option<&str>) -> [&'static str; 3] {
+    let lang = locale.unwrap_or("").to_lowercase();
+    if ["no", "nb", "nn"].iter().any(|l| lang.starts_with(l)) {
+        ["Å gjøre", "Pågår", "Ferdig"]
+    } else {
+        ["To do", "In progress", "Done"]
+    }
+}
 
 const PROJECT_COLS: &str =
     "id, name, slug, description, color, icon, created_at, updated_at, archived_at";
@@ -63,11 +70,12 @@ impl Store {
         let tx = self.conn.transaction()?;
         tx.execute(
             "INSERT INTO projects (name, slug, description, color, icon)
-             VALUES (?1, ?2, ?3, coalesce(?4, '#7c9cff'), coalesce(?5, '📁'))",
-            params![name, slug, new.description.trim(), new.color, new.icon],
+             VALUES (?1, ?2, ?3, coalesce(?4, '#7c9cff'), coalesce(?5, ?6))",
+            params![name, slug, new.description.trim(), new.color, new.icon, DEFAULT_ICON],
         )?;
         let id = tx.last_insert_rowid();
-        for (position, (status, color, is_done)) in DEFAULT_STATUSES.iter().enumerate() {
+        let names = status_names(new.locale.as_deref());
+        for (position, ((color, is_done), status)) in DEFAULT_STATUSES.iter().zip(names).enumerate() {
             tx.execute(
                 "INSERT INTO statuses (project_id, name, color, position, is_done)
                  VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -75,7 +83,7 @@ impl Store {
             )?;
         }
         tx.commit()?;
-        self.log(Some(id), None, "project.create", &format!("opprettet prosjektet «{name}»"))?;
+        self.log(Some(id), None, "project.create", &name, None)?;
         self.get_project(id)
     }
 
@@ -159,7 +167,7 @@ impl Store {
                 id
             ],
         )?;
-        self.log(Some(id), None, "project.update", &format!("oppdaterte prosjektet «{name}»"))?;
+        self.log(Some(id), None, "project.update", &name, None)?;
         self.get_project(id)
     }
 
@@ -172,8 +180,8 @@ impl Store {
              WHERE id = ?2",
             params![archived, id],
         )?;
-        let verb = if archived { "arkiverte" } else { "gjenopprettet" };
-        self.log(Some(id), None, "project.archive", &format!("{verb} prosjektet «{}»", project.name))?;
+        let action = if archived { "project.archive" } else { "project.restore" };
+        self.log(Some(id), None, action, &project.name, None)?;
         self.get_project(id)
     }
 
@@ -215,7 +223,8 @@ mod tests {
         assert_eq!(p.name, "Reisly");
         assert_eq!(p.slug, "reisly");
         let statuses = s.list_statuses(p.id).unwrap();
-        assert_eq!(statuses.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), ["Å gjøre", "Pågår", "Ferdig"]);
+        assert_eq!(statuses.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), ["To do", "In progress", "Done"]);
+        assert_eq!(p.icon, ">_");
         assert!(statuses[2].is_done);
         assert_eq!(s.recent_activity(Some(p.id), 10).unwrap()[0].action, "project.create");
     }
@@ -267,7 +276,16 @@ mod tests {
     fn find_status_by_name_is_case_insensitive() {
         let (mut s, _dir) = store();
         let p = s.create_project(NewProject { name: "A".into(), ..Default::default() }).unwrap();
+        assert!(s.find_status(p.id, "done").unwrap().is_done);
+        assert!(s.find_status(p.id, "IN PROGRESS").is_ok());
+    }
+
+    #[test]
+    fn norwegian_locale_gets_norwegian_columns() {
+        let (mut s, _dir) = store();
+        let p = s.create_project(NewProject { name: "A".into(), locale: Some("nb_NO".into()), ..Default::default() }).unwrap();
         assert!(s.find_status(p.id, "ferdig").unwrap().is_done);
         assert!(s.find_status(p.id, "PÅGÅR").is_ok());
+        assert_eq!(status_names(Some("en_US.UTF-8"))[0], "To do");
     }
 }

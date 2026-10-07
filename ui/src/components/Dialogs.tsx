@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import type { NewProject } from '../api'
+import { useApp } from '../data'
+import { PROJECT_GLYPHS, ProjectGlyph } from './Icons'
 
 const COLORS = ['#7c9cff', '#00d4b0', '#3fb950', '#f5a524', '#ff7a1a', '#ff6b6b', '#e86bff', '#a78bfa']
-const ICONS = ['📁', '🚀', '📱', '💸', '✈️', '🎨', '🛠️', '📚', '🧪', '🏔️', '🎮', '💡']
 
 interface Props {
   onCancel: () => void
@@ -10,12 +11,13 @@ interface Props {
 }
 
 export function NewProjectDialog({ onCancel, onCreate }: Props) {
+  const { t, locale } = useApp()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [color, setColor] = useState(COLORS[0])
-  const [icon, setIcon] = useState(ICONS[1])
+  const [icon, setIcon] = useState(PROJECT_GLYPHS[0])
 
-  const submit = () => name.trim() && onCreate({ name: name.trim(), description, color, icon })
+  const submit = () => name.trim() && onCreate({ name: name.trim(), description, color, icon, locale })
 
   return (
     <div className="overlay" onMouseDown={onCancel}>
@@ -28,31 +30,39 @@ export function NewProjectDialog({ onCancel, onCreate }: Props) {
         }}
         onKeyDown={(e) => e.key === 'Escape' && onCancel()}
         role="dialog"
-        aria-label="Nytt prosjekt"
+        aria-label={t('dialog.newProject')}
       >
-        <h2>
-          {icon} Nytt prosjekt
+        <h2 className="dialog-title">
+          <ProjectGlyph glyph={icon} color={color} size="lg" /> {name.trim() || t('dialog.newProject')}
         </h2>
         <label className="row">
-          Navn
-          <input className="input" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="F.eks. Bokost" />
+          {t('dialog.name')}
+          <input className="input" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t('dialog.namePlaceholder')} />
         </label>
         <label className="row">
-          Beskrivelse
-          <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Valgfritt" />
+          {t('dialog.description')}
+          <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('dialog.optional')} />
         </label>
         <div className="row">
-          Ikon
-          <div className="emojis">
-            {ICONS.map((i) => (
-              <button type="button" key={i} className={`emoji ${i === icon ? 'on' : ''}`} onClick={() => setIcon(i)} aria-label={`Ikon ${i}`}>
-                {i}
+          {t('dialog.icon')}
+          <div className="glyph-picker">
+            {PROJECT_GLYPHS.map((g) => (
+              <button type="button" key={g} className={`glyph-option ${g === icon ? 'on' : ''}`} onClick={() => setIcon(g)} aria-label={g}>
+                {g}
               </button>
             ))}
+            <input
+              className="input glyph-custom"
+              maxLength={3}
+              value={PROJECT_GLYPHS.includes(icon) ? '' : icon}
+              onChange={(e) => setIcon(e.target.value || PROJECT_GLYPHS[0])}
+              placeholder="abc"
+              aria-label={t('dialog.icon')}
+            />
           </div>
         </div>
         <div className="row">
-          Farge
+          {t('dialog.color')}
           <div className="swatches">
             {COLORS.map((c) => (
               <button
@@ -61,17 +71,17 @@ export function NewProjectDialog({ onCancel, onCreate }: Props) {
                 className={`swatch ${c === color ? 'on' : ''}`}
                 style={{ background: c }}
                 onClick={() => setColor(c)}
-                aria-label={`Farge ${c}`}
+                aria-label={c}
               />
             ))}
           </div>
         </div>
         <div className="actions">
           <button type="button" className="btn ghost" onClick={onCancel}>
-            Avbryt
+            {t('dialog.cancel')}
           </button>
           <button type="submit" className="btn primary" disabled={!name.trim()}>
-            Opprett <kbd>⏎</kbd>
+            {t('dialog.create')} <kbd>⏎</kbd>
           </button>
         </div>
       </form>
