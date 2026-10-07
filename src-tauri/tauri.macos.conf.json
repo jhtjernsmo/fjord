@@ -1,0 +1,18 @@
+{
+  "app": {
+    "windows": [
+      {
+        "title": "Fjord",
+        "width": 1320,
+        "height": 840,
+        "minWidth": 760,
+        "minHeight": 520,
+        "resizable": true,
+        "dragDropEnabled": true,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      }
+    ]
+  }
+}

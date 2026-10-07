@@ -67,7 +67,7 @@ kbd {
 
 /* ---------- layout ---------- */
 /* Rows are capped at the window height so panels scroll inside instead of growing the page. */
-.app { display: grid; grid-template-columns: 260px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); height: 100vh; overflow: hidden; }
+.app { display: grid; grid-template-columns: 260px minmax(0, 1fr); grid-template-rows: var(--titlebar-h) minmax(0, 1fr); height: 100vh; overflow: hidden; --titlebar-h: 34px; }
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; position: relative; }
 
 /* ---------- sidebar ---------- */
@@ -504,3 +504,17 @@ kbd {
 
 .update-banner { display: flex; align-items: center; gap: 10px; padding: 8px 22px; background: color-mix(in oklab, var(--accent) 14%, var(--bg-2)); border-bottom: 1px solid color-mix(in oklab, var(--accent) 35%, transparent); font-size: 13px; }
 .update-banner .btn { padding: 4px 12px; }
+
+/* ---------- title bar (window frame is drawn by Fjord) ---------- */
+.titlebar { grid-column: 1 / -1; display: grid; grid-template-columns: 260px minmax(0, 1fr); height: var(--titlebar-h); user-select: none; -webkit-user-select: none; }
+.titlebar-side { background: var(--bg-2); border-right: 1px solid var(--line); }
+.titlebar-main { display: flex; align-items: center; min-width: 0; position: relative; }
+.titlebar-title { flex: 1; text-align: center; font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 150px; pointer-events: none; }
+.window-controls { position: absolute; right: 0; top: 0; display: flex; height: var(--titlebar-h); }
+.window-controls button { width: 46px; height: 100%; display: grid; place-items: center; color: var(--muted); border-radius: 0; transition: background .12s, color .12s; }
+.window-controls button:hover { background: var(--panel-2); color: var(--text); }
+.window-controls button.close:hover { background: #c42b1c; color: #fff; }
+.titlebar.mac .titlebar-title { padding: 0 90px; }
+/* The sidebar and main area start below the bar, so they read as one surface with it. */
+.app > .sidebar, .app > .main { grid-row: 2; }
+@media (max-width: 760px) { .titlebar { grid-template-columns: 1fr; } .titlebar-side { display: none; } }
