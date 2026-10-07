@@ -1,11 +1,25 @@
 // Markdown with live [[wiki link]] chips for projects, tasks and notes.
 import { useEffect, useMemo, useState } from 'react'
+import type React from 'react'
 import Markdown, { defaultUrlTransform } from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { CircleCheck, FilePlus2, FolderKanban, NotebookText, Square } from 'lucide-react'
 import { api } from '../api'
 import type { LinkTarget } from '../api'
 import { useApp } from '../data'
 import { useNav } from '../nav'
+
+/** GitHub-flavored markdown: tables, task lists, strikethrough, autolinks. */
+export const MARKDOWN_PLUGINS = [remarkGfm]
+
+/** Wide tables scroll sideways instead of stretching the page. */
+export function ScrollTable({ children }: { children?: React.ReactNode }) {
+  return (
+    <div className="md-table">
+      <table>{children}</table>
+    </div>
+  )
+}
 
 const LINK_RE = /\[\[([^\]\n]+?)\]\]/g
 const SCHEME = 'fjord-link:'
@@ -71,8 +85,10 @@ export function NoteMarkdown({ markdown }: { markdown: string }) {
 
   return (
     <Markdown
+      remarkPlugins={MARKDOWN_PLUGINS}
       urlTransform={(url) => (url.startsWith(SCHEME) ? url : defaultUrlTransform(url))}
       components={{
+        table: ScrollTable,
         a: ({ href, children }) => {
           if (href?.startsWith(SCHEME)) {
             const target = decodeURIComponent(href.slice(SCHEME.length))
