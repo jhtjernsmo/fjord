@@ -4,7 +4,7 @@ import Markdown from 'react-markdown'
 import { motion } from 'motion/react'
 import { Archive, CircleCheck, ExternalLink, GitBranch, GitPullRequest, Trash2, X } from 'lucide-react'
 import { useContextMenus, useEntityActions } from './actions'
-import { api, formatBytes, relativeTime } from '../api'
+import { api, formatBytes, relativeTime, remoteOf } from '../api'
 import type { Attachment, Status, Task, TaskPatch } from '../api'
 import { useApp, useLive } from '../data'
 import type { MessageKey } from '../i18n'
@@ -218,7 +218,7 @@ function GitSection({ task }: { task: Task }) {
   const prs = usePullRequests(task.project_id)
   const [busy, setBusy] = useState(false)
   const pr = prs?.find((p) => p.task_id === task.id)
-  const hasGithub = !!repo?.github_owner
+  const hasGithub = !!remoteOf(repo)
   // Fetch PRs once if nothing has synced this project yet (e.g. Git tab never opened).
   useEffect(() => {
     if (hasGithub && prs === undefined) refreshPullRequests(task.project_id).catch(() => undefined)
@@ -269,7 +269,7 @@ function GitSection({ task }: { task: Task }) {
             </div>
           ) : (
             task.branch &&
-            repo.github_owner && (
+            hasGithub && (
               <div className="row-inline">
                 <button className="btn primary" disabled={busy} onClick={() => openPr(false)}>
                   <GitPullRequest size={14} /> {t('git.openPr')}

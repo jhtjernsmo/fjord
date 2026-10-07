@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use fjord_core::{ProjectRepo, Task};
-use fjord_vcs::{GitOverview, PullRequest, StartedBranch, SyncReport};
+use fjord_vcs::{AzureAccount, GitHubAccount, GitOverview, PullRequest, StartedBranch, SyncReport};
 use tauri::State;
 
 use crate::AppState;
@@ -124,4 +124,38 @@ pub fn open_url(url: String) -> CmdResult<()> {
         return Err("only https links can be opened".into());
     }
     tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
+}
+
+/// The GitHub account Fjord uses (None when not connected).
+#[tauri::command]
+pub async fn github_account() -> CmdResult<Option<GitHubAccount>> {
+    off_thread(fjord_vcs::github_account).await
+}
+
+/// Verifies a personal access token and saves it in the OS credential store.
+#[tauri::command]
+pub async fn connect_github(token: String) -> CmdResult<GitHubAccount> {
+    off_thread(move || fjord_vcs::connect_github(&token)).await
+}
+
+#[tauri::command]
+pub async fn disconnect_github() -> CmdResult<()> {
+    off_thread(fjord_vcs::disconnect_github).await
+}
+
+/// The Azure DevOps identity Fjord uses for an organization (None when not connected).
+#[tauri::command]
+pub async fn azure_account(org: String) -> CmdResult<Option<AzureAccount>> {
+    off_thread(move || fjord_vcs::azure_account(&org)).await
+}
+
+/// Verifies a personal access token for an organization and saves it in the OS credential store.
+#[tauri::command]
+pub async fn connect_azure(org: String, token: String) -> CmdResult<AzureAccount> {
+    off_thread(move || fjord_vcs::connect_azure(&org, &token)).await
+}
+
+#[tauri::command]
+pub async fn disconnect_azure(org: String) -> CmdResult<()> {
+    off_thread(move || fjord_vcs::disconnect_azure(&org)).await
 }

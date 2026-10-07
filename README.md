@@ -157,8 +157,16 @@ Link a project to a repository in the **Git** tab (or `fjord git link <project> 
 - moves a task to done when its PR is merged (on **Sync**), unless you turn auto-move off.
 
 Git runs through your installed `git`, so your config, hooks and credentials apply. GitHub access
-comes from `gh auth login` or `GITHUB_TOKEN`; Fjord never stores a token. Public repositories can be
-read without one.
+(needed for private repositories and opening PRs) comes from, in order: `GITHUB_TOKEN`/`GH_TOKEN`, a
+personal access token connected in **Settings → GitHub**, or `gh auth login`. A connected token is
+checked with GitHub and kept in the OS credential store (Windows Credential Manager, macOS Keychain,
+Secret Service on Linux), never in Fjord's database or files. Public repositories can be read without one.
+
+**Azure DevOps (beta).** Repositories on `dev.azure.com` (and the older `visualstudio.com` URLs) are
+detected the same way and get the same features: pull requests with pipeline status, a branch per
+task, opening PRs from a task, and moving tasks to done when their PR completes. Auth comes from
+`AZURE_DEVOPS_EXT_PAT`, a personal access token per organization in **Settings → Azure DevOps**
+(scopes: Code Read & Write, Build Read; stored in the OS credential store), or `az login`.
 
 | | |
 |---|---|

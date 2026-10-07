@@ -2,17 +2,25 @@
 //! branches from tasks, list pull requests with CI state, open PRs, and move
 //! tasks along the board as their PRs get merged.
 
+pub mod azure;
+pub mod credentials;
 pub mod git;
 pub mod github;
 
 use std::path::Path;
 
-use fjord_core::{ProjectRepo, Store, Task};
+use fjord_core::{ProjectRepo, RemoteHost, Store, Task};
 use serde::Serialize;
 use thiserror::Error;
 
+pub use azure::{
+    AzureAccount, AzureDevOps, azure_account, connect_azure, disconnect_azure, parse_azure_remote,
+};
 pub use git::{Branch, Commit, Git, branch_name_for_task, task_id_from_branch};
-pub use github::{Checks, GitHub, PullRequest, find_token, parse_github_remote};
+pub use github::{
+    Checks, GitHub, GitHubAccount, PullRequest, TokenSource, connect_github, disconnect_github,
+    find_token, github_account, parse_github_remote,
+};
 
 const RECENT_COMMITS: usize = 15;
 
@@ -26,13 +34,19 @@ pub enum VcsError {
     Git(String),
     #[error("invalid branch name «{0}»")]
     InvalidBranch(String),
-    #[error("GitHub is not connected: run `gh auth login` or set GITHUB_TOKEN")]
+    #[error("GitHub is not connected: connect it in Settings (or run `gh auth login`)")]
     NoToken,
+    #[error("credential store: {0}")]
+    Credentials(String),
     #[error("GitHub: {0}")]
     GitHub(String),
+    #[error("Azure DevOps is not connected for «{0}»: add a token in Settings (or run `az login`)")]
+    NoAzureToken(String),
+    #[error("Azure DevOps: {0}")]
+    Azure(String),
     #[error("this project is not linked to a git repository")]
     NotLinked,
-    #[error("the linked repository has no GitHub remote (origin)")]
+    #[error("the linked repository's origin is not on GitHub or Azure DevOps")]
     NoGitHub,
     #[error("task {0} has no branch yet; start one first")]
     NoBranch(i64),
@@ -73,15 +87,25 @@ pub struct SyncReport {
     pub completed: Vec<Task>,
 }
 
-/// Links a project to the repository containing `path` and detects GitHub.
+/// GitHub or Azure DevOps, from a remote URL.
+pub fn detect_host(url: &str) -> Option<RemoteHost> {
+    if let Some((owner, repo)) = parse_github_remote(url) {
+        return Some(RemoteHost::GitHub { owner, repo });
+    }
+    parse_azure_remote(url).map(|(org, project, repo)| RemoteHost::AzureDevOps {
+        org,
+        project,
+        repo,
+    })
+}
+
+/// Links a project to the repository containing `path` and detects where its
+/// pull requests live (GitHub or Azure DevOps).
 pub fn link_repo(store: &mut Store, project_id: i64, path: &Path) -> Result<ProjectRepo> {
     let git = Git::open(path)?;
-    let github = git
-        .remote_url("origin")
-        .and_then(|u| parse_github_remote(&u));
+    let host = git.remote_url("origin").and_then(|u| detect_host(&u));
     let root = git.root().display().to_string();
-    let gh = github.as_ref().map(|(o, r)| (o.as_str(), r.as_str()));
-    Ok(store.set_project_repo(project_id, &root, gh)?)
+    Ok(store.set_project_repo(project_id, &root, host.as_ref())?)
 }
 
 fn linked(store: &Store, project_id: i64) -> Result<(ProjectRepo, Git)> {
@@ -92,10 +116,59 @@ fn linked(store: &Store, project_id: i64) -> Result<(ProjectRepo, Git)> {
     Ok((repo, git))
 }
 
-fn github_for(repo: &ProjectRepo) -> Result<GitHub> {
-    match (&repo.github_owner, &repo.github_repo) {
-        (Some(owner), Some(name)) => Ok(GitHub::new(owner, name, find_token())),
-        _ => Err(VcsError::NoGitHub),
+/// The service hosting a linked repository's pull requests.
+enum Forge {
+    GitHub(GitHub),
+    Azure(AzureDevOps),
+}
+
+impl Forge {
+    fn for_repo(repo: &ProjectRepo) -> Result<Self> {
+        if let (Some(owner), Some(name)) = (&repo.github_owner, &repo.github_repo) {
+            return Ok(Forge::GitHub(GitHub::new(owner, name, find_token())));
+        }
+        if let (Some(org), Some(project), Some(name)) =
+            (&repo.azure_org, &repo.azure_project, &repo.azure_repo)
+        {
+            return Ok(Forge::Azure(AzureDevOps::new(org, project, name)));
+        }
+        Err(VcsError::NoGitHub)
+    }
+
+    fn require_token(&self) -> Result<()> {
+        match self {
+            Forge::GitHub(gh) if !gh.has_token() => Err(VcsError::NoToken),
+            Forge::Azure(az) if !az.has_token() => Err(VcsError::NoAzureToken(az.org().into())),
+            _ => Ok(()),
+        }
+    }
+
+    fn pull_requests(&self) -> Result<Vec<PullRequest>> {
+        match self {
+            Forge::GitHub(gh) => gh.pull_requests(),
+            Forge::Azure(az) => az.pull_requests(),
+        }
+    }
+
+    fn default_branch(&self) -> Result<String> {
+        match self {
+            Forge::GitHub(gh) => gh.default_branch(),
+            Forge::Azure(az) => az.default_branch(),
+        }
+    }
+
+    fn create_pull_request(
+        &self,
+        head: &str,
+        base: &str,
+        title: &str,
+        body: &str,
+        draft: bool,
+    ) -> Result<PullRequest> {
+        match self {
+            Forge::GitHub(gh) => gh.create_pull_request(head, base, title, body, draft),
+            Forge::Azure(az) => az.create_pull_request(head, base, title, body, draft),
+        }
     }
 }
 
@@ -166,7 +239,7 @@ fn link_tasks(
 /// Network only: recent pull requests of a linked repo. Doesn't touch the
 /// store, so callers can run it without holding a database lock.
 pub fn fetch_pull_requests(repo: &ProjectRepo) -> Result<Vec<PullRequest>> {
-    github_for(repo)?.pull_requests()
+    Forge::for_repo(repo)?.pull_requests()
 }
 
 /// Fetches pull requests and applies them (see [`apply_sync`]).
@@ -216,13 +289,11 @@ pub fn open_pull_request(store: &Store, task_id: i64, draft: bool) -> Result<Pul
 pub fn open_pull_request_for(task: &Task, repo: &ProjectRepo, draft: bool) -> Result<PullRequest> {
     let branch = task.branch.clone().ok_or(VcsError::NoBranch(task.id))?;
     let git = Git::open(Path::new(&repo.path))?;
-    let gh = github_for(repo)?;
-    if !gh.has_token() {
-        return Err(VcsError::NoToken);
-    }
+    let forge = Forge::for_repo(repo)?;
+    forge.require_token()?;
     git.push_upstream(&branch)?;
-    let base = gh.default_branch()?;
-    gh.create_pull_request(&branch, &base, &task.title, &pr_body(task), draft)
+    let base = forge.default_branch()?;
+    forge.create_pull_request(&branch, &base, &task.title, &pr_body(task), draft)
 }
 
 fn pr_body(task: &Task) -> String {
@@ -331,6 +402,44 @@ mod tests {
         assert!(ov.branches.iter().any(|b| b.name == "main"));
         assert_eq!(ov.commits[0].subject, "init");
         assert!(!ov.dirty);
+    }
+
+    #[test]
+    fn link_detects_azure_devops_remotes() {
+        let repo = temp_repo();
+        assert!(
+            Command::new("git")
+                .arg("-C")
+                .arg(repo.path())
+                .args([
+                    "remote",
+                    "set-url",
+                    "origin",
+                    "https://contoso@dev.azure.com/contoso/Mobile%20App/_git/bokost"
+                ])
+                .status()
+                .unwrap()
+                .success()
+        );
+        let (mut s, _d) = store();
+        let p = s
+            .create_project(NewProject {
+                name: "Demo".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let linked = link_repo(&mut s, p, repo.path()).unwrap();
+        assert_eq!(linked.github_owner, None);
+        assert_eq!(
+            (
+                linked.azure_org.as_deref(),
+                linked.azure_project.as_deref(),
+                linked.azure_repo.as_deref()
+            ),
+            (Some("contoso"), Some("Mobile App"), Some("bokost"))
+        );
+        assert!(matches!(Forge::for_repo(&linked), Ok(Forge::Azure(_))));
     }
 
     #[test]

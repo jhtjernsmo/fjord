@@ -80,6 +80,35 @@ export interface Note {
   updated_at: string
 }
 
+export interface GitHubAccount {
+  login: string
+  source: 'env' | 'saved' | 'gh_cli'
+  private_repos: boolean
+}
+
+export interface AzureAccount {
+  org: string
+  user: string
+  source: 'env' | 'saved' | 'cli'
+}
+
+/** Where a linked repository's pull requests live, for links and labels. */
+export function remoteOf(repo: ProjectRepo | null | undefined): { kind: 'github' | 'azure'; label: string; url: string } | null {
+  if (!repo) return null
+  if (repo.github_owner && repo.github_repo) {
+    return { kind: 'github', label: `${repo.github_owner}/${repo.github_repo}`, url: `https://github.com/${repo.github_owner}/${repo.github_repo}` }
+  }
+  if (repo.azure_org && repo.azure_project && repo.azure_repo) {
+    const enc = encodeURIComponent
+    return {
+      kind: 'azure',
+      label: `${repo.azure_project}/${repo.azure_repo}`,
+      url: `https://dev.azure.com/${enc(repo.azure_org)}/${enc(repo.azure_project)}/_git/${enc(repo.azure_repo)}`,
+    }
+  }
+  return null
+}
+
 export interface LinkTarget {
   kind: 'project' | 'task' | 'note'
   id: number
@@ -112,6 +141,9 @@ export interface ProjectRepo {
   path: string
   github_owner: string | null
   github_repo: string | null
+  azure_org: string | null
+  azure_project: string | null
+  azure_repo: string | null
   auto_move: boolean
 }
 
@@ -243,6 +275,12 @@ export const api = {
   syncPullRequests: (projectId: number) => invoke<SyncReport>('sync_pull_requests', { projectId }),
   openPullRequest: (taskId: number, draft: boolean) => invoke<PullRequest>('open_pull_request', { taskId, draft }),
   openUrl: (url: string) => invoke<void>('open_url', { url }),
+  githubAccount: () => invoke<GitHubAccount | null>('github_account'),
+  connectGithub: (token: string) => invoke<GitHubAccount>('connect_github', { token }),
+  disconnectGithub: () => invoke<void>('disconnect_github'),
+  azureAccount: (org: string) => invoke<AzureAccount | null>('azure_account', { org }),
+  connectAzure: (org: string, token: string) => invoke<AzureAccount>('connect_azure', { org, token }),
+  disconnectAzure: (org: string) => invoke<void>('disconnect_azure', { org }),
 }
 
 export function errorMessage(err: unknown): string {
