@@ -1,0 +1,169 @@
+// Typed wrappers around the Tauri commands in src-tauri/src/commands.rs.
+import { invoke } from '@tauri-apps/api/core'
+
+export interface Project {
+  id: number
+  name: string
+  slug: string
+  description: string
+  color: string
+  icon: string
+  created_at: string
+  updated_at: string
+  archived_at: string | null
+}
+
+export interface ProjectSummary extends Project {
+  task_count: number
+  done_count: number
+  overdue_count: number
+}
+
+export interface Status {
+  id: number
+  project_id: number
+  name: string
+  color: string
+  position: number
+  is_done: boolean
+}
+
+export interface Task {
+  id: number
+  project_id: number
+  status_id: number
+  title: string
+  body_md: string
+  priority: number
+  due_at: string | null
+  position: number
+  created_by: string
+  created_at: string
+  updated_at: string
+  archived_at: string | null
+}
+
+export interface Board {
+  project: Project
+  statuses: Status[]
+  tasks: Task[]
+}
+
+export interface Attachment {
+  id: number
+  project_id: number
+  task_id: number | null
+  original_name: string
+  sha256: string
+  size: number
+  added_by: string
+  created_at: string
+}
+
+export interface AttachOutcome {
+  path: string
+  attachment: Attachment | null
+  error: string | null
+}
+
+export interface Note {
+  id: number
+  project_id: number
+  title: string
+  body_md: string
+  updated_at: string
+}
+
+export interface Activity {
+  id: number
+  project_id: number | null
+  task_id: number | null
+  actor: string
+  action: string
+  summary: string
+  created_at: string
+}
+
+export interface SearchHit {
+  kind: 'task' | 'note' | 'file'
+  ref_id: number
+  project_id: number
+  title: string
+  snippet: string
+}
+
+export interface NewProject {
+  name: string
+  description?: string
+  color?: string
+  icon?: string
+}
+
+export interface TaskPatch {
+  title?: string
+  body_md?: string
+  priority?: number
+  /** `null` clears the due date; omit to keep it. */
+  due_at?: string | null
+}
+
+export const api = {
+  actor: () => invoke<string>('actor'),
+  changeCounter: () => invoke<number>('change_counter'),
+  listProjects: (includeArchived = false) => invoke<ProjectSummary[]>('list_projects', { includeArchived }),
+  createProject: (input: NewProject) => invoke<Project>('create_project', { input }),
+  updateProject: (id: number, patch: Partial<NewProject>) => invoke<Project>('update_project', { id, patch }),
+  archiveProject: (id: number, archived: boolean) => invoke<Project>('archive_project', { id, archived }),
+  getBoard: (projectId: number) => invoke<Board>('get_board', { projectId }),
+  createTask: (input: { project_id: number; title: string; status_id?: number; priority?: number; due_at?: string }) =>
+    invoke<Task>('create_task', { input }),
+  updateTask: (id: number, patch: TaskPatch) => invoke<Task>('update_task', { id, patch }),
+  moveTask: (id: number, statusId: number, beforeTaskId: number | null = null) =>
+    invoke<Task>('move_task', { id, statusId, beforeTaskId }),
+  archiveTask: (id: number, archived: boolean) => invoke<Task>('archive_task', { id, archived }),
+  listAttachments: (projectId: number, taskId: number | null = null) =>
+    invoke<Attachment[]>('list_attachments', { projectId, taskId }),
+  attachFiles: (projectId: number, taskId: number | null, paths: string[]) =>
+    invoke<AttachOutcome[]>('attach_files', { projectId, taskId, paths }),
+  detachFile: (id: number) => invoke<void>('detach_file', { id }),
+  openAttachment: (id: number) => invoke<void>('open_attachment', { id }),
+  previewAttachment: (id: number) => invoke<string | null>('preview_attachment', { id }),
+  listNotes: (projectId: number) => invoke<Note[]>('list_notes', { projectId }),
+  addNote: (projectId: number, title: string, bodyMd: string) => invoke<Note>('add_note', { projectId, title, bodyMd }),
+  updateNote: (id: number, title: string, bodyMd: string) => invoke<Note>('update_note', { id, title, bodyMd }),
+  search: (query: string) => invoke<SearchHit[]>('search', { query }),
+  recentActivity: (projectId: number | null, limit = 30) => invoke<Activity[]>('recent_activity', { projectId, limit }),
+  loadKeymap: () => invoke<unknown>('load_keymap'),
+}
+
+export const PRIORITIES = ['Ingen', 'Lav', 'Middels', 'Høy'] as const
+
+export function errorMessage(err: unknown): string {
+  if (typeof err === 'string') return err
+  if (err instanceof Error) return err.message
+  return JSON.stringify(err)
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+export function relativeTime(iso: string): string {
+  const seconds = (Date.now() - new Date(iso).getTime()) / 1000
+  if (seconds < 60) return 'nå nettopp'
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min siden`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} t siden`
+  return new Date(iso).toLocaleDateString('no-NO', { day: 'numeric', month: 'short' })
+}
+
+export function todayIso(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+export function isOverdue(task: Task, statuses: Status[]): boolean {
+  if (!task.due_at) return false
+  const done = statuses.find((s) => s.id === task.status_id)?.is_done
+  return !done && task.due_at < todayIso()
+}

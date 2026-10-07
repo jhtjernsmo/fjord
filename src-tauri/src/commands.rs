@@ -1,0 +1,203 @@
+//! Thin command layer: lock the store, call fjord-core, map errors to strings.
+
+use std::path::PathBuf;
+
+use base64::Engine;
+use fjord_core::{
+    Activity, Attachment, NewProject, NewTask, Note, Project, ProjectPatch, ProjectSummary, SearchHit, Status,
+    Store, Task, TaskPatch,
+};
+use serde::Serialize;
+use tauri::State;
+
+use crate::AppState;
+
+const MAX_PREVIEW_BYTES: u64 = 8 * 1024 * 1024;
+const IMAGE_TYPES: &[(&str, &str)] = &[
+    ("png", "image/png"),
+    ("jpg", "image/jpeg"),
+    ("jpeg", "image/jpeg"),
+    ("gif", "image/gif"),
+    ("webp", "image/webp"),
+];
+
+type CmdResult<T> = Result<T, String>;
+
+fn with_store<T>(state: &State<AppState>, f: impl FnOnce(&mut Store) -> fjord_core::Result<T>) -> CmdResult<T> {
+    let mut store = state.0.lock().map_err(|_| "store lock poisoned".to_string())?;
+    f(&mut store).map_err(|e| e.to_string())
+}
+
+#[derive(Serialize)]
+pub struct Board {
+    project: Project,
+    statuses: Vec<Status>,
+    tasks: Vec<Task>,
+}
+
+#[tauri::command]
+pub fn actor(state: State<AppState>) -> CmdResult<String> {
+    with_store(&state, |s| Ok(s.actor().to_string()))
+}
+
+#[tauri::command]
+pub fn change_counter(state: State<AppState>) -> CmdResult<i64> {
+    with_store(&state, |s| s.change_counter())
+}
+
+#[tauri::command]
+pub fn list_projects(state: State<AppState>, include_archived: bool) -> CmdResult<Vec<ProjectSummary>> {
+    with_store(&state, |s| s.list_projects(include_archived))
+}
+
+#[tauri::command]
+pub fn create_project(state: State<AppState>, input: NewProject) -> CmdResult<Project> {
+    with_store(&state, |s| s.create_project(input))
+}
+
+#[tauri::command]
+pub fn update_project(state: State<AppState>, id: i64, patch: ProjectPatch) -> CmdResult<Project> {
+    with_store(&state, |s| s.update_project(id, patch))
+}
+
+#[tauri::command]
+pub fn archive_project(state: State<AppState>, id: i64, archived: bool) -> CmdResult<Project> {
+    with_store(&state, |s| s.set_project_archived(id, archived))
+}
+
+#[tauri::command]
+pub fn get_board(state: State<AppState>, project_id: i64) -> CmdResult<Board> {
+    with_store(&state, |s| {
+        Ok(Board {
+            project: s.get_project(project_id)?,
+            statuses: s.list_statuses(project_id)?,
+            tasks: s.list_tasks(project_id)?,
+        })
+    })
+}
+
+#[tauri::command]
+pub fn create_task(state: State<AppState>, input: NewTask) -> CmdResult<Task> {
+    with_store(&state, |s| s.create_task(input))
+}
+
+#[tauri::command]
+pub fn update_task(state: State<AppState>, id: i64, patch: TaskPatch) -> CmdResult<Task> {
+    with_store(&state, |s| s.update_task(id, patch))
+}
+
+#[tauri::command]
+pub fn move_task(state: State<AppState>, id: i64, status_id: i64, before_task_id: Option<i64>) -> CmdResult<Task> {
+    with_store(&state, |s| s.move_task(id, status_id, before_task_id))
+}
+
+#[tauri::command]
+pub fn archive_task(state: State<AppState>, id: i64, archived: bool) -> CmdResult<Task> {
+    with_store(&state, |s| s.set_task_archived(id, archived))
+}
+
+#[tauri::command]
+pub fn list_attachments(state: State<AppState>, project_id: i64, task_id: Option<i64>) -> CmdResult<Vec<Attachment>> {
+    with_store(&state, |s| s.list_attachments(project_id, task_id))
+}
+
+#[derive(Serialize)]
+pub struct AttachOutcome {
+    path: String,
+    attachment: Option<Attachment>,
+    error: Option<String>,
+}
+
+/// Attaches dropped files; directories and unreadable paths are reported per file, not fatal.
+#[tauri::command]
+pub fn attach_files(
+    state: State<AppState>,
+    project_id: i64,
+    task_id: Option<i64>,
+    paths: Vec<PathBuf>,
+) -> CmdResult<Vec<AttachOutcome>> {
+    with_store(&state, |s| {
+        Ok(paths
+            .iter()
+            .map(|p| match s.attach_file(project_id, task_id, p) {
+                Ok(a) => AttachOutcome { path: p.display().to_string(), attachment: Some(a), error: None },
+                Err(e) => AttachOutcome { path: p.display().to_string(), attachment: None, error: Some(e.to_string()) },
+            })
+            .collect())
+    })
+}
+
+#[tauri::command]
+pub fn detach_file(state: State<AppState>, id: i64) -> CmdResult<()> {
+    with_store(&state, |s| s.detach_file(id))
+}
+
+/// Blobs have no extension, so copy to a temp file with the original name
+/// and let the desktop pick the right app.
+#[tauri::command]
+pub fn open_attachment(state: State<AppState>, id: i64) -> CmdResult<()> {
+    let (blob, attachment) = with_store(&state, |s| Ok((s.attachment_path(id)?, s.get_attachment(id)?)))?;
+    let base = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
+    let dir = base.join("fjord-open");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let safe_name: String = attachment
+        .original_name
+        .chars()
+        .map(|c| if c == '/' || c == '\0' { '_' } else { c })
+        .collect();
+    let target = dir.join(format!("{}-{safe_name}", attachment.id));
+    std::fs::copy(&blob, &target).map_err(|e| e.to_string())?;
+    tauri_plugin_opener::open_path(&target, None::<&str>).map_err(|e| e.to_string())
+}
+
+/// Data URL for small raster images, `None` for everything else.
+#[tauri::command]
+pub fn preview_attachment(state: State<AppState>, id: i64) -> CmdResult<Option<String>> {
+    let (blob, attachment) = with_store(&state, |s| Ok((s.attachment_path(id)?, s.get_attachment(id)?)))?;
+    let ext = attachment.original_name.rsplit('.').next().unwrap_or("").to_lowercase();
+    let Some((_, mime)) = IMAGE_TYPES.iter().find(|(e, _)| *e == ext) else { return Ok(None) };
+    if attachment.size as u64 > MAX_PREVIEW_BYTES {
+        return Ok(None);
+    }
+    let bytes = std::fs::read(blob).map_err(|e| e.to_string())?;
+    Ok(Some(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes))))
+}
+
+#[tauri::command]
+pub fn list_notes(state: State<AppState>, project_id: i64) -> CmdResult<Vec<Note>> {
+    with_store(&state, |s| s.list_notes(project_id))
+}
+
+#[tauri::command]
+pub fn add_note(state: State<AppState>, project_id: i64, title: String, body_md: String) -> CmdResult<Note> {
+    with_store(&state, |s| s.add_note(project_id, &title, &body_md))
+}
+
+#[tauri::command]
+pub fn update_note(state: State<AppState>, id: i64, title: String, body_md: String) -> CmdResult<Note> {
+    with_store(&state, |s| s.update_note(id, &title, &body_md))
+}
+
+#[tauri::command]
+pub fn search(state: State<AppState>, query: String) -> CmdResult<Vec<SearchHit>> {
+    with_store(&state, |s| s.search(&query))
+}
+
+#[tauri::command]
+pub fn recent_activity(state: State<AppState>, project_id: Option<i64>, limit: i64) -> CmdResult<Vec<Activity>> {
+    with_store(&state, |s| s.recent_activity(project_id, limit))
+}
+
+/// User overrides from ~/.config/fjord/keymap.json (raw JSON; merged in the UI).
+#[tauri::command]
+pub fn load_keymap() -> CmdResult<Option<serde_json::Value>> {
+    let base = std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or_else(|| {
+        PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".config")
+    });
+    let path = base.join("fjord").join("keymap.json");
+    match std::fs::read_to_string(&path) {
+        Ok(text) => serde_json::from_str(&text).map(Some).map_err(|e| format!("{}: {e}", path.display())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}

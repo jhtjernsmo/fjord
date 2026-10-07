@@ -1,0 +1,22 @@
+[package]
+name = "fjord-app"
+version = "0.1.0"
+description = "Fjord — local project management for Linux"
+license = "MIT OR Apache-2.0"
+edition = "2024"
+rust-version = "1.90"
+
+[lib]
+name = "fjord_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.1", features = [] }
+
+[dependencies]
+fjord-core = { path = "../crates/fjord-core" }
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+tauri = { version = "2.12.1", features = [] }
+tauri-plugin-opener = "2"
+base64 = "0.22"

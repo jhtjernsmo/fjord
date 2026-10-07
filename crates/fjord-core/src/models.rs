@@ -83,8 +83,37 @@ pub struct TaskPatch {
     pub title: Option<String>,
     pub body_md: Option<String>,
     pub priority: Option<i64>,
-    /// `Some(None)` clears the due date.
+    /// `Some(None)` clears the due date. In JSON: field missing = keep, `null` = clear.
+    #[serde(default, deserialize_with = "present_or_null")]
     pub due_at: Option<Option<String>>,
+}
+
+/// Distinguishes a JSON field that is present (even as `null`) from one that is missing.
+fn present_or_null<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Option<String>>, D::Error> {
+    Option::<String>::deserialize(d).map(Some)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn task_patch_due_missing_keeps_and_null_clears() {
+        let keep: TaskPatch = serde_json::from_str(r#"{"title":"x"}"#).unwrap();
+        let clear: TaskPatch = serde_json::from_str(r#"{"due_at":null}"#).unwrap();
+        let set: TaskPatch = serde_json::from_str(r#"{"due_at":"2026-01-01"}"#).unwrap();
+        assert_eq!(keep.due_at, None);
+        assert_eq!(clear.due_at, Some(None));
+        assert_eq!(set.due_at, Some(Some("2026-01-01".into())));
+    }
+
+    #[test]
+    fn ui_payloads_deserialize_with_defaults() {
+        let task: NewTask = serde_json::from_str(r#"{"project_id":1,"title":"x","status_id":11}"#).unwrap();
+        assert_eq!((task.priority, task.body_md.as_str(), task.status_id), (0, "", Some(11)));
+        let project: NewProject = serde_json::from_str(r##"{"name":"Bokost","color":"#00d4b0","icon":"💸"}"##).unwrap();
+        assert_eq!((project.description.as_str(), project.icon.as_deref()), ("", Some("💸")));
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
