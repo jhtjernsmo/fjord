@@ -10,6 +10,7 @@ import { useApp, useLive } from '../data'
 import type { MessageKey } from '../i18n'
 import { AgentTag, FileTypeIcon } from './Icons'
 import { ChecksIcon, PrStateBadge, refreshPullRequests, usePullRequests } from './GitView'
+import { Backlinks } from './NoteEditor'
 
 const PRIORITY_LEVELS = [0, 1, 2, 3]
 
@@ -197,6 +198,8 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
           </div>
 
           <GitSection task={task} />
+
+          <Backlinks kind="task" id={task.id} />
 
           {status?.is_done && (
             <div className="chip done-chip">

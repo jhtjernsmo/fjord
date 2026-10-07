@@ -1,95 +1,17 @@
 // Secondary project tabs: notes, files and activity.
-import { useEffect, useState } from 'react'
-import Markdown from 'react-markdown'
-import { ArchiveRestore, NotebookText, Paperclip, Plus, Trash2 } from 'lucide-react'
+import { ArchiveRestore, Paperclip, Trash2 } from 'lucide-react'
 import { useContextMenus, useEntityActions } from './actions'
 import { api, relativeTime } from '../api'
-import type { Note } from '../api'
 import { useApp, useLive } from '../data'
 import { ActivityList } from './Home'
+import { Notespace } from './Notespace'
+import type { ProjectSummary } from '../api'
 import { FileTile } from './TaskPanel'
 
-export function NotesView({ projectId }: { projectId: number }) {
-  const { run, t, locale } = useApp()
-  const { noteMenu } = useContextMenus()
-  const { deleteNote } = useEntityActions()
-  const [notes] = useLive(() => api.listNotes(projectId), [projectId])
-  const [activeId, setActiveId] = useState<number | null>(null)
-  const active: Note | undefined = notes?.find((n) => n.id === activeId) ?? notes?.[0]
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
-  const [editing, setEditing] = useState(false)
-
-  useEffect(() => {
-    setTitle(active?.title ?? '')
-    setBody(active?.body_md ?? '')
-  }, [active?.id, active?.title, active?.body_md])
-
-  const create = async () => {
-    const note = await run(api.addNote(projectId, t('notes.untitled'), ''))
-    if (note) {
-      setActiveId(note.id)
-      setEditing(true)
-    }
-  }
-  const save = () => active && title.trim() && run(api.updateNote(active.id, title, body))
-
+export function NotesView({ projectId, projects, selectedId, onSelect }: { projectId: number; projects: ProjectSummary[]; selectedId?: number | null; onSelect?: (id: number | null) => void }) {
   return (
-    <div className="page">
-      <div className="notes">
-        <div className="note-list">
-          <button className="btn primary" onClick={create}>
-            <Plus size={14} /> {t('notes.new').replace('+ ', '')}
-          </button>
-          {(notes ?? []).map((n) => (
-            <button
-              key={n.id}
-              className={`nav-item ${n.id === active?.id ? 'active' : ''}`}
-              onClick={() => setActiveId(n.id)}
-              onContextMenu={noteMenu(n, () => setActiveId(n.id))}
-            >
-              <NotebookText size={15} strokeWidth={1.6} />
-              <span className="name">{n.title}</span>
-              <span className="note-time">{relativeTime(n.updated_at, t, locale)}</span>
-            </button>
-          ))}
-        </div>
-        {active ? (
-          <div className="note-editor">
-            <div className="row-inline">
-              <input className="title-input" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={save} aria-label={t('task.title')} />
-              <button className="btn danger-ghost" onClick={() => deleteNote(active)} title={t('menu.delete')}>
-                <Trash2 size={14} /> {t('menu.delete')}
-              </button>
-            </div>
-            <div className="section-title">
-              {t('notes.content')}
-              <button onClick={() => (editing ? (save(), setEditing(false)) : setEditing(true))}>
-                {editing ? t('task.save') : t('task.edit')}
-              </button>
-            </div>
-            {editing ? (
-              <textarea
-                className="md-editor"
-                style={{ minHeight: 360 }}
-                autoFocus
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                onBlur={() => {
-                  save()
-                  setEditing(false)
-                }}
-              />
-            ) : (
-              <div className={`markdown ${active.body_md ? '' : 'empty'}`} onClick={() => setEditing(true)}>
-                {active.body_md ? <Markdown>{active.body_md}</Markdown> : t('notes.empty')}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="empty-state">{t('notes.none')}</div>
-        )}
-      </div>
+    <div className="page notes-page">
+      <Notespace projectId={projectId} projects={projects} selectedId={selectedId} onSelect={onSelect} />
     </div>
   )
 }

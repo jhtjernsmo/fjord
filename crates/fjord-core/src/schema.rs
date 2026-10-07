@@ -136,6 +136,44 @@ const MIGRATIONS: &[&str] = &[
         value TEXT NOT NULL
     );
     "#,
+    // v4: notespace — notes may live outside projects; [[wiki links]] are indexed
+    r#"
+    CREATE TABLE notes_v4 (
+        id         INTEGER PRIMARY KEY,
+        project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+        title      TEXT NOT NULL,
+        body_md    TEXT NOT NULL DEFAULT '',
+        folder     TEXT NOT NULL DEFAULT '',
+        pinned     INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    );
+    INSERT INTO notes_v4 (id, project_id, title, body_md, created_at, updated_at)
+        SELECT id, project_id, title, body_md, updated_at, updated_at FROM notes;
+    DROP TABLE notes;
+    ALTER TABLE notes_v4 RENAME TO notes;
+
+    CREATE TABLE note_links (
+        note_id   INTEGER NOT NULL,
+        kind      TEXT NOT NULL CHECK (kind IN ('project', 'task', 'note')),
+        target_id INTEGER NOT NULL,
+        PRIMARY KEY (note_id, kind, target_id)
+    );
+    CREATE INDEX note_links_target ON note_links(kind, target_id);
+
+    CREATE TRIGGER notes_ai AFTER INSERT ON notes BEGIN
+        INSERT INTO search_fts(kind, ref_id, project_id, title, body)
+        VALUES ('note', new.id, new.project_id, new.title, new.body_md);
+    END;
+    CREATE TRIGGER notes_au AFTER UPDATE OF title, body_md, project_id ON notes BEGIN
+        UPDATE search_fts SET title = new.title, body = new.body_md, project_id = new.project_id
+        WHERE kind = 'note' AND ref_id = new.id;
+    END;
+    CREATE TRIGGER notes_ad AFTER DELETE ON notes BEGIN
+        DELETE FROM search_fts WHERE kind = 'note' AND ref_id = old.id;
+        DELETE FROM note_links WHERE note_id = old.id;
+    END;
+    "#,
 ];
 
 pub fn configure(conn: &Connection) -> Result<()> {

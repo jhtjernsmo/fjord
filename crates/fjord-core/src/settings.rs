@@ -101,14 +101,10 @@ impl Store {
     pub fn delete_note(&mut self, id: i64) -> Result<()> {
         let note = self.get_note(id)?;
         self.conn.execute("DELETE FROM notes WHERE id = ?1", [id])?;
-        self.touch_project(note.project_id)?;
-        self.log(
-            Some(note.project_id),
-            None,
-            "note.delete",
-            &note.title,
-            None,
-        )?;
+        if let Some(p) = note.project_id {
+            self.touch_project(p)?;
+        }
+        self.log(note.project_id, None, "note.delete", &note.title, None)?;
         Ok(())
     }
 

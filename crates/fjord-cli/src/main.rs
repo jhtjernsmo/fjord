@@ -58,10 +58,11 @@ enum Command {
         #[arg(long)]
         task: Option<i64>,
     },
-    /// Add a note to a project
+    /// Add a note (to a project with --project, else to the notespace)
     Note {
-        project: String,
         title: String,
+        #[arg(long, short)]
+        project: Option<String>,
         #[arg(long, default_value = "")]
         body: String,
     },
@@ -304,12 +305,15 @@ fn run(cli: Cli) -> Result<()> {
             out.attachments(&store.list_attachments(p.id, task)?)
         }
         Command::Note {
-            project,
             title,
+            project,
             body,
         } => {
-            let p = store.find_project(&project)?;
-            out.note(&store.add_note(p.id, &title, &body)?)
+            let project_id = project
+                .map(|p| store.find_project(&p))
+                .transpose()?
+                .map(|p| p.id);
+            out.note(&store.create_note(project_id, &title, &body)?)
         }
         Command::Search { query } => out.search(&store.search(&query.join(" "))?),
         Command::Log { project, limit } => {

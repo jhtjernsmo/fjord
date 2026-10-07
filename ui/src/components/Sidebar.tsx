@@ -1,4 +1,4 @@
-import { Command, House, Keyboard, Languages, Plus, Settings } from 'lucide-react'
+import { Command, House, Keyboard, Languages, NotebookText, Plus, Settings } from 'lucide-react'
 import type { ProjectSummary } from '../api'
 import { useApp } from '../data'
 import { LOCALES } from '../i18n'
@@ -16,6 +16,8 @@ interface Props {
   onPalette: () => void
   onHelp: () => void
   onSettings: () => void
+  onNotes: () => void
+  notesActive: boolean
 }
 
 export function ProgressRing({ done, total, color }: { done: number; total: number; color: string }) {
@@ -23,7 +25,7 @@ export function ProgressRing({ done, total, color }: { done: number; total: numb
   return <span className="ring" style={{ ['--p' as string]: percent, ['--c' as string]: color }} title={`${percent} %`} />
 }
 
-export function Sidebar({ projects, activeId, onHome, onSelect, onNewProject, onPalette, onHelp, onSettings }: Props) {
+export function Sidebar({ projects, activeId, onHome, onSelect, onNewProject, onPalette, onHelp, onSettings, onNotes, notesActive }: Props) {
   const { keymap, t, locale, setLocale } = useApp()
   const { projectMenu } = useContextMenus()
   const keys = (id: string) => displayKeys(keymap.bindings[id], keymap.leader)
@@ -33,10 +35,15 @@ export function Sidebar({ projects, activeId, onHome, onSelect, onNewProject, on
       <div className="brand">
         <img className="brand-icon" src={iconUrl} alt="" width={28} height={28} /> fjord
       </div>
-      <button className={`nav-item ${activeId === null ? 'active' : ''}`} onClick={onHome}>
+      <button className={`nav-item ${activeId === null && !notesActive ? 'active' : ''}`} onClick={onHome}>
         <House size={16} strokeWidth={1.6} />
         <span className="name">{t('app.overview')}</span>
         <kbd>{keys('go.home')}</kbd>
+      </button>
+      <button className={`nav-item ${notesActive ? 'active' : ''}`} onClick={onNotes}>
+        <NotebookText size={16} strokeWidth={1.6} />
+        <span className="name">{t('nav.notes')}</span>
+        <kbd>{keys('go.notes')}</kbd>
       </button>
       <button className="nav-item" onClick={onPalette}>
         <Command size={16} strokeWidth={1.6} />

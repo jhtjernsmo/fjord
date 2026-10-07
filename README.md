@@ -25,11 +25,11 @@ the same projects, and you can always see who did what.
 - **Projects & kanban boards** — drag and drop, or move tasks with `H`/`L`. Rename, recolor, reorder and add columns.
 - **Tasks** — markdown descriptions, priority, due dates, overdue warnings, archive & restore.
 - **Files** — drop files onto the window to attach them to a project or task. Stored content-addressed (deduplicated) with image previews.
-- **Notes** — markdown notes per project.
+- **Notespace** — Obsidian-style markdown notes, inside a project or free-floating, with folders and pins. Link anything with `[[Project]]`, `[[#12]]` (a task) or `[[Another note]]` — type `[[` for autocomplete — and see backlinks (“mentioned in”) on tasks, projects and notes.
 - **Full-text search** across tasks, notes and file names (`Space f`).
 - **Keyboard-first, LazyVim-style** — a leader key with a which-key popup, vim motions on the board, a `Ctrl+K` command palette, and every binding configurable. The mouse works for everything too.
 - **Git & GitHub** — link a project to a repo, start a branch from any task (`B`), see pull requests with CI status, open PRs from a task, and let merged PRs move tasks to done.
-- **AI-agent ready** — `fjord mcp` exposes 17 tools to MCP clients such as Claude. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
+- **AI-agent ready** — `fjord mcp` exposes 18 tools to MCP clients such as Claude. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
 - **Activity log** — what changed, when, and by whom (you or an agent).
 - **Live updates** — changes from the CLI or an agent appear in the open app within a second or two.
 - **English and Norwegian** — English by default; adding a language is one file.
@@ -110,7 +110,8 @@ what comes next.
 | `Space b` `o` `F` `a` `A` | Board, notes, files, activity, archive | `x` | Toggle done |
 | `Space ,` | Settings | `d d` | Archive task |
 | `Space L` | Switch language | `p` | Cycle priority |
-| `Esc` | Close | `/` | Filter the board |
+| `Space N` | Notespace | `/` | Filter the board |
+| `Esc` | Close | `B` | Start branch for task |
 
 On macOS, `Ctrl` shortcuts use `⌘` instead. Remap anything in `keymap.json` (see [Data](#data) for where it lives):
 
@@ -186,7 +187,7 @@ Other clients:
 
 Tools: `list_projects`, `get_board`, `create_project`, `create_task`, `update_task`, `move_task`,
 `complete_task`, `archive_task`, `add_note`, `attach_file`, `search`, `recent_activity`, `link_repo`,
-`git_status`, `start_branch`, `list_pull_requests`, `open_pull_request`. There is deliberately no
+`git_status`, `start_branch`, `list_pull_requests`, `open_pull_request`, `backlinks`. There is deliberately no
 delete tool.
 
 ## Data

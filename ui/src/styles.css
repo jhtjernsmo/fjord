@@ -468,3 +468,36 @@ kbd {
 .menu button[role^='menuitem']:disabled { opacity: 0.4; cursor: default; }
 .menu button[role^='menuitem'].danger { color: var(--danger); }
 .btn:disabled { opacity: 0.45; cursor: default; transform: none; box-shadow: none; }
+
+/* ---------- notespace ---------- */
+.notes-page { display: flex; min-height: 0; padding-bottom: 0; }
+.notespace { flex: 1; display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 20px; min-height: 0; }
+.notespace .note-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; min-height: 0; padding-bottom: 20px; }
+.small-search { min-width: 0; margin: 6px 0; }
+.note-folder { font: 500 11px var(--mono); color: var(--dim); text-transform: uppercase; letter-spacing: .06em; padding: 10px 10px 4px; display: flex; align-items: center; gap: 5px; }
+.note-project { font-size: 11px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px; }
+.note-editor { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; padding-bottom: 20px; }
+.note-head { display: flex; align-items: center; gap: 6px; }
+.note-meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.note-meta label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.note-meta .input { padding: 5px 9px; font-size: 12.5px; }
+.note-body { display: grid; gap: 14px; min-height: 360px; }
+.note-body.mode-split { grid-template-columns: 1fr 1fr; }
+.note-input { position: relative; display: flex; }
+.note-input .md-editor { flex: 1; min-height: 360px; }
+.note-preview { background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; overflow-y: auto; cursor: default; }
+.link-chip { display: inline-flex; align-items: center; gap: 4px; padding: 0 7px; margin: 0 1px; border-radius: 6px; font-size: .92em; line-height: 1.6; border: 1px solid var(--line-2); background: var(--panel); color: var(--text); vertical-align: baseline; }
+.link-chip:hover { border-color: var(--accent); }
+.link-chip.kind-project { color: var(--accent); }
+.link-chip.kind-note { color: #c4a7ff; }
+.link-chip.kind-task.done { color: var(--ok); text-decoration: line-through; }
+.link-chip.missing { border-style: dashed; color: var(--muted); }
+.link-chip.loading { opacity: .6; }
+.link-suggest { position: absolute; left: 12px; bottom: 12px; z-index: 30; min-width: 280px; max-height: 260px; overflow-y: auto; background: var(--panel); border: 1px solid var(--line-2); border-radius: 10px; box-shadow: var(--shadow); padding: 5px; display: flex; flex-direction: column; }
+.link-suggest button { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; text-align: left; font-size: 13px; }
+.link-suggest button.on, .link-suggest button:hover { background: var(--panel-2); }
+.backlinks { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.backlink { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); text-align: left; font-size: 13px; }
+.backlink:hover { border-color: var(--line-2); }
+.danger-icon:hover { color: var(--danger); }
+@media (max-width: 1100px) { .note-body.mode-split { grid-template-columns: 1fr; } }

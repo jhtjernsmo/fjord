@@ -71,7 +71,7 @@ export function CommandPalette({ mode, projects, onClose, onAction, onProject, o
   }, [mode, query, toast])
 
   const items: Item[] = useMemo(() => {
-    const projectName = (id: number) => projects.find((p) => p.id === id)?.name ?? ''
+    const projectName = (id: number | null) => projects.find((p) => p.id === id)?.name ?? ''
     if (mode === 'commands') {
       return DEFAULT_ACTIONS.filter((a) => a.scope === 'global' && !HIDDEN_COMMANDS.has(a.id))
         .map((a) => ({ a, label: t(`action.${a.id}` as MessageKey) }))
