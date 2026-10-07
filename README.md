@@ -27,7 +27,7 @@ the same projects, and you can always see who did what.
 - **Files** — drop files onto the window to attach them to a project or task. Stored content-addressed (deduplicated) with image previews.
 - **Notespace** — Obsidian-style markdown notes, inside a project or free-floating, with folders and pins. Link anything with `[[Project]]`, `[[#12]]` (a task) or `[[Another note]]` — type `[[` for autocomplete — and see backlinks (“mentioned in”) on tasks, projects and notes.
 - **Full-text search** across tasks, notes and file names (`Space f`).
-- **Keyboard-first, LazyVim-style** — a leader key with a which-key popup, vim motions on the board, a `Ctrl+K` command palette, and every binding configurable. The mouse works for everything too.
+- **Keyboard-first** — a leader key with a which-key popup, vim motions on the board, a `Ctrl+K` command palette, and every binding configurable. The mouse works for everything too.
 - **Git & GitHub** — link a project to a repo, start a branch from any task (`B`), see pull requests with CI status, open PRs from a task, and let merged PRs move tasks to done.
 - **AI-agent ready** — `fjord mcp` exposes 21 tools to MCP clients such as Claude. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
 - **Activity log** — what changed, when, and by whom (you or an agent).
