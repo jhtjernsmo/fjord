@@ -8,6 +8,7 @@
 
 **Local-first project management for Linux — built for the keyboard, friendly to the mouse, and open to AI agents.**
 
+[![CI](https://github.com/jhtjernsmo/fjord/actions/workflows/ci.yml/badge.svg)](https://github.com/jhtjernsmo/fjord/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)
 ![Platform](https://img.shields.io/badge/platform-Linux-informational)
 ![Status](https://img.shields.io/badge/status-early%20preview-orange)

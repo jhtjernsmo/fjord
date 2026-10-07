@@ -25,7 +25,7 @@ npm --prefix ui run typecheck
 npm --prefix ui test
 ```
 
-CI will run the same checks.
+CI runs the same checks on every pull request.
 
 ## Guidelines
 
