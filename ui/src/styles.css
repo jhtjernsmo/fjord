@@ -444,3 +444,5 @@ kbd {
 .card-branch { color: var(--accent); display: inline-flex; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.brand-icon { display: block; border-radius: 7px; }
