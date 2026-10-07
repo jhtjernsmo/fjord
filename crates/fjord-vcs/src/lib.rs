@@ -100,7 +100,15 @@ fn github_for(repo: &ProjectRepo) -> Result<GitHub> {
 }
 
 pub fn overview(store: &Store, project_id: i64) -> Result<GitOverview> {
-    let (repo, git) = linked(store, project_id)?;
+    let repo = store
+        .get_project_repo(project_id)?
+        .ok_or(VcsError::NotLinked)?;
+    overview_for(repo)
+}
+
+/// Git only; doesn't touch the store.
+pub fn overview_for(repo: ProjectRepo) -> Result<GitOverview> {
+    let git = Git::open(Path::new(&repo.path))?;
     Ok(GitOverview {
         current_branch: git.current_branch()?,
         dirty: git.has_uncommitted_changes()?,

@@ -1,7 +1,8 @@
 // Secondary project tabs: notes, files and activity.
 import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
-import { ArchiveRestore, NotebookText, Paperclip, Plus } from 'lucide-react'
+import { ArchiveRestore, NotebookText, Paperclip, Plus, Trash2 } from 'lucide-react'
+import { useContextMenus, useEntityActions } from './actions'
 import { api, relativeTime } from '../api'
 import type { Note } from '../api'
 import { useApp, useLive } from '../data'
@@ -10,6 +11,8 @@ import { FileTile } from './TaskPanel'
 
 export function NotesView({ projectId }: { projectId: number }) {
   const { run, t, locale } = useApp()
+  const { noteMenu } = useContextMenus()
+  const { deleteNote } = useEntityActions()
   const [notes] = useLive(() => api.listNotes(projectId), [projectId])
   const [activeId, setActiveId] = useState<number | null>(null)
   const active: Note | undefined = notes?.find((n) => n.id === activeId) ?? notes?.[0]
@@ -39,7 +42,12 @@ export function NotesView({ projectId }: { projectId: number }) {
             <Plus size={14} /> {t('notes.new').replace('+ ', '')}
           </button>
           {(notes ?? []).map((n) => (
-            <button key={n.id} className={`nav-item ${n.id === active?.id ? 'active' : ''}`} onClick={() => setActiveId(n.id)}>
+            <button
+              key={n.id}
+              className={`nav-item ${n.id === active?.id ? 'active' : ''}`}
+              onClick={() => setActiveId(n.id)}
+              onContextMenu={noteMenu(n, () => setActiveId(n.id))}
+            >
               <NotebookText size={15} strokeWidth={1.6} />
               <span className="name">{n.title}</span>
               <span className="note-time">{relativeTime(n.updated_at, t, locale)}</span>
@@ -48,7 +56,12 @@ export function NotesView({ projectId }: { projectId: number }) {
         </div>
         {active ? (
           <div className="note-editor">
-            <input className="title-input" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={save} aria-label={t('task.title')} />
+            <div className="row-inline">
+              <input className="title-input" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={save} aria-label={t('task.title')} />
+              <button className="btn danger-ghost" onClick={() => deleteNote(active)} title={t('menu.delete')}>
+                <Trash2 size={14} /> {t('menu.delete')}
+              </button>
+            </div>
             <div className="section-title">
               {t('notes.content')}
               <button onClick={() => (editing ? (save(), setEditing(false)) : setEditing(true))}>
@@ -116,6 +129,8 @@ export function ActivityView({ projectId }: { projectId: number }) {
 
 export function ArchiveView({ projectId }: { projectId: number }) {
   const { run, t, locale } = useApp()
+  const { archivedTaskMenu } = useContextMenus()
+  const { deleteTask } = useEntityActions()
   const [tasks] = useLive(() => api.listArchivedTasks(projectId), [projectId])
   return (
     <div className="page">
@@ -125,7 +140,7 @@ export function ArchiveView({ projectId }: { projectId: number }) {
       {tasks && tasks.length > 0 ? (
         <div className="archive-list">
           {tasks.map((task) => (
-            <div className="archive-row" key={task.id}>
+            <div className="archive-row" key={task.id} onContextMenu={archivedTaskMenu(task)}>
               <span className="mono dim">#{task.id}</span>
               <span className="archive-title">{task.title}</span>
               <span className="dim">{task.archived_at ? relativeTime(task.archived_at, t, locale) : ''}</span>
@@ -134,6 +149,9 @@ export function ArchiveView({ projectId }: { projectId: number }) {
                 onClick={() => run(api.archiveTask(task.id, false), t('archive.restored', { name: task.title }))}
               >
                 <ArchiveRestore size={14} /> {t('archive.restore')}
+              </button>
+              <button className="btn danger-ghost" onClick={() => deleteTask(task)} aria-label={t('menu.delete')}>
+                <Trash2 size={14} />
               </button>
             </div>
           ))}

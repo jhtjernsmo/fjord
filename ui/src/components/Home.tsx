@@ -6,6 +6,12 @@ import type { Activity, ProjectSummary } from '../api'
 import { useApp, useLive } from '../data'
 import type { MessageKey } from '../i18n'
 import { AgentTag, ProjectGlyph } from './Icons'
+import { useContextMenus } from './actions'
+import { useState } from 'react'
+
+/** Overview shows a short activity preview; "Show all" loads more. */
+const ACTIVITY_PREVIEW = 8
+const ACTIVITY_ALL = 50
 
 function greetingKey(): MessageKey {
   const h = new Date().getHours()
@@ -46,7 +52,9 @@ interface Props {
 
 export function Home({ actor, projects, onOpen, onNewProject }: Props) {
   const { t, run } = useApp()
-  const [activity] = useLive(() => api.recentActivity(null, 15), [])
+  const [showAll, setShowAll] = useState(false)
+  const [activity] = useLive(() => api.recentActivity(null, showAll ? ACTIVITY_ALL : ACTIVITY_PREVIEW + 1), [showAll])
+  const { projectMenu } = useContextMenus()
   const [allProjects] = useLive(() => api.listProjects(true), [])
   const archived = (allProjects ?? []).filter((p) => p.archived_at)
   const open = projects.reduce((n, p) => n + p.task_count - p.done_count, 0)
@@ -100,6 +108,7 @@ export function Home({ actor, projects, onOpen, onNewProject }: Props) {
                 className="pcard"
                 style={{ ['--c' as string]: p.color }}
                 onClick={() => onOpen(p.id)}
+                onContextMenu={projectMenu(p, { onOpen: () => onOpen(p.id) })}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
@@ -128,7 +137,12 @@ export function Home({ actor, projects, onOpen, onNewProject }: Props) {
         <div className="section-title" style={{ marginBottom: 8 }}>
           {t('home.recent')}
         </div>
-        <ActivityList items={activity ?? []} projects={projects} />
+        <ActivityList items={(activity ?? []).slice(0, showAll ? ACTIVITY_ALL : ACTIVITY_PREVIEW)} projects={projects} />
+        {(showAll || (activity?.length ?? 0) > ACTIVITY_PREVIEW) && (
+          <button className="show-more" onClick={() => setShowAll((v) => !v)}>
+            {showAll ? t('home.showLess') : t('home.showAll')}
+          </button>
+        )}
       </div>
 
       {archived.length > 0 && (
@@ -138,7 +152,7 @@ export function Home({ actor, projects, onOpen, onNewProject }: Props) {
           </div>
           <div className="archive-list">
             {archived.map((p) => (
-              <div className="archive-row" key={p.id}>
+              <div className="archive-row" key={p.id} onContextMenu={projectMenu(p, { onOpen: () => undefined })}>
                 <ProjectGlyph glyph={p.icon} color={p.color} />
                 <span className="archive-title">{p.name}</span>
                 <button className="btn" onClick={() => run(api.archiveProject(p.id, false), t('archive.restored', { name: p.name }))}>

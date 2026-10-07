@@ -144,6 +144,30 @@ pub fn delete_status(state: State<AppState>, id: i64) -> CmdResult<()> {
 }
 
 #[tauri::command]
+pub fn delete_task(state: State<AppState>, id: i64) -> CmdResult<()> {
+    with_store(&state, |s| s.delete_task(id))
+}
+
+#[tauri::command]
+pub fn delete_project(state: State<AppState>, id: i64) -> CmdResult<()> {
+    with_store(&state, |s| s.delete_project(id))
+}
+
+#[tauri::command]
+pub fn delete_note(state: State<AppState>, id: i64) -> CmdResult<()> {
+    with_store(&state, |s| s.delete_note(id))
+}
+
+#[tauri::command]
+pub fn rename_user(
+    state: State<AppState>,
+    name: String,
+    rewrite_history: bool,
+) -> CmdResult<String> {
+    with_store(&state, |s| s.rename_user(&name, rewrite_history))
+}
+
+#[tauri::command]
 pub fn list_attachments(
     state: State<AppState>,
     project_id: i64,

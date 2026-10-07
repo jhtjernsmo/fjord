@@ -129,6 +129,13 @@ const MIGRATIONS: &[&str] = &[
     );
     ALTER TABLE tasks ADD COLUMN branch TEXT;
     "#,
+    // v3: app settings (user name, …)
+    r#"
+    CREATE TABLE settings (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+    "#,
 ];
 
 pub fn configure(conn: &Connection) -> Result<()> {

@@ -52,6 +52,7 @@ export function PrStateBadge({ pr }: { pr: LinkedPullRequest }) {
 function LinkRepo({ projectId }: { projectId: number }) {
   const { run, t } = useApp()
   const [path, setPath] = useState('')
+  const [linking, setLinking] = useState(false)
   const choose = async () => {
     const picked = await openDialog({ directory: true, multiple: false })
     if (typeof picked === 'string') setPath(picked)
@@ -66,15 +67,23 @@ function LinkRepo({ projectId }: { projectId: number }) {
           className="row-inline"
           onSubmit={(e) => {
             e.preventDefault()
-            if (path.trim()) run(api.linkRepo(projectId, path.trim()))
+            if (!path.trim() || linking) return
+            setLinking(true)
+            run(api.linkRepo(projectId, path.trim())).finally(() => setLinking(false))
           }}
         >
           <button type="button" className="btn" onClick={choose}>
             {t('git.choose')}
           </button>
           <input className="input mono grow" value={path} onChange={(e) => setPath(e.target.value)} placeholder={t('git.pathPlaceholder')} aria-label={t('git.pathPlaceholder')} />
-          <button className="btn primary" disabled={!path.trim()}>
-            {t('git.link')}
+          <button className="btn primary" disabled={!path.trim() || linking}>
+            {linking ? (
+              <>
+                <RefreshCw size={13} className="spin" /> {t('git.linking')}
+              </>
+            ) : (
+              t('git.link')
+            )}
           </button>
         </form>
       </div>
@@ -118,6 +127,11 @@ export function GitView({ projectId, onOpenTask }: { projectId: number; onOpenTa
   return (
     <div className="page git-page">
       <RepoHeader repo={repo} />
+      {overview === undefined && (
+        <div className="loading-line">
+          <RefreshCw size={13} className="spin" /> {t('git.loading')}
+        </div>
+      )}
       {overview && (
         <div className="git-status">
           <GitBranch size={14} /> {t('git.onBranch', { branch: overview.current_branch || 'HEAD' })}

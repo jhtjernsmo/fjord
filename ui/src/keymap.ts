@@ -48,6 +48,7 @@ export const DEFAULT_ACTIONS: ActionDef[] = [
   { id: 'task.priority', group: 'board', scope: 'board', keys: 'p' },
   { id: 'board.filter', group: 'board', scope: 'board', keys: '/' },
   { id: 'task.branch', group: 'board', scope: 'board', keys: 'B' },
+  { id: 'task.delete', group: 'board', scope: 'board', keys: 'delete' },
 ]
 
 export interface KeymapConfig {

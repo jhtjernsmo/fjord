@@ -20,6 +20,8 @@ import { useActions, useApp } from '../data'
 import type { MessageKey } from '../i18n'
 import { AgentTag } from './Icons'
 import { AddColumn, ColumnHeader, EMPTY_FILTER, FilterBar, isFiltering } from './Columns'
+import { useContextMenus, useEntityActions } from './actions'
+import { useLive } from '../data'
 import type { BoardFilter } from './Columns'
 
 const PRIORITY_ICON = ['', '↓', '→', '↑']
@@ -35,7 +37,7 @@ interface Props {
   keysEnabled: boolean
 }
 
-function TaskCard({ task, statuses, cursor, onOpen }: { task: Task; statuses: Status[]; cursor: boolean; onOpen: () => void }) {
+function TaskCard({ task, statuses, cursor, onOpen, onMenu }: { task: Task; statuses: Status[]; cursor: boolean; onOpen: () => void; onMenu: (e: React.MouseEvent) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
   const ref = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -52,6 +54,7 @@ function TaskCard({ task, statuses, cursor, onOpen }: { task: Task; statuses: St
       {...listeners}
       tabIndex={-1}
       onClick={onOpen}
+      onContextMenu={onMenu}
     >
       <CardBody task={task} statuses={statuses} className={`${cursor ? 'cursor' : ''} ${isDragging ? 'dragging' : ''}`} />
     </div>
@@ -108,6 +111,7 @@ function Column(props: {
   over: boolean
   cursorTaskId: number | null
   onOpen: (id: number) => void
+  onMenu: (task: Task) => (e: React.MouseEvent) => void
   quickAddRef: (el: HTMLInputElement | null) => void
   onAdd: (title: string) => void
 }) {
@@ -120,7 +124,7 @@ function Column(props: {
       <SortableContext items={props.tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <div className="column-body" ref={setNodeRef}>
           {props.tasks.map((t) => (
-            <TaskCard key={t.id} task={t} statuses={props.statuses} cursor={t.id === props.cursorTaskId} onOpen={() => props.onOpen(t.id)} />
+            <TaskCard key={t.id} task={t} statuses={props.statuses} cursor={t.id === props.cursorTaskId} onOpen={() => props.onOpen(t.id)} onMenu={props.onMenu(t)} />
           ))}
         </div>
       </SortableContext>
@@ -147,6 +151,9 @@ function Column(props: {
 
 export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysEnabled }: Props) {
   const { run, t, toast } = useApp()
+  const { taskMenu } = useContextMenus()
+  const { deleteTask } = useEntityActions()
+  const [repo] = useLive(() => api.getProjectRepo(board.project.id), [board.project.id])
   const { statuses, tasks: allTasks } = board
   const [filter, setFilter] = useState<BoardFilter>(EMPTY_FILTER)
   const filterRef = useRef<HTMLInputElement>(null)
@@ -237,6 +244,7 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
       'task.archive': () => current && run(api.archiveTask(current.id, true), t('toast.archivedTask', { name: current.title })),
       'task.priority': () => current && run(api.updateTask(current.id, { priority: (current.priority + 1) % 4 })),
       'board.filter': () => filterRef.current?.focus(),
+      'task.delete': () => current && deleteTask(current),
       'task.branch': () =>
         current &&
         run(api.startBranch(current.id)).then((r) => r && toast(t('git.branchStarted', { branch: r.branch }), 'success')),
@@ -279,6 +287,7 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
             over={ci === overCol}
             cursorTaskId={ci === col ? (current?.id ?? null) : null}
             onOpen={onOpenTask}
+            onMenu={(task) => taskMenu(task, statuses, { onOpen: () => onOpenTask(task.id), hasRepo: !!repo })}
             quickAddRef={(el) => (el ? quickAdd.current.set(c.status.id, el) : quickAdd.current.delete(c.status.id))}
             onAdd={(title) => run(api.createTask({ project_id: board.project.id, title, status_id: c.status.id }))}
           />

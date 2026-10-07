@@ -3,6 +3,7 @@
 //! other commands stay responsive while GitHub answers.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use fjord_core::{ProjectRepo, Task};
 use fjord_vcs::{GitOverview, PullRequest, StartedBranch, SyncReport};
@@ -32,14 +33,34 @@ async fn off_thread<T: Send + 'static>(
         .map_err(|e| e.to_string())
 }
 
+/// Runs `f` with the store on a worker thread (for git commands that may be slow,
+/// e.g. on Windows or in big repositories), so the window never freezes.
+async fn with_store_bg<T: Send + 'static>(
+    state: &State<'_, AppState>,
+    f: impl FnOnce(&mut fjord_core::Store) -> fjord_vcs::Result<T> + Send + 'static,
+) -> CmdResult<T> {
+    let shared = Arc::clone(&state.0);
+    off_thread(move || {
+        let mut store = shared
+            .lock()
+            .map_err(|_| fjord_vcs::VcsError::Git("store lock poisoned".into()))?;
+        f(&mut store)
+    })
+    .await
+}
+
 #[tauri::command]
 pub fn get_project_repo(state: State<AppState>, project_id: i64) -> CmdResult<Option<ProjectRepo>> {
     with_store(&state, |s| Ok(s.get_project_repo(project_id)?))
 }
 
 #[tauri::command]
-pub fn link_repo(state: State<AppState>, project_id: i64, path: PathBuf) -> CmdResult<ProjectRepo> {
-    with_store(&state, |s| fjord_vcs::link_repo(s, project_id, &path))
+pub async fn link_repo(
+    state: State<'_, AppState>,
+    project_id: i64,
+    path: PathBuf,
+) -> CmdResult<ProjectRepo> {
+    with_store_bg(&state, move |s| fjord_vcs::link_repo(s, project_id, &path)).await
 }
 
 #[tauri::command]
@@ -57,13 +78,16 @@ pub fn set_repo_auto_move(
 }
 
 #[tauri::command]
-pub fn git_overview(state: State<AppState>, project_id: i64) -> CmdResult<GitOverview> {
-    with_store(&state, |s| fjord_vcs::overview(s, project_id))
+pub async fn git_overview(state: State<'_, AppState>, project_id: i64) -> CmdResult<GitOverview> {
+    // Read the link quickly, then run git without holding the lock.
+    let repo = with_store(&state, |s| Ok(s.get_project_repo(project_id)?))?
+        .ok_or("this project is not linked to a git repository")?;
+    off_thread(move || fjord_vcs::overview_for(repo)).await
 }
 
 #[tauri::command]
-pub fn start_branch(state: State<AppState>, task_id: i64) -> CmdResult<StartedBranch> {
-    with_store(&state, |s| fjord_vcs::start_branch(s, task_id))
+pub async fn start_branch(state: State<'_, AppState>, task_id: i64) -> CmdResult<StartedBranch> {
+    with_store_bg(&state, move |s| fjord_vcs::start_branch(s, task_id)).await
 }
 
 #[tauri::command]
