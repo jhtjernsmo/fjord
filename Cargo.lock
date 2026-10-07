@@ -217,6 +217,7 @@ dependencies = [
  "anyhow",
  "clap",
  "fjord-core",
+ "serde",
  "serde_json",
 ]
 
