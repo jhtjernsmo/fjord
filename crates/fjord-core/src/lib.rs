@@ -3,6 +3,7 @@
 
 mod error;
 mod files;
+mod links;
 mod models;
 mod notes;
 mod projects;
@@ -14,6 +15,7 @@ mod store;
 mod tasks;
 
 pub use error::{Error, Result};
+pub use links::parse_links;
 pub use models::*;
 pub use projects::{slugify, status_names};
 pub use store::{Store, config_dir, default_actor};

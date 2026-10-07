@@ -71,10 +71,21 @@ export interface AttachOutcome {
 
 export interface Note {
   id: number
-  project_id: number
+  project_id: number | null
   title: string
   body_md: string
+  folder: string
+  pinned: boolean
+  created_at: string
   updated_at: string
+}
+
+export interface LinkTarget {
+  kind: 'project' | 'task' | 'note'
+  id: number
+  label: string
+  project_id: number | null
+  done: boolean
 }
 
 export interface Activity {
@@ -91,7 +102,7 @@ export interface Activity {
 export interface SearchHit {
   kind: 'task' | 'note' | 'file'
   ref_id: number
-  project_id: number
+  project_id: number | null
   title: string
   snippet: string
 }
@@ -211,6 +222,15 @@ export const api = {
   addNote: (projectId: number, title: string, bodyMd: string) => invoke<Note>('add_note', { projectId, title, bodyMd }),
   updateNote: (id: number, title: string, bodyMd: string) => invoke<Note>('update_note', { id, title, bodyMd }),
   search: (query: string) => invoke<SearchHit[]>('search', { query }),
+  listAllNotes: (freeOnly = false) => invoke<Note[]>('list_all_notes', { freeOnly }),
+  createNote: (projectId: number | null, title: string, bodyMd: string) => invoke<Note>('create_note', { projectId, title, bodyMd }),
+  getNote: (id: number) => invoke<Note>('get_note', { id }),
+  moveNote: (id: number, projectId: number | null) => invoke<Note>('move_note', { id, projectId }),
+  setNoteFolder: (id: number, folder: string) => invoke<Note>('set_note_folder', { id, folder }),
+  setNotePinned: (id: number, pinned: boolean) => invoke<Note>('set_note_pinned', { id, pinned }),
+  resolveLinks: (texts: string[]) => invoke<(LinkTarget | null)[]>('resolve_links', { texts }),
+  backlinks: (kind: LinkTarget['kind'], targetId: number) => invoke<Note[]>('backlinks', { kind, targetId }),
+  linkSuggestions: (query: string) => invoke<LinkTarget[]>('link_suggestions', { query }),
   recentActivity: (projectId: number | null, limit = 30) => invoke<Activity[]>('recent_activity', { projectId, limit }),
   loadKeymap: () => invoke<unknown>('load_keymap'),
   dataPaths: () => invoke<{ data: string; keymap: string }>('data_paths'),

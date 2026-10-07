@@ -163,10 +163,27 @@ pub struct Attachment {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Note {
     pub id: i64,
-    pub project_id: i64,
+    /// `None` for notes in the global notespace.
+    pub project_id: Option<i64>,
     pub title: String,
     pub body_md: String,
+    pub folder: String,
+    pub pinned: bool,
+    pub created_at: String,
     pub updated_at: String,
+}
+
+/// What a `[[wiki link]]` points at.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LinkTarget {
+    /// "project", "task" or "note"
+    pub kind: String,
+    pub id: i64,
+    pub label: String,
+    /// Project the target lives in (the project itself for kind = project).
+    pub project_id: Option<i64>,
+    /// For tasks: whether it sits in a done column.
+    pub done: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -188,7 +205,7 @@ pub struct Activity {
 pub struct SearchHit {
     pub kind: String,
     pub ref_id: i64,
-    pub project_id: i64,
+    pub project_id: Option<i64>,
     pub title: String,
     pub snippet: String,
 }

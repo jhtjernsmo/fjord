@@ -6,13 +6,19 @@ use crate::store::{Store, require_text};
 
 const MAX_SEARCH_HITS: i64 = 50;
 
-fn note_from_row(row: &Row) -> rusqlite::Result<Note> {
+pub(crate) const NOTE_COLS: &str =
+    "id, project_id, title, body_md, folder, pinned, created_at, updated_at";
+
+pub(crate) fn note_from_row(row: &Row) -> rusqlite::Result<Note> {
     Ok(Note {
         id: row.get(0)?,
         project_id: row.get(1)?,
         title: row.get(2)?,
         body_md: row.get(3)?,
-        updated_at: row.get(4)?,
+        folder: row.get(4)?,
+        pinned: row.get(5)?,
+        created_at: row.get(6)?,
+        updated_at: row.get(7)?,
     })
 }
 
@@ -32,16 +38,32 @@ fn fts_query(input: &str) -> Option<String> {
 }
 
 impl Store {
+    /// A note in a project.
     pub fn add_note(&mut self, project_id: i64, title: &str, body_md: &str) -> Result<Note> {
+        self.create_note(Some(project_id), title, body_md)
+    }
+
+    /// A note in a project, or in the global notespace with `project_id = None`.
+    pub fn create_note(
+        &mut self,
+        project_id: Option<i64>,
+        title: &str,
+        body_md: &str,
+    ) -> Result<Note> {
         let title = require_text(title, "note title")?;
-        self.get_project(project_id)?;
+        if let Some(p) = project_id {
+            self.get_project(p)?;
+        }
         self.conn.execute(
             "INSERT INTO notes (project_id, title, body_md) VALUES (?1, ?2, ?3)",
             params![project_id, title, body_md],
         )?;
         let id = self.conn.last_insert_rowid();
-        self.touch_project(project_id)?;
-        self.log(Some(project_id), None, "note.create", &title, None)?;
+        if let Some(p) = project_id {
+            self.touch_project(p)?;
+        }
+        self.reindex_links(id, body_md)?;
+        self.log(project_id, None, "note.create", &title, None)?;
         self.get_note(id)
     }
 
@@ -53,15 +75,18 @@ impl Store {
              WHERE id = ?3",
             params![title, body_md, id],
         )?;
-        self.touch_project(note.project_id)?;
-        self.log(Some(note.project_id), None, "note.update", &title, None)?;
+        if let Some(p) = note.project_id {
+            self.touch_project(p)?;
+        }
+        self.reindex_links(id, body_md)?;
+        self.log(note.project_id, None, "note.update", &title, None)?;
         self.get_note(id)
     }
 
     pub fn get_note(&self, id: i64) -> Result<Note> {
         self.conn
             .query_row(
-                "SELECT id, project_id, title, body_md, updated_at FROM notes WHERE id = ?1",
+                &format!("SELECT {NOTE_COLS} FROM notes WHERE id = ?1"),
                 [id],
                 note_from_row,
             )
@@ -70,10 +95,9 @@ impl Store {
     }
 
     pub fn list_notes(&self, project_id: i64) -> Result<Vec<Note>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, project_id, title, body_md, updated_at FROM notes
-             WHERE project_id = ?1 ORDER BY updated_at DESC, id DESC",
-        )?;
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {NOTE_COLS} FROM notes WHERE project_id = ?1 ORDER BY pinned DESC, updated_at DESC, id DESC"
+        ))?;
         let rows = stmt.query_map([project_id], note_from_row)?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
@@ -88,9 +112,10 @@ impl Store {
             "SELECT f.kind, f.ref_id, f.project_id, f.title,
                     snippet(search_fts, 4, '[', ']', '…', 12)
              FROM search_fts f
-             JOIN projects p ON p.id = f.project_id AND p.archived_at IS NULL
+             LEFT JOIN projects p ON p.id = f.project_id
              LEFT JOIN tasks t ON f.kind = 'task' AND t.id = f.ref_id
              WHERE search_fts MATCH ?1 AND (f.kind != 'task' OR t.archived_at IS NULL)
+               AND (f.project_id IS NULL OR p.archived_at IS NULL)
              ORDER BY rank LIMIT ?2",
         )?;
         let rows = stmt.query_map(params![fts, MAX_SEARCH_HITS], |row| {

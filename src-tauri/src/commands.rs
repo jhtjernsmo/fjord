@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 use base64::Engine;
 use fjord_core::{
-    Activity, Attachment, NewProject, NewTask, Note, Project, ProjectPatch, ProjectSummary,
-    SearchHit, Status, StatusPatch, Store, Task, TaskPatch,
+    Activity, Attachment, LinkTarget, NewProject, NewTask, Note, Project, ProjectPatch,
+    ProjectSummary, SearchHit, Status, StatusPatch, Store, Task, TaskPatch,
 };
 use serde::Serialize;
 use tauri::State;
@@ -292,6 +292,62 @@ pub fn update_note(
     body_md: String,
 ) -> CmdResult<Note> {
     with_store(&state, |s| s.update_note(id, &title, &body_md))
+}
+
+#[tauri::command]
+pub fn list_all_notes(state: State<AppState>, free_only: bool) -> CmdResult<Vec<Note>> {
+    with_store(&state, |s| s.list_all_notes(free_only))
+}
+
+#[tauri::command]
+pub fn create_note(
+    state: State<AppState>,
+    project_id: Option<i64>,
+    title: String,
+    body_md: String,
+) -> CmdResult<Note> {
+    with_store(&state, |s| s.create_note(project_id, &title, &body_md))
+}
+
+#[tauri::command]
+pub fn get_note(state: State<AppState>, id: i64) -> CmdResult<Note> {
+    with_store(&state, |s| s.get_note(id))
+}
+
+#[tauri::command]
+pub fn move_note(state: State<AppState>, id: i64, project_id: Option<i64>) -> CmdResult<Note> {
+    with_store(&state, |s| s.move_note(id, project_id))
+}
+
+#[tauri::command]
+pub fn set_note_folder(state: State<AppState>, id: i64, folder: String) -> CmdResult<Note> {
+    with_store(&state, |s| s.set_note_folder(id, &folder))
+}
+
+#[tauri::command]
+pub fn set_note_pinned(state: State<AppState>, id: i64, pinned: bool) -> CmdResult<Note> {
+    with_store(&state, |s| s.set_note_pinned(id, pinned))
+}
+
+/// Resolves many `[[link]]` texts at once (for rendering a note).
+#[tauri::command]
+pub fn resolve_links(
+    state: State<AppState>,
+    texts: Vec<String>,
+) -> CmdResult<Vec<Option<LinkTarget>>> {
+    with_store(&state, |s| {
+        texts.iter().map(|t| s.resolve_link(t)).collect()
+    })
+}
+
+#[tauri::command]
+pub fn backlinks(state: State<AppState>, kind: String, target_id: i64) -> CmdResult<Vec<Note>> {
+    with_store(&state, |s| s.backlinks(&kind, target_id))
+}
+
+#[tauri::command]
+pub fn link_suggestions(state: State<AppState>, query: String) -> CmdResult<Vec<LinkTarget>> {
+    with_store(&state, |s| s.link_suggestions(&query))
 }
 
 #[tauri::command]

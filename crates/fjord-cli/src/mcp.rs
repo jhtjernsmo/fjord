@@ -147,9 +147,15 @@ fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "add_note",
-            "Add a markdown note to a project.",
+            "Add a markdown note — to a project, or to the global notespace if project is omitted. Link with [[Project]], [[#12]] (task) or [[Note title]].",
             json!({ "project": project, "title": { "type": "string" }, "body": { "type": "string" } }),
-            &["project", "title"],
+            &["title"],
+        ),
+        tool(
+            "backlinks",
+            "Notes that link to a project, task or note.",
+            json!({ "kind": { "type": "string", "enum": ["project", "task", "note"] }, "id": { "type": "integer" } }),
+            &["kind", "id"],
         ),
         tool(
             "attach_file",
@@ -303,12 +309,18 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
             serde_json::to_value(store.set_task_archived(int_arg(args, "id")?, true)?)?
         }
         "add_note" => {
-            let p = store.find_project(str_arg(args, "project")?)?;
-            serde_json::to_value(store.add_note(
-                p.id,
+            let project_id = match opt_str(args, "project") {
+                Some(p) => Some(store.find_project(&p)?.id),
+                None => None,
+            };
+            serde_json::to_value(store.create_note(
+                project_id,
                 str_arg(args, "title")?,
                 &opt_str(args, "body").unwrap_or_default(),
             )?)?
+        }
+        "backlinks" => {
+            serde_json::to_value(store.backlinks(str_arg(args, "kind")?, int_arg(args, "id")?)?)?
         }
         "attach_file" => {
             let p = store.find_project(str_arg(args, "project")?)?;
@@ -391,7 +403,7 @@ mod tests {
         );
         let tools =
             handle_line(&mut s, r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#).unwrap();
-        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 17);
+        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 18);
         let unknown = handle_line(&mut s, r#"{"jsonrpc":"2.0","id":3,"method":"nope"}"#).unwrap();
         assert_eq!(unknown["error"]["code"], -32601);
         let bad = handle_line(&mut s, "{not json").unwrap();

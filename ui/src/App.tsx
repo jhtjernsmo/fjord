@@ -5,6 +5,9 @@ import { useContextMenus } from './components/actions'
 import { api } from './api'
 import type { SearchHit } from './api'
 import { useActions, useApp, useLive } from './data'
+import { NavContext } from './nav'
+import type { Nav } from './nav'
+import { Notespace } from './components/Notespace'
 import { LOCALES } from './i18n'
 import type { MessageKey } from './i18n'
 import { ProjectGlyph } from './components/Icons'
@@ -21,12 +24,12 @@ import { TaskPanel } from './components/TaskPanel'
 import { HelpSheet, WhichKey } from './components/WhichKey'
 
 type Tab = 'board' | 'notes' | 'files' | 'git' | 'activity' | 'archive'
-type View = { kind: 'home' } | { kind: 'project'; id: number; tab: Tab }
+type View = { kind: 'home' } | { kind: 'notes' } | { kind: 'project'; id: number; tab: Tab }
 
 const TABS: Tab[] = ['board', 'notes', 'files', 'git', 'activity', 'archive']
 
 const GLOBAL_ACTIONS = [
-  'palette.open', 'help.toggle', 'panel.close', 'go.home', 'project.pick', 'project.new', 'project.archive',
+  'palette.open', 'help.toggle', 'panel.close', 'go.home', 'go.notes', 'project.pick', 'project.new', 'project.archive',
   'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'view.archive', 'view.git',
 ]
 
@@ -35,6 +38,7 @@ export default function App() {
   const { projectMenu } = useContextMenus()
   const [view, setView] = useState<View>({ kind: 'home' })
   const [taskId, setTaskId] = useState<number | null>(null)
+  const [noteId, setNoteId] = useState<number | null>(null)
   const [palette, setPalette] = useState<PaletteMode | null>(null)
   const [newProject, setNewProject] = useState(false)
   const [help, setHelp] = useState(false)
@@ -97,6 +101,10 @@ export default function App() {
         else if (newProject) setNewProject(false)
         else setTaskId(null)
       },
+      'go.notes': () => {
+        setView({ kind: 'notes' })
+        setTaskId(null)
+      },
       'go.home': () => {
         setView({ kind: 'home' })
         setTaskId(null)
@@ -132,21 +140,39 @@ export default function App() {
 
   useActions(Object.fromEntries(GLOBAL_ACTIONS.map((id) => [id, () => runAction(id)])))
 
+  const nav: Nav = {
+    openProject: (id) => openProject(id),
+    openTask: (projectId, id) => {
+      setView({ kind: 'project', id: projectId, tab: 'board' })
+      setTaskId(id)
+    },
+    openNote: (id, projectId) => {
+      setNoteId(id)
+      setTaskId(null)
+      setView(projectId === null ? { kind: 'notes' } : { kind: 'project', id: projectId, tab: 'notes' })
+    },
+    createNote: async (title) => {
+      const note = await run(api.createNote(null, title, ''))
+      if (note) nav.openNote(note.id, null)
+    },
+  }
+
   const openHit = (hit: SearchHit) => {
-    if (hit.kind === 'task') {
-      setView({ kind: 'project', id: hit.project_id, tab: 'board' })
-      setTaskId(hit.ref_id)
-    } else {
-      openProject(hit.project_id, hit.kind === 'note' ? 'notes' : 'files')
-    }
+    if (hit.kind === 'note') nav.openNote(hit.ref_id, hit.project_id)
+    else if (hit.project_id === null) return
+    else if (hit.kind === 'task') nav.openTask(hit.project_id, hit.ref_id)
+    else openProject(hit.project_id, 'files')
   }
 
   return (
+    <NavContext.Provider value={nav}>
     <div className="app">
       <Sidebar
         projects={projects ?? []}
         activeId={projectId}
         onHome={() => runAction('go.home')}
+        onNotes={() => runAction('go.notes')}
+        notesActive={view.kind === 'notes'}
         onSelect={(id) => openProject(id)}
         onNewProject={() => setNewProject(true)}
         onPalette={() => setPalette('commands')}
@@ -155,6 +181,17 @@ export default function App() {
       />
 
       <main className="main">
+        {view.kind === 'notes' && (
+          <>
+            <header className="header">
+              <h1>{t('nav.notes')}</h1>
+            </header>
+            <div className="page notes-page">
+              <Notespace projectId={null} projects={projects ?? []} selectedId={noteId} onSelect={setNoteId} />
+            </div>
+          </>
+        )}
+
         {view.kind === 'home' && (
           <Home actor={actor ?? ''} projects={projects ?? []} onOpen={openProject} onNewProject={() => setNewProject(true)} />
         )}
@@ -192,7 +229,9 @@ export default function App() {
                 keysEnabled={taskId === null && !overlayOpen}
               />
             )}
-            {view.tab === 'notes' && <NotesView projectId={activeBoard.project.id} />}
+            {view.tab === 'notes' && (
+              <NotesView projectId={activeBoard.project.id} projects={projects ?? []} selectedId={noteId} onSelect={setNoteId} />
+            )}
             {view.tab === 'files' && <FilesView projectId={activeBoard.project.id} />}
             {view.tab === 'activity' && <ActivityView projectId={activeBoard.project.id} />}
             {view.tab === 'archive' && <ArchiveView projectId={activeBoard.project.id} />}
@@ -234,5 +273,6 @@ export default function App() {
       {settings && <SettingsDialog theme={theme} onTheme={setTheme} onClose={() => setSettings(false)} />}
       <WhichKey />
     </div>
+    </NavContext.Provider>
   )
 }
