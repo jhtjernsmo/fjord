@@ -40,7 +40,7 @@ export function HelpSheet({ onClose }: { onClose: () => void }) {
         <p className="intro">
           {before}
           <kbd>{displayKeys('<leader>', keymap.leader)}</kbd>
-          {after} <code>~/.config/fjord/keymap.json</code>.
+          {after}
         </p>
         <div className="groups">
           {groups.map((g) => (

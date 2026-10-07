@@ -4,16 +4,10 @@ mod commands;
 
 use std::sync::Mutex;
 
-use fjord_core::Store;
+use fjord_core::{Store, default_actor};
 use tauri::Manager;
 
 pub struct AppState(pub Mutex<Store>);
-
-fn default_actor() -> String {
-    std::env::var("FJORD_ACTOR")
-        .or_else(|_| std::env::var("USER"))
-        .unwrap_or_else(|_| "user".into())
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -52,6 +46,7 @@ pub fn run() {
             commands::search,
             commands::recent_activity,
             commands::load_keymap,
+            commands::data_paths,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Fjord");

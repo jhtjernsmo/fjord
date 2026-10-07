@@ -206,7 +206,14 @@ pub fn open_attachment(state: State<AppState>, id: i64) -> CmdResult<()> {
     let safe_name: String = attachment
         .original_name
         .chars()
-        .map(|c| if c == '/' || c == '\0' { '_' } else { c })
+        // Characters not allowed in file names on Windows (and '/' everywhere).
+        .map(|c| {
+            if r#"/\:*?"<>|"#.contains(c) || c.is_control() {
+                '_'
+            } else {
+                c
+            }
+        })
         .collect();
     let target = dir.join(format!("{}-{safe_name}", attachment.id));
     std::fs::copy(&blob, &target).map_err(|e| e.to_string())?;
@@ -277,20 +284,33 @@ pub fn recent_activity(
     with_store(&state, |s| s.recent_activity(project_id, limit))
 }
 
-/// User overrides from ~/.config/fjord/keymap.json (raw JSON; merged in the UI).
+/// User overrides from <config dir>/keymap.json (raw JSON; merged in the UI).
 #[tauri::command]
 pub fn load_keymap() -> CmdResult<Option<serde_json::Value>> {
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".config")
-        });
-    let path = base.join("fjord").join("keymap.json");
+    let path = fjord_core::config_dir().join("keymap.json");
     match std::fs::read_to_string(&path) {
         Ok(text) => serde_json::from_str(&text)
             .map(Some)
             .map_err(|e| format!("{}: {e}", path.display())),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(e.to_string()),
+    }
+}
+
+#[derive(Serialize)]
+pub struct DataPaths {
+    data: String,
+    keymap: String,
+}
+
+/// Where Fjord keeps its data and keymap on this machine (shown in Settings).
+#[tauri::command]
+pub fn data_paths() -> DataPaths {
+    DataPaths {
+        data: Store::default_dir().display().to_string(),
+        keymap: fjord_core::config_dir()
+            .join("keymap.json")
+            .display()
+            .to_string(),
     }
 }

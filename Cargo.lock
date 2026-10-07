@@ -1153,6 +1153,7 @@ dependencies = [
 name = "fjord-core"
 version = "0.1.0"
 dependencies = [
+ "dirs",
  "hex",
  "rusqlite",
  "serde",

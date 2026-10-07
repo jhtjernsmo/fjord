@@ -53,18 +53,11 @@ impl Store {
         &self.actor
     }
 
-    /// Data directory: $FJORD_DATA_DIR, else $XDG_DATA_HOME/fjord or ~/.local/share/fjord.
+    /// Data directory: $FJORD_DATA_DIR, else the platform data dir:
+    /// ~/.local/share/fjord (Linux, honours $XDG_DATA_HOME), %APPDATA%\fjord (Windows),
+    /// ~/Library/Application Support/fjord (macOS).
     pub fn default_dir() -> PathBuf {
-        if let Some(dir) = std::env::var_os("FJORD_DATA_DIR") {
-            return PathBuf::from(dir);
-        }
-        let base = std::env::var_os("XDG_DATA_HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| {
-                let home = std::env::var_os("HOME").unwrap_or_default();
-                PathBuf::from(home).join(".local/share")
-            });
-        base.join("fjord")
+        env_or_platform("FJORD_DATA_DIR", dirs::data_dir())
     }
 
     /// Bumps whenever anything changes; lets the GUI cheaply poll for
@@ -92,6 +85,27 @@ impl Store {
         )?;
         Ok(())
     }
+}
+
+/// Config directory (keymap.json): $FJORD_CONFIG_DIR, else ~/.config/fjord on Linux,
+/// %APPDATA%\fjord on Windows, ~/Library/Application Support/fjord on macOS.
+pub fn config_dir() -> PathBuf {
+    env_or_platform("FJORD_CONFIG_DIR", dirs::config_dir())
+}
+
+/// Who is acting: $FJORD_ACTOR, else the OS user name ($USER / %USERNAME%).
+pub fn default_actor() -> String {
+    ["FJORD_ACTOR", "USER", "USERNAME"]
+        .iter()
+        .find_map(|key| std::env::var(key).ok().filter(|v| !v.trim().is_empty()))
+        .unwrap_or_else(|| "user".into())
+}
+
+pub(crate) fn env_or_platform(var: &str, platform: Option<PathBuf>) -> PathBuf {
+    if let Some(dir) = std::env::var_os(var).filter(|d| !d.is_empty()) {
+        return PathBuf::from(dir);
+    }
+    platform.unwrap_or_else(std::env::temp_dir).join("fjord")
 }
 
 pub(crate) fn require_text(value: &str, field: &str) -> Result<String> {

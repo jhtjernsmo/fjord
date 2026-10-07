@@ -6,11 +6,11 @@
 /    \/    \  fjord
 ```
 
-**Local-first project management for Linux — built for the keyboard, friendly to the mouse, and open to AI agents.**
+**Local-first project management — Linux first, also on Windows & macOS. Built for the keyboard, friendly to the mouse, and open to AI agents.**
 
 [![CI](https://github.com/jhtjernsmo/fjord/actions/workflows/ci.yml/badge.svg)](https://github.com/jhtjernsmo/fjord/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)
-![Platform](https://img.shields.io/badge/platform-Linux-informational)
+![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-informational)
 ![Status](https://img.shields.io/badge/status-early%20preview-orange)
 
 ![Fjord board](docs/screenshots/board.png)
@@ -53,9 +53,27 @@ the same projects, and you can always see who did what.
 
 ## Install
 
-Fjord is an early preview; there are no packaged releases yet. Build it from source:
+Fjord is **Linux first**: that's where it's developed and used daily. Windows and macOS builds come
+from the same code and are tested in CI on every pull request.
 
-**Requirements:** Rust (stable), Node.js 20+, and WebKitGTK 4.1.
+### Download
+
+Grab the installer for your system from [Releases](https://github.com/jhtjernsmo/fjord/releases):
+
+| System | File |
+|---|---|
+| Linux | `.AppImage` (any distro), `.deb` (Debian/Ubuntu), `.rpm` (Fedora/openSUSE) |
+| Windows 10/11 | `.msi` or `-setup.exe` |
+| macOS | `.dmg` (Apple Silicon or Intel) |
+
+The CLI is attached separately as `fjord-cli-<platform>`. Builds aren't code-signed yet: Windows
+may show a SmartScreen warning (More info → Run anyway), and on macOS right-click the app → Open
+the first time.
+
+### Build from source
+
+**Requirements:** Rust (stable), Node.js 20+. On Linux also WebKitGTK 4.1; Windows uses the
+built-in WebView2, and macOS needs the Xcode command line tools.
 
 ```sh
 # Arch
@@ -70,7 +88,7 @@ sudo dnf install webkit2gtk4.1-devel openssl-devel librsvg2-devel
 git clone https://github.com/jhtjernsmo/fjord.git
 cd fjord
 npm --prefix ui install
-npx --prefix ui tauri build --bundles deb   # release build + .deb in target/release/bundle
+npx --prefix ui tauri build          # installers for your OS in target/release/bundle
 ./target/release/fjord-app           # run it
 
 cargo install --path crates/fjord-cli  # optional: puts `fjord` on your PATH
@@ -95,7 +113,7 @@ what comes next.
 | `Space L` | Switch language | `p` | Cycle priority |
 | `Esc` | Close | `/` | Filter the board |
 
-Remap anything in `~/.config/fjord/keymap.json`:
+On macOS, `Ctrl` shortcuts use `⌘` instead. Remap anything in `keymap.json` (see [Data](#data) for where it lives):
 
 ```json
 {
@@ -150,12 +168,13 @@ deliberately no delete tool.
 
 | What | Where |
 |---|---|
-| Database | `~/.local/share/fjord/fjord.db` (SQLite, WAL) |
-| Attached files | `~/.local/share/fjord/files/` (named by SHA-256) |
-| Keymap | `~/.config/fjord/keymap.json` |
+| | Linux | Windows | macOS |
+|---|---|---|---|
+| Data (`fjord.db`, `files/`) | `~/.local/share/fjord` | `%APPDATA%\fjord` | `~/Library/Application Support/fjord` |
+| Keymap (`keymap.json`) | `~/.config/fjord` | `%APPDATA%\fjord` | `~/Library/Application Support/fjord` |
 
-Set `FJORD_DATA_DIR` to use another location, for example a separate test database. Back up by
-copying the folder.
+Settings in the app shows the exact paths. Set `FJORD_DATA_DIR` / `FJORD_CONFIG_DIR` to use other
+locations (for example a separate test database). Back up by copying the data folder.
 
 ## Architecture
 
@@ -184,7 +203,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Translations are welcome: copy the `no` 
 
 ## Roadmap
 
-- Packaged releases (AppImage, Flatpak, AUR)
+- More packaging: Flathub, AUR, winget, Homebrew
 - Tags and saved filters
 - Desktop notifications for due dates
 - Paste images from the clipboard, PDF previews

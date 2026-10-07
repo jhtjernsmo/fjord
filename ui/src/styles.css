@@ -409,3 +409,5 @@ kbd {
 .dim { color: var(--dim); font-size: 12px; }
 .hint { color: var(--muted); font-size: 12.5px; }
 .push-right { margin-left: auto; }
+
+.path { font: 11.5px var(--mono); color: var(--muted); background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; word-break: break-all; user-select: text; }

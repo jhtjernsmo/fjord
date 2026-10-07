@@ -14,7 +14,7 @@ mod tasks;
 pub use error::{Error, Result};
 pub use models::*;
 pub use projects::{slugify, status_names};
-pub use store::Store;
+pub use store::{Store, config_dir, default_actor};
 
 #[cfg(test)]
 pub(crate) mod test_util {
@@ -51,6 +51,23 @@ mod tests {
             .unwrap();
         assert_eq!(version as usize, schema::version());
         assert_eq!(s.actor(), "claude");
+    }
+
+    #[test]
+    fn platform_dirs_end_in_fjord_and_env_overrides_win() {
+        let platform = Some(std::path::PathBuf::from("/platform/data"));
+        let fallback = store::env_or_platform("FJORD_TEST_VAR_THAT_IS_NEVER_SET", platform);
+        assert_eq!(
+            fallback,
+            std::path::PathBuf::from("/platform/data").join("fjord")
+        );
+        // PATH is always set, so it stands in for an override here.
+        let overridden = store::env_or_platform("PATH", Some("/ignored".into()));
+        assert_eq!(
+            overridden,
+            std::path::PathBuf::from(std::env::var_os("PATH").unwrap())
+        );
+        assert!(!default_actor().trim().is_empty());
     }
 
     #[test]

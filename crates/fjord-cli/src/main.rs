@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use fjord_core::{NewProject, NewTask, ProjectPatch, StatusPatch, Store, TaskPatch};
+use fjord_core::{NewProject, NewTask, ProjectPatch, StatusPatch, Store, TaskPatch, default_actor};
 
 #[derive(Parser)]
 #[command(
@@ -16,10 +16,10 @@ use fjord_core::{NewProject, NewTask, ProjectPatch, StatusPatch, Store, TaskPatc
     about = "Local-first project management — CLI"
 )]
 struct Cli {
-    /// Who is making changes (shown in the activity log). Default: $FJORD_ACTOR or $USER.
+    /// Who is making changes (shown in the activity log). Default: $FJORD_ACTOR or your user name.
     #[arg(long, global = true)]
     actor: Option<String>,
-    /// Data directory. Default: $FJORD_DATA_DIR or ~/.local/share/fjord.
+    /// Data directory. Default: $FJORD_DATA_DIR or the platform data dir (~/.local/share/fjord on Linux).
     #[arg(long, global = true)]
     data_dir: Option<PathBuf>,
     /// Print JSON instead of text (for scripts and agents).
@@ -195,12 +195,6 @@ enum ColumnCmd {
     /// Remove an empty column
     #[command(alias = "rm")]
     Remove { project: String, column: String },
-}
-
-fn default_actor() -> String {
-    std::env::var("FJORD_ACTOR")
-        .or_else(|_| std::env::var("USER"))
-        .unwrap_or_else(|_| "user".into())
 }
 
 fn main() {

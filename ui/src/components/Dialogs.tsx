@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { api } from '../api'
 import type { NewProject } from '../api'
 import { useApp } from '../data'
 import { LOCALES } from '../i18n'
@@ -97,6 +98,10 @@ export const THEMES: Theme[] = ['system', 'dark', 'light']
 
 export function SettingsDialog({ theme, onTheme, onClose }: { theme: Theme; onTheme: (t: Theme) => void; onClose: () => void }) {
   const { t, locale, setLocale } = useApp()
+  const [paths, setPaths] = useState<{ data: string; keymap: string } | null>(null)
+  useEffect(() => {
+    api.dataPaths().then(setPaths).catch(() => setPaths(null))
+  }, [])
   return (
     <div className="overlay" onMouseDown={onClose}>
       <div className="dialog" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-label={t('settings.title')}>
@@ -129,6 +134,7 @@ export function SettingsDialog({ theme, onTheme, onClose }: { theme: Theme; onTh
         <div className="row">
           {t('settings.keys')}
           <span className="hint">{t('settings.keysHint')}</span>
+          {paths && <code className="path">{paths.keymap}</code>}
         </div>
         <div className="row">
           {t('settings.agents')}
@@ -137,6 +143,7 @@ export function SettingsDialog({ theme, onTheme, onClose }: { theme: Theme; onTh
         <div className="row">
           {t('settings.data')}
           <span className="hint">{t('settings.dataHint')}</span>
+          {paths && <code className="path">{paths.data}</code>}
         </div>
       </div>
     </div>

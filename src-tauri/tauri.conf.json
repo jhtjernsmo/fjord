@@ -27,7 +27,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["appimage", "deb"],
+    "targets": "all",
     "category": "Productivity",
     "shortDescription": "Local project management",
     "icon": [

@@ -20,6 +20,13 @@ describe('eventToken', () => {
     expect(eventToken(key('Enter', { shiftKey: true }))).toBe('shift+enter')
     expect(eventToken(key('Shift', { shiftKey: true }))).toBeNull()
   })
+
+  it('treats Cmd as Ctrl on macOS only', () => {
+    expect(eventToken(key('k', { metaKey: true }), true)).toBe('ctrl+k')
+    expect(eventToken(key('k', { metaKey: true }), false)).toBe('meta+k')
+    expect(displayKeys('ctrl+k', 'space', true)).toBe('⌘k')
+    expect(displayKeys('ctrl+k', 'space', false)).toBe('ctrl+k')
+  })
 })
 
 describe('buildKeymap', () => {
@@ -63,7 +70,7 @@ describe('match', () => {
 
 describe('displayKeys', () => {
   it('prettifies special keys', () => {
-    expect(displayKeys('<leader>f', 'space')).toBe('␣ f')
-    expect(displayKeys('enter', 'space')).toBe('⏎')
+    expect(displayKeys('<leader>f', 'space', false)).toBe('␣ f')
+    expect(displayKeys('enter', 'space', false)).toBe('⏎')
   })
 })

@@ -89,15 +89,18 @@ const NAMED_KEYS: Record<string, string> = {
   Backspace: 'backspace',
 }
 
+/** On macOS, Cmd plays the role of Ctrl so "ctrl+k" also means ⌘K. */
+export const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+
 /** KeyboardEvent -> token like "j", "J", "ctrl+k", "space", "esc". */
-export function eventToken(e: KeyboardEvent): string | null {
+export function eventToken(e: KeyboardEvent, mac: boolean = IS_MAC): string | null {
   if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return null
   const named = NAMED_KEYS[e.key]
   const key = named ?? (e.key.length === 1 ? e.key : e.key.toLowerCase())
   const mods: string[] = []
-  if (e.ctrlKey) mods.push('ctrl')
+  if (e.ctrlKey || (mac && e.metaKey)) mods.push('ctrl')
   if (e.altKey) mods.push('alt')
-  if (e.metaKey) mods.push('meta')
+  if (e.metaKey && !mac) mods.push('meta')
   // Shift is already reflected in printable keys ("J"); only spell it for named keys.
   if (e.shiftKey && key.length > 1) mods.push('shift')
   // ctrl+K and ctrl+k should be the same binding.
@@ -105,10 +108,10 @@ export function eventToken(e: KeyboardEvent): string | null {
   return [...mods, normalized].join('+')
 }
 
-export function displayKeys(keys: string, leader: string): string {
+export function displayKeys(keys: string, leader: string, mac: boolean = IS_MAC): string {
   const pretty: Record<string, string> = { space: '␣', esc: 'Esc', enter: '⏎' }
   return parseSequence(keys, leader)
-    .map((k) => pretty[k] ?? k)
+    .map((k) => pretty[k] ?? (mac ? k.replace(/^ctrl\+/, '⌘') : k))
     .join(' ')
 }
 

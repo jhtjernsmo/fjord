@@ -145,6 +145,7 @@ export const api = {
   search: (query: string) => invoke<SearchHit[]>('search', { query }),
   recentActivity: (projectId: number | null, limit = 30) => invoke<Activity[]>('recent_activity', { projectId, limit }),
   loadKeymap: () => invoke<unknown>('load_keymap'),
+  dataPaths: () => invoke<{ data: string; keymap: string }>('data_paths'),
 }
 
 export function errorMessage(err: unknown): string {
