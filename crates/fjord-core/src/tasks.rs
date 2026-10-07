@@ -5,7 +5,7 @@ use crate::models::{NewTask, Task, TaskPatch};
 use crate::store::{Store, require_text};
 
 const TASK_COLS: &str = "id, project_id, status_id, title, body_md, priority, due_at, position,
-    created_by, created_at, updated_at, archived_at";
+    created_by, created_at, updated_at, archived_at, branch";
 
 fn task_from_row(row: &Row) -> rusqlite::Result<Task> {
     Ok(Task {
@@ -21,6 +21,7 @@ fn task_from_row(row: &Row) -> rusqlite::Result<Task> {
         created_at: row.get(9)?,
         updated_at: row.get(10)?,
         archived_at: row.get(11)?,
+        branch: row.get(12)?,
     })
 }
 

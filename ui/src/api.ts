@@ -43,6 +43,7 @@ export interface Task {
   created_at: string
   updated_at: string
   archived_at: string | null
+  branch: string | null
 }
 
 export interface Board {
@@ -93,6 +94,69 @@ export interface SearchHit {
   project_id: number
   title: string
   snippet: string
+}
+
+export interface ProjectRepo {
+  project_id: number
+  path: string
+  github_owner: string | null
+  github_repo: string | null
+  auto_move: boolean
+}
+
+export interface GitBranch {
+  name: string
+  sha: string
+  current: boolean
+  upstream: string | null
+  ahead: number
+  behind: number
+}
+
+export interface GitCommit {
+  sha: string
+  author: string
+  date: string
+  subject: string
+}
+
+export interface GitOverview {
+  repo: ProjectRepo
+  current_branch: string
+  dirty: boolean
+  branches: GitBranch[]
+  commits: GitCommit[]
+}
+
+export type Checks = 'none' | 'pending' | 'success' | 'failure'
+
+export interface PullRequest {
+  number: number
+  title: string
+  state: 'open' | 'closed' | 'merged'
+  draft: boolean
+  url: string
+  author: string
+  head: string
+  base: string
+  head_sha: string
+  updated_at: string
+  checks: Checks
+}
+
+export interface LinkedPullRequest extends PullRequest {
+  task_id: number | null
+}
+
+export interface SyncReport {
+  pull_requests: LinkedPullRequest[]
+  completed: Task[]
+}
+
+export interface StartedBranch {
+  task: Task
+  branch: string
+  created: boolean
 }
 
 export interface NewProject {
@@ -146,6 +210,15 @@ export const api = {
   recentActivity: (projectId: number | null, limit = 30) => invoke<Activity[]>('recent_activity', { projectId, limit }),
   loadKeymap: () => invoke<unknown>('load_keymap'),
   dataPaths: () => invoke<{ data: string; keymap: string }>('data_paths'),
+  getProjectRepo: (projectId: number) => invoke<ProjectRepo | null>('get_project_repo', { projectId }),
+  linkRepo: (projectId: number, path: string) => invoke<ProjectRepo>('link_repo', { projectId, path }),
+  unlinkRepo: (projectId: number) => invoke<void>('unlink_repo', { projectId }),
+  setRepoAutoMove: (projectId: number, autoMove: boolean) => invoke<void>('set_repo_auto_move', { projectId, autoMove }),
+  gitOverview: (projectId: number) => invoke<GitOverview>('git_overview', { projectId }),
+  startBranch: (taskId: number) => invoke<StartedBranch>('start_branch', { taskId }),
+  syncPullRequests: (projectId: number) => invoke<SyncReport>('sync_pull_requests', { projectId }),
+  openPullRequest: (taskId: number, draft: boolean) => invoke<PullRequest>('open_pull_request', { taskId, draft }),
+  openUrl: (url: string) => invoke<void>('open_url', { url }),
 }
 
 export function errorMessage(err: unknown): string {

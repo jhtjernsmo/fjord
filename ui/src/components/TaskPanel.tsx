@@ -2,12 +2,13 @@
 import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
 import { motion } from 'motion/react'
-import { Archive, CircleCheck, X } from 'lucide-react'
+import { Archive, CircleCheck, ExternalLink, GitBranch, GitPullRequest, X } from 'lucide-react'
 import { api, formatBytes, relativeTime } from '../api'
-import type { Attachment, Status, TaskPatch } from '../api'
+import type { Attachment, Status, Task, TaskPatch } from '../api'
 import { useApp, useLive } from '../data'
 import type { MessageKey } from '../i18n'
 import { AgentTag, FileTypeIcon } from './Icons'
+import { ChecksIcon, PrStateBadge, refreshPullRequests, usePullRequests } from './GitView'
 
 const PRIORITY_LEVELS = [0, 1, 2, 3]
 
@@ -189,6 +190,8 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
             </div>
           </div>
 
+          <GitSection task={task} />
+
           {status?.is_done && (
             <div className="chip done-chip">
               <CircleCheck size={13} /> {t('task.done')}
@@ -197,5 +200,79 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
         </div>
       </motion.aside>
     </>
+  )
+}
+
+function GitSection({ task }: { task: Task }) {
+  const { run, t, toast } = useApp()
+  const [repo] = useLive(() => api.getProjectRepo(task.project_id), [task.project_id])
+  const prs = usePullRequests(task.project_id)
+  const [busy, setBusy] = useState(false)
+  const pr = prs?.find((p) => p.task_id === task.id)
+  const hasGithub = !!repo?.github_owner
+  // Fetch PRs once if nothing has synced this project yet (e.g. Git tab never opened).
+  useEffect(() => {
+    if (hasGithub && prs === undefined) refreshPullRequests(task.project_id).catch(() => undefined)
+  }, [hasGithub, prs, task.project_id])
+  if (repo === undefined) return null
+
+  const openPr = async (draft: boolean) => {
+    setBusy(true)
+    const created = await run(api.openPullRequest(task.id, draft))
+    if (created) {
+      toast(t('git.prOpened', { n: created.number }), 'success')
+      refreshPullRequests(task.project_id).catch(() => undefined)
+    }
+    setBusy(false)
+  }
+
+  return (
+    <div>
+      <div className="section-title">Git</div>
+      {repo === null ? (
+        <div className="hint" style={{ marginTop: 6 }}>
+          {t('git.notLinked')}
+        </div>
+      ) : (
+        <div className="task-git">
+          {task.branch ? (
+            <div className="row-inline">
+              <GitBranch size={14} />
+              <span className="mono">{task.branch}</span>
+              <button className="btn ghost" onClick={() => run(api.startBranch(task.id), t('git.branchStarted', { branch: task.branch ?? '' }))}>
+                {t('git.checkout')}
+              </button>
+            </div>
+          ) : (
+            <button className="btn" onClick={() => run(api.startBranch(task.id)).then((r) => r && toast(t('git.branchStarted', { branch: r.branch }), 'success'))}>
+              <GitBranch size={14} /> {t('git.startBranch')} <kbd>B</kbd>
+            </button>
+          )}
+          {pr ? (
+            <div className="pr-row">
+              <ChecksIcon checks={pr.checks} />
+              <span className="mono dim">#{pr.number}</span>
+              <span className="pr-title">{pr.title}</span>
+              <PrStateBadge pr={pr} />
+              <button className="icon-btn" onClick={() => run(api.openUrl(pr.url))} aria-label={t('git.openOnGithub')}>
+                <ExternalLink size={14} />
+              </button>
+            </div>
+          ) : (
+            task.branch &&
+            repo.github_owner && (
+              <div className="row-inline">
+                <button className="btn primary" disabled={busy} onClick={() => openPr(false)}>
+                  <GitPullRequest size={14} /> {t('git.openPr')}
+                </button>
+                <button className="btn ghost" disabled={busy} onClick={() => openPr(true)}>
+                  {t('git.openDraft')}
+                </button>
+              </div>
+            )
+          )}
+        </div>
+      )}
+    </div>
   )
 }

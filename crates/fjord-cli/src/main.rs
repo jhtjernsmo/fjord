@@ -40,6 +40,9 @@ enum Command {
     /// Manage board columns
     #[command(subcommand, alias = "c")]
     Column(ColumnCmd),
+    /// Git & GitHub: link a repo, branches, pull requests
+    #[command(subcommand, alias = "g")]
+    Git(GitCmd),
     /// Run as an MCP server on stdio (for AI agents; actor defaults to "claude")
     Mcp,
     /// Attach a file to a project (optionally to a task)
@@ -160,6 +163,32 @@ enum TaskCmd {
 }
 
 #[derive(Subcommand)]
+enum GitCmd {
+    /// Link a project to the git repository containing PATH
+    Link { project: String, path: PathBuf },
+    /// Forget the link (the repository is untouched)
+    Unlink { project: String },
+    /// Current branch, branches and recent commits
+    Status { project: String },
+    /// Turn automatic task moves on or off
+    AutoMove {
+        project: String,
+        #[arg(action = clap::ArgAction::Set, value_parser = clap::builder::BoolishValueParser::new())]
+        on: bool,
+    },
+    /// Check out (or create) the branch for a task
+    Branch { task: i64 },
+    /// Pull requests with CI state; moves tasks of merged PRs to done
+    Prs { project: String },
+    /// Push the task's branch and open a pull request
+    Pr {
+        task: i64,
+        #[arg(long)]
+        draft: bool,
+    },
+}
+
+#[derive(Subcommand)]
 enum ColumnCmd {
     /// List columns of a project
     #[command(alias = "ls")]
@@ -222,6 +251,7 @@ fn run(cli: Cli) -> Result<()> {
         Command::Project(cmd) => project(&mut store, &out, cmd),
         Command::Task(cmd) => task(&mut store, &out, cmd),
         Command::Column(cmd) => column(&mut store, &out, cmd),
+        Command::Git(cmd) => git(&mut store, &out, cmd),
         Command::Mcp => mcp::serve(&mut store),
         Command::Attach {
             project,
@@ -367,6 +397,41 @@ fn task(store: &mut Store, out: &output::Printer, cmd: TaskCmd) -> Result<()> {
         TaskCmd::Archived { project } => {
             let p = store.find_project(&project)?;
             out.tasks(&store.list_archived_tasks(p.id)?)
+        }
+    }
+}
+
+fn git(store: &mut Store, out: &output::Printer, cmd: GitCmd) -> Result<()> {
+    match cmd {
+        GitCmd::Link { project, path } => {
+            let p = store.find_project(&project)?;
+            out.value(&fjord_vcs::link_repo(store, p.id, &path)?)
+        }
+        GitCmd::Unlink { project } => {
+            let p = store.find_project(&project)?;
+            store.unlink_project_repo(p.id)?;
+            out.message("Unlinked.")
+        }
+        GitCmd::Status { project } => {
+            let p = store.find_project(&project)?;
+            out.git_overview(&fjord_vcs::overview(store, p.id)?)
+        }
+        GitCmd::AutoMove { project, on } => {
+            let p = store.find_project(&project)?;
+            store.set_repo_auto_move(p.id, on)?;
+            out.message(if on {
+                "Auto-move on."
+            } else {
+                "Auto-move off."
+            })
+        }
+        GitCmd::Branch { task } => out.started_branch(&fjord_vcs::start_branch(store, task)?),
+        GitCmd::Prs { project } => {
+            let p = store.find_project(&project)?;
+            out.sync_report(&fjord_vcs::sync(store, p.id)?)
+        }
+        GitCmd::Pr { task, draft } => {
+            out.pull_request(&fjord_vcs::open_pull_request(store, task, draft)?)
         }
     }
 }

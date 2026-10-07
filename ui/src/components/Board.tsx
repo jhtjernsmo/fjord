@@ -13,7 +13,7 @@ import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import confetti from 'canvas-confetti'
-import { AlignLeft, CalendarDays } from 'lucide-react'
+import { AlignLeft, CalendarDays, GitBranch } from 'lucide-react'
 import { api, isOverdue } from '../api'
 import type { Board as BoardData, Status, Task } from '../api'
 import { useActions, useApp } from '../data'
@@ -70,7 +70,7 @@ function CardBody({ task, statuses, className = '' }: { task: Task; statuses: St
         </span>
       )}
       <div className="card-title">{task.title}</div>
-      {(task.priority > 0 || task.due_at || task.body_md) && (
+      {(task.priority > 0 || task.due_at || task.body_md || task.branch) && (
         <div className="card-meta">
           {task.priority > 0 && (
             <span className={`prio-${task.priority}`} title={`${t('task.priority')}: ${priority}`}>
@@ -85,6 +85,11 @@ function CardBody({ task, statuses, className = '' }: { task: Task; statuses: St
           {task.body_md && (
             <span title={t('board.hasDescription')}>
               <AlignLeft size={12} strokeWidth={1.8} />
+            </span>
+          )}
+          {task.branch && (
+            <span className="card-branch" title={task.branch}>
+              <GitBranch size={12} strokeWidth={1.8} />
             </span>
           )}
         </div>
@@ -141,7 +146,7 @@ function Column(props: {
 }
 
 export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysEnabled }: Props) {
-  const { run, t } = useApp()
+  const { run, t, toast } = useApp()
   const { statuses, tasks: allTasks } = board
   const [filter, setFilter] = useState<BoardFilter>(EMPTY_FILTER)
   const filterRef = useRef<HTMLInputElement>(null)
@@ -232,6 +237,9 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
       'task.archive': () => current && run(api.archiveTask(current.id, true), t('toast.archivedTask', { name: current.title })),
       'task.priority': () => current && run(api.updateTask(current.id, { priority: (current.priority + 1) % 4 })),
       'board.filter': () => filterRef.current?.focus(),
+      'task.branch': () =>
+        current &&
+        run(api.startBranch(current.id)).then((r) => r && toast(t('git.branchStarted', { branch: r.branch }), 'success')),
   }
   useActions(keysEnabled ? boardActions : {}, 'board')
 

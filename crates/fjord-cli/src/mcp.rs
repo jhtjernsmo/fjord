@@ -164,6 +164,36 @@ fn tool_definitions() -> Vec<Value> {
             &["query"],
         ),
         tool(
+            "link_repo",
+            "Link a project to the git repository at a local path (GitHub is detected from origin).",
+            json!({ "project": project, "path": { "type": "string" } }),
+            &["project", "path"],
+        ),
+        tool(
+            "git_status",
+            "Current branch, branches and recent commits of a project's repository.",
+            json!({ "project": project }),
+            &["project"],
+        ),
+        tool(
+            "start_branch",
+            "Check out (or create) the git branch for a task, e.g. fjord/12-fix-push. Moves the task to in progress when auto-move is on.",
+            json!({ "id": { "type": "integer" } }),
+            &["id"],
+        ),
+        tool(
+            "list_pull_requests",
+            "GitHub pull requests of a project with CI state and linked tasks; moves tasks of merged PRs to done.",
+            json!({ "project": project }),
+            &["project"],
+        ),
+        tool(
+            "open_pull_request",
+            "Push a task's branch and open a GitHub pull request using the task title and description.",
+            json!({ "id": { "type": "integer" }, "draft": { "type": "boolean" } }),
+            &["id"],
+        ),
+        tool(
             "recent_activity",
             "Recent changes, optionally for one project.",
             json!({ "project": project, "limit": { "type": "integer" } }),
@@ -301,6 +331,33 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
                 .unwrap_or(DEFAULT_ACTIVITY_LIMIT);
             serde_json::to_value(store.recent_activity(project_id, limit)?)?
         }
+        "link_repo" => {
+            let p = store.find_project(str_arg(args, "project")?)?;
+            serde_json::to_value(fjord_vcs::link_repo(
+                store,
+                p.id,
+                &PathBuf::from(str_arg(args, "path")?),
+            )?)?
+        }
+        "git_status" => {
+            let p = store.find_project(str_arg(args, "project")?)?;
+            serde_json::to_value(fjord_vcs::overview(store, p.id)?)?
+        }
+        "start_branch" => {
+            serde_json::to_value(fjord_vcs::start_branch(store, int_arg(args, "id")?)?)?
+        }
+        "list_pull_requests" => {
+            let p = store.find_project(str_arg(args, "project")?)?;
+            serde_json::to_value(fjord_vcs::sync(store, p.id)?)?
+        }
+        "open_pull_request" => {
+            let draft = args.get("draft").and_then(Value::as_bool).unwrap_or(false);
+            serde_json::to_value(fjord_vcs::open_pull_request(
+                store,
+                int_arg(args, "id")?,
+                draft,
+            )?)?
+        }
         other => bail!("unknown tool «{other}»"),
     };
     Ok(value)
@@ -334,7 +391,7 @@ mod tests {
         );
         let tools =
             handle_line(&mut s, r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#).unwrap();
-        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 12);
+        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 17);
         let unknown = handle_line(&mut s, r#"{"jsonrpc":"2.0","id":3,"method":"nope"}"#).unwrap();
         assert_eq!(unknown["error"]["code"], -32601);
         let bad = handle_line(&mut s, "{not json").unwrap();

@@ -30,7 +30,8 @@ the same projects, and you can always see who did what.
 - **Notes** — markdown notes per project.
 - **Full-text search** across tasks, notes and file names (`Space f`).
 - **Keyboard-first, LazyVim-style** — a leader key with a which-key popup, vim motions on the board, a `Ctrl+K` command palette, and every binding configurable. The mouse works for everything too.
-- **AI-agent ready** — `fjord mcp` exposes 12 tools to MCP clients such as Claude. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
+- **Git & GitHub** — link a project to a repo, start a branch from any task (`B`), see pull requests with CI status, open PRs from a task, and let merged PRs move tasks to done.
+- **AI-agent ready** — `fjord mcp` exposes 17 tools to MCP clients such as Claude. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
 - **Activity log** — what changed, when, and by whom (you or an agent).
 - **Live updates** — changes from the CLI or an agent appear in the open app within a second or two.
 - **English and Norwegian** — English by default; adding a language is one file.
@@ -143,6 +144,31 @@ fjord --json project ls            # JSON for scripts
 
 Run `fjord --help` for everything. Changes are recorded with an actor: `--actor`, `$FJORD_ACTOR` or `$USER`.
 
+## Git & GitHub
+
+Link a project to a repository in the **Git** tab (or `fjord git link <project> <path>`). Fjord then:
+
+- starts a branch for a task — `fjord/12-fix-push-notifications` — and moves the task to the second column,
+- shows branches, recent commits and GitHub pull requests with their CI status,
+- links pull requests to tasks by branch name, and opens a PR straight from a task (title and description come from the task),
+- moves a task to done when its PR is merged (on **Sync**), unless you turn auto-move off.
+
+Git runs through your installed `git`, so your config, hooks and credentials apply. GitHub access
+comes from `gh auth login` or `GITHUB_TOKEN`; Fjord never stores a token. Public repositories can be
+read without one.
+
+| | |
+|---|---|
+| ![Git tab](docs/screenshots/git.png) | ![Git in a task](docs/screenshots/task-git.png) |
+
+```sh
+fjord git link bokost ~/code/bokost
+fjord git branch 12          # check out (or create) the task's branch
+fjord git status bokost      # branches and recent commits
+fjord git prs bokost         # pull requests + CI; moves merged tasks to done
+fjord git pr 12 --draft      # push the branch and open a pull request
+```
+
 ## AI agents (MCP)
 
 `fjord mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server on stdio. Changes it
@@ -161,8 +187,9 @@ Other clients:
 ```
 
 Tools: `list_projects`, `get_board`, `create_project`, `create_task`, `update_task`, `move_task`,
-`complete_task`, `archive_task`, `add_note`, `attach_file`, `search`, `recent_activity`. There is
-deliberately no delete tool.
+`complete_task`, `archive_task`, `add_note`, `attach_file`, `search`, `recent_activity`, `link_repo`,
+`git_status`, `start_branch`, `list_pull_requests`, `open_pull_request`. There is deliberately no
+delete tool.
 
 ## Data
 
@@ -180,6 +207,7 @@ locations (for example a separate test database). Back up by copying the data fo
 
 ```
 crates/fjord-core   Rust library: schema & migrations, projects, columns, tasks, files, notes, search, activity
+crates/fjord-vcs    Git (via the git CLI) and GitHub REST integration
 crates/fjord-cli    `fjord` CLI and MCP server
 src-tauri           Tauri desktop shell — thin commands over fjord-core
 ui                  React + TypeScript interface (dnd-kit, Lucide, Motion)
@@ -207,7 +235,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Translations are welcome: copy the `no` 
 - Tags and saved filters
 - Desktop notifications for due dates
 - Paste images from the clipboard, PDF previews
-- Git integration (`fixes #12` closes a task)
+- GitHub issues ↔ tasks, review status on cards
 - Timeline and calendar views
 
 ## License

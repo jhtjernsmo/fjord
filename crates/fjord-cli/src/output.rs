@@ -58,11 +58,115 @@ fn describe(a: &Activity) -> String {
         "status.update" => format!("updated column “{subject}”"),
         "status.move" => format!("moved column “{subject}”"),
         "status.delete" => format!("removed column “{subject}”"),
+        "repo.link" => format!("linked “{subject}” to {detail}"),
+        "repo.unlink" => format!("unlinked the repository from “{subject}”"),
+        "task.branch" => format!("started branch {detail} for “{subject}”"),
         other => format!("{other} “{subject}”"),
     }
 }
 
 impl Printer {
+    pub fn value<T: Serialize>(&self, v: &T) -> Result<()> {
+        if self.json {
+            return print_json(v);
+        }
+        println!("{}", serde_json::to_string_pretty(v)?);
+        Ok(())
+    }
+
+    pub fn message(&self, text: &str) -> Result<()> {
+        if self.json {
+            return print_json(&serde_json::json!({ "ok": true, "message": text }));
+        }
+        println!("{text}");
+        Ok(())
+    }
+
+    pub fn git_overview(&self, o: &fjord_vcs::GitOverview) -> Result<()> {
+        if self.json {
+            return print_json(o);
+        }
+        let gh = match (&o.repo.github_owner, &o.repo.github_repo) {
+            (Some(a), Some(b)) => format!("  github.com/{a}/{b}"),
+            _ => String::new(),
+        };
+        println!("{}{gh}", o.repo.path);
+        println!(
+            "on {}{}\n",
+            o.current_branch,
+            if o.dirty {
+                "  (uncommitted changes)"
+            } else {
+                ""
+            }
+        );
+        for b in &o.branches {
+            let mark = if b.current { "*" } else { " " };
+            let track = match (b.ahead, b.behind) {
+                (0, 0) => String::new(),
+                (a, 0) => format!("  ↑{a}"),
+                (0, z) => format!("  ↓{z}"),
+                (a, z) => format!("  ↑{a} ↓{z}"),
+            };
+            println!("{mark} {:<36} {}{track}", b.name, b.sha);
+        }
+        println!();
+        for c in &o.commits {
+            println!("{}  {}  ({})", c.sha, c.subject, c.author);
+        }
+        Ok(())
+    }
+
+    pub fn started_branch(&self, b: &fjord_vcs::StartedBranch) -> Result<()> {
+        if self.json {
+            return print_json(b);
+        }
+        let verb = if b.created {
+            "Created and switched to"
+        } else {
+            "Switched to"
+        };
+        println!("{verb} {} for #{} {}", b.branch, b.task.id, b.task.title);
+        Ok(())
+    }
+
+    pub fn pull_request(&self, pr: &fjord_vcs::PullRequest) -> Result<()> {
+        if self.json {
+            return print_json(pr);
+        }
+        println!("#{} {}  [{}]  {}", pr.number, pr.title, pr.state, pr.url);
+        Ok(())
+    }
+
+    pub fn sync_report(&self, r: &fjord_vcs::SyncReport) -> Result<()> {
+        if self.json {
+            return print_json(r);
+        }
+        if r.pull_requests.is_empty() {
+            println!("No pull requests.");
+        }
+        for lp in &r.pull_requests {
+            let checks = match lp.pr.checks {
+                fjord_vcs::Checks::Success => "✓",
+                fjord_vcs::Checks::Failure => "✗",
+                fjord_vcs::Checks::Pending => "…",
+                fjord_vcs::Checks::None => " ",
+            };
+            let task = lp
+                .task_id
+                .map(|id| format!("  task #{id}"))
+                .unwrap_or_default();
+            println!(
+                "{checks} #{:<5} {:<8} {}  ({}){task}",
+                lp.pr.number, lp.pr.state, lp.pr.title, lp.pr.head
+            );
+        }
+        for t in &r.completed {
+            println!("→ moved #{} {} to done (PR merged)", t.id, t.title);
+        }
+        Ok(())
+    }
+
     pub fn projects(&self, list: &[ProjectSummary]) -> Result<()> {
         if self.json {
             return print_json(list);

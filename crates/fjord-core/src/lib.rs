@@ -6,6 +6,7 @@ mod files;
 mod models;
 mod notes;
 mod projects;
+mod repos;
 mod schema;
 mod statuses;
 mod store;
