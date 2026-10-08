@@ -4,6 +4,8 @@ name: Release
 # The result is a *draft* GitHub Release — review it, then click Publish.
 # Builds are signed for the in-app updater (secrets TAURI_SIGNING_PRIVATE_KEY[_PASSWORD]);
 # tauri-action uploads latest.json, which installed apps read once the release is published.
+# macOS apps are code-signed with the Developer ID certificate and notarized by Apple
+# (secrets APPLE_CERTIFICATE[_PASSWORD], APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID).
 on:
   push:
     tags: ['v*']
@@ -60,6 +62,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # macOS only (ignored elsewhere): sign with Developer ID, then notarize.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tauriScript: npx --prefix ui tauri
           args: --config src-tauri/tauri.updater.conf.json ${{ matrix.args }}
@@ -68,8 +77,8 @@ jobs:
           releaseName: Fjord ${{ github.ref_name }}
           releaseBody: |
             Local-first project management — Linux first, also on Windows & macOS.
-            See the README for install notes. Builds are not code-signed yet:
-            Windows may show a SmartScreen warning and macOS needs right-click → Open.
+            See the README for install notes. macOS builds are signed and notarized by Apple.
+            Windows builds are not code-signed yet, so SmartScreen may show a warning.
           releaseDraft: true
           prerelease: false # the updater only sees the latest non-prerelease
 
