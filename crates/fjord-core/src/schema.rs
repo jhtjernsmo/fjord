@@ -199,6 +199,10 @@ const MIGRATIONS: &[&str] = &[
     ALTER TABLE tasks ADD COLUMN child_order REAL NOT NULL DEFAULT 0;
     CREATE INDEX tasks_parent ON tasks(parent_id);
     "#,
+    // v8: remember the external item's last state (Azure "Active", "Resolved", …)
+    r#"
+    ALTER TABLE external_links ADD COLUMN state TEXT;
+    "#,
 ];
 
 pub fn configure(conn: &Connection) -> Result<()> {
