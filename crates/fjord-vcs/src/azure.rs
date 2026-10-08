@@ -516,7 +516,7 @@ const ASSIGNED_TO_ME: &str = "SELECT [System.Id] FROM WorkItems \
      AND [System.State] NOT IN ('Closed', 'Done', 'Removed', 'Resolved', 'Completed') \
      ORDER BY [System.ChangedDate] DESC";
 const MAX_WORK_ITEMS: usize = 200;
-const WORK_ITEM_FIELDS: &str = "System.Id,System.Rev,System.Title,System.Description,System.TeamProject,\
+const WORK_ITEM_FIELDS: &str = "System.Id,System.Rev,System.Parent,System.Title,System.Description,System.TeamProject,\
      System.AreaPath,System.WorkItemType,System.State,Microsoft.VSTS.Common.Priority,\
      Microsoft.VSTS.Scheduling.DueDate,Microsoft.VSTS.Scheduling.TargetDate,\
      Microsoft.VSTS.Common.AcceptanceCriteria,Microsoft.VSTS.TCM.ReproSteps";
@@ -556,6 +556,8 @@ pub struct WorkItem {
     pub priority: Option<i64>,
     /// YYYY-MM-DD
     pub due: Option<String>,
+    /// The parent work item (e.g. the User Story above a Task).
+    pub parent: Option<u64>,
 }
 
 impl WorkItem {
@@ -637,6 +639,7 @@ fn work_item_from(org: &str, item: ApiWorkItem) -> WorkItem {
             .get("Microsoft.VSTS.Common.Priority")
             .and_then(|v| v.as_i64()),
         due,
+        parent: f.get("System.Parent").and_then(|v| v.as_u64()),
     }
 }
 
@@ -680,6 +683,50 @@ pub fn assigned_work_items(org: &str) -> Result<Vec<WorkItem>> {
         .into_iter()
         .map(|i| work_item_from(org, i))
         .collect())
+}
+
+/// States that mean a work item is finished.
+pub const CLOSED_STATES: &[&str] = &["Closed", "Done", "Removed", "Resolved", "Completed"];
+
+/// Parent and state of a work item, for walking up the hierarchy and noticing
+/// items that were closed since they were imported.
+#[derive(Debug, Clone, PartialEq)]
+pub struct WorkItemInfo {
+    pub parent: Option<u64>,
+    pub state: String,
+}
+
+/// Parent and state for each of `ids` (deleted or inaccessible items are left out).
+pub fn work_item_info(
+    org: &str,
+    ids: &[u64],
+) -> Result<std::collections::HashMap<u64, WorkItemInfo>> {
+    let org = check_org(org)?;
+    let (auth, _) = find_auth(org).ok_or_else(|| VcsError::NoAzureToken(org.to_string()))?;
+    let agent = agent();
+    let mut out = std::collections::HashMap::new();
+    for chunk in ids.chunks(MAX_WORK_ITEMS) {
+        let list: Vec<String> = chunk.iter().map(u64::to_string).collect();
+        let mut res = agent
+            .get(&format!(
+                "{HOST}/{}/_apis/wit/workitems?ids={}&fields=System.Id,System.Parent,System.State&errorPolicy=omit&api-version={API_VERSION}",
+                encode(org),
+                list.join(",")
+            ))
+            .header("Accept", "application/json")
+            .header("Authorization", &auth.header())
+            .call()
+            .map_err(|e| api_error(e, org))?;
+        let items: List<Option<ApiWorkItem>> = read_json(&mut res, org)?;
+        for item in items.value.into_iter().flatten() {
+            let info = WorkItemInfo {
+                parent: item.fields.get("System.Parent").and_then(|v| v.as_u64()),
+                state: field_str(&item.fields, "System.State"),
+            };
+            out.insert(item.id, info);
+        }
+    }
+    Ok(out)
 }
 
 /// Good-enough HTML → markdown for work item descriptions: paragraphs, line breaks,
@@ -896,7 +943,7 @@ mod tests {
             "System.WorkItemType":"Bug","System.State":"Active","System.Title":"Crash on login",
             "System.Description":"<div>App crashes</div>",
             "Microsoft.VSTS.Common.AcceptanceCriteria":"<ul><li>No crash</li></ul>",
-            "Microsoft.VSTS.Common.Priority":1,"Microsoft.VSTS.Scheduling.DueDate":"2026-10-20T00:00:00Z"}}]}"#;
+            "Microsoft.VSTS.Common.Priority":1,"Microsoft.VSTS.Scheduling.DueDate":"2026-10-20T00:00:00Z","System.Parent":280}}]}"#;
         let list: List<ApiWorkItem> = serde_json::from_str(json).unwrap();
         let wi = work_item_from("Contoso", list.value.into_iter().next().unwrap());
         assert_eq!(
@@ -907,6 +954,7 @@ mod tests {
             wi.url(),
             "https://dev.azure.com/Contoso/Mobile%20App/_workitems/edit/297"
         );
+        assert_eq!(wi.parent, Some(280));
 
         let item = wi.to_external_item();
         assert_eq!(

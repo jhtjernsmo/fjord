@@ -62,7 +62,7 @@ export function AzureImportSettings() {
     setBusy(true)
     try {
       const r = await api.runAzureImport()
-      toast(t('import.report', { created: r.created.length, updated: r.updated, unmapped: r.unmapped }), 'success')
+      toast(t('import.report', { created: r.created.length, updated: r.updated, closed: r.closed, unmapped: r.unmapped }), 'success')
     } catch (e) {
       toast(errorMessage(e), 'error')
     } finally {

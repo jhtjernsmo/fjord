@@ -153,6 +153,46 @@ impl Store {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// Makes a task a subtask of `parent` (or a top-level task with `None`).
+    /// Same rules as creating one: same project, one level deep.
+    pub fn set_task_parent(&mut self, id: i64, parent: Option<i64>) -> Result<Task> {
+        let task = self.get_task(id)?;
+        let child_order = match parent {
+            Some(parent_id) => {
+                let p = self.get_task(parent_id)?;
+                if p.id == task.id || p.project_id != task.project_id {
+                    return Err(Error::Invalid(
+                        "a subtask must be in its parent's project".into(),
+                    ));
+                }
+                if p.parent_id.is_some() {
+                    return Err(Error::Invalid(
+                        "subtasks can't have subtasks of their own".into(),
+                    ));
+                }
+                if !self.list_subtasks(task.id)?.is_empty() {
+                    return Err(Error::Invalid(
+                        "a task with subtasks can't become a subtask".into(),
+                    ));
+                }
+                self.conn.query_row(
+                    "SELECT coalesce(max(child_order), 0) + 1 FROM tasks WHERE parent_id = ?1",
+                    [parent_id],
+                    |r| r.get::<_, f64>(0),
+                )?
+            }
+            None => 0.0,
+        };
+        self.conn.execute(
+            "UPDATE tasks SET parent_id = ?1, child_order = ?2,
+                updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+             WHERE id = ?3",
+            params![parent, child_order, id],
+        )?;
+        self.touch_project(task.project_id)?;
+        self.get_task(id)
+    }
+
     /// Moves a subtask to `index` among its siblings.
     pub fn move_subtask(&mut self, id: i64, index: usize) -> Result<Vec<Task>> {
         let task = self.get_task(id)?;
@@ -585,5 +625,67 @@ mod tests {
         // Deleting the parent deletes its subtasks.
         s.delete_task(parent.id).unwrap();
         assert!(s.get_task(a.id).is_err());
+    }
+
+    #[test]
+    fn tasks_can_be_moved_under_a_parent_and_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = Store::open(dir.path(), "tester").unwrap();
+        let p = s
+            .create_project(NewProject {
+                name: "P".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let q = s
+            .create_project(NewProject {
+                name: "Q".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let story = s
+            .create_task(NewTask {
+                project_id: p,
+                title: "Story".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        let task = s
+            .create_task(NewTask {
+                project_id: p,
+                title: "Task".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        let elsewhere = s
+            .create_task(NewTask {
+                project_id: q,
+                title: "Other".into(),
+                ..Default::default()
+            })
+            .unwrap();
+
+        assert_eq!(
+            s.set_task_parent(task.id, Some(story.id))
+                .unwrap()
+                .parent_id,
+            Some(story.id)
+        );
+        assert_eq!(s.list_subtasks(story.id).unwrap().len(), 1);
+        assert!(
+            s.set_task_parent(story.id, Some(task.id)).is_err(),
+            "a task with subtasks can't become one"
+        );
+        assert!(
+            s.set_task_parent(elsewhere.id, Some(story.id)).is_err(),
+            "other project"
+        );
+        assert!(
+            s.set_task_parent(story.id, Some(story.id)).is_err(),
+            "itself"
+        );
+        assert_eq!(s.set_task_parent(task.id, None).unwrap().parent_id, None);
     }
 }

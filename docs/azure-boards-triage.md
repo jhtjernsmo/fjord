@@ -23,6 +23,17 @@ because you or an agent may have added to it.
 
 Work items in Azure projects without a mapping are skipped.
 
+**Hierarchy.** If a work item assigned to you has a parent (or grandparent) that is
+also assigned to you, it becomes a subtask of it in Fjord, e.g. your Tasks under
+your User Story. Fjord has one level of subtasks, so deeper chains (Epic → Feature →
+Story → Task) all go under the topmost item assigned to you. Parents assigned to
+others are looked through but not imported. Tasks already imported move to the
+right place on the next import.
+
+**Closed in Azure.** When a work item you imported is closed, done, resolved or
+removed in Azure, its Fjord task is moved to your done column on the next import
+(only once, so you can still move it back).
+
 ## 2. AI triage via MCP
 
 Imported tasks stay on a "new" list until an agent marks them analyzed. The MCP

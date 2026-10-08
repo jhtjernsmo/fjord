@@ -8,6 +8,7 @@ pub mod git;
 pub mod github;
 mod process;
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use fjord_core::{ImportOutcome, ImportSettings, ProjectRepo, RemoteHost, Store, Task};
@@ -15,8 +16,8 @@ use serde::Serialize;
 use thiserror::Error;
 
 pub use azure::{
-    AzureAccount, AzureDevOps, WorkItem, assigned_work_items, azure_account, connect_azure,
-    connect_azure_cli, disconnect_azure, parse_azure_remote,
+    AzureAccount, AzureDevOps, WorkItem, WorkItemInfo, assigned_work_items, azure_account,
+    connect_azure, connect_azure_cli, disconnect_azure, parse_azure_remote, work_item_info,
 };
 pub use git::{Branch, Commit, Git, branch_name_for_task, task_id_from_branch};
 pub use github::{
@@ -339,11 +340,34 @@ pub struct ImportReport {
     pub unchanged: usize,
     /// Work items in Azure projects that aren't mapped to a Fjord project.
     pub unmapped: usize,
+    /// Tasks moved under (or out from) a parent to match Azure's hierarchy.
+    pub regrouped: usize,
+    /// Imported tasks moved to done because their work item was closed in Azure.
+    pub closed: usize,
 }
 
-/// Network only: open work items assigned to you, for every organization in the
-/// mappings. Doesn't touch the store.
-pub fn fetch_assigned_work_items(settings: &ImportSettings) -> Result<Vec<WorkItem>> {
+/// Everything the import needs from Azure, fetched without touching the store.
+#[derive(Debug, Default)]
+pub struct ImportFetch {
+    pub items: Vec<WorkItem>,
+    /// Parent and state of other relevant work items: ancestors of the items
+    /// above, and previously imported items that are no longer assigned/open.
+    pub info: HashMap<(String, u64), WorkItemInfo>,
+}
+
+/// How far up the hierarchy to look for an imported ancestor (Task → Story →
+/// Feature → Epic is three steps).
+const MAX_HIERARCHY_DEPTH: usize = 4;
+
+fn split_external_id(id: &str) -> Option<(String, u64)> {
+    let (org, num) = id.rsplit_once('/')?;
+    Some((org.to_string(), num.parse().ok()?))
+}
+
+/// Network only: open work items assigned to you for every organization in the
+/// mappings, plus what's needed to nest them and to notice closed ones.
+/// `known` are external ids already imported (`org/id`).
+pub fn fetch_import(settings: &ImportSettings, known: &[String]) -> Result<ImportFetch> {
     let mut orgs: Vec<String> = settings
         .mappings
         .iter()
@@ -351,21 +375,93 @@ pub fn fetch_assigned_work_items(settings: &ImportSettings) -> Result<Vec<WorkIt
         .collect();
     orgs.sort();
     orgs.dedup();
-    let mut items = Vec::new();
+    let mut fetch = ImportFetch::default();
     for org in orgs {
-        items.extend(assigned_work_items(&org)?);
+        let items = assigned_work_items(&org)?;
+        let ids: std::collections::HashSet<u64> = items.iter().map(|i| i.id).collect();
+        // Walk up from parents that aren't assigned to you, to find an ancestor that is.
+        let mut seen = ids.clone();
+        let mut frontier: Vec<u64> = items
+            .iter()
+            .filter_map(|i| i.parent)
+            .filter(|p| seen.insert(*p))
+            .collect();
+        for _ in 0..MAX_HIERARCHY_DEPTH {
+            if frontier.is_empty() {
+                break;
+            }
+            let info = work_item_info(&org, &frontier)?;
+            frontier = info
+                .values()
+                .filter_map(|i| i.parent)
+                .filter(|p| seen.insert(*p))
+                .collect();
+            fetch
+                .info
+                .extend(info.into_iter().map(|(id, i)| ((org.clone(), id), i)));
+        }
+        // Previously imported items that dropped out (closed, or reassigned).
+        let gone: Vec<u64> = known
+            .iter()
+            .filter_map(|k| split_external_id(k))
+            .filter(|(o, id)| {
+                *o == org && !ids.contains(id) && !fetch.info.contains_key(&(org.clone(), *id))
+            })
+            .map(|(_, id)| id)
+            .collect();
+        if !gone.is_empty() {
+            let info = work_item_info(&org, &gone)?;
+            fetch
+                .info
+                .extend(info.into_iter().map(|(id, i)| ((org.clone(), id), i)));
+        }
+        fetch.items.extend(items);
     }
-    Ok(items)
+    Ok(fetch)
 }
 
-/// Creates or refreshes a Fjord task for each mapped work item.
+/// Network only, without hierarchy: open work items assigned to you.
+pub fn fetch_assigned_work_items(settings: &ImportSettings) -> Result<Vec<WorkItem>> {
+    Ok(fetch_import(settings, &[])?.items)
+}
+
+/// The topmost ancestor of `item` that is also being imported, if any.
+fn imported_root(
+    item: &WorkItem,
+    fetch: &ImportFetch,
+    imported: &HashMap<(String, u64), &WorkItem>,
+) -> Option<u64> {
+    let org = item.org.to_lowercase();
+    let parent_of = |id: u64| {
+        imported
+            .get(&(org.clone(), id))
+            .map(|w| w.parent)
+            .or_else(|| fetch.info.get(&(org.clone(), id)).map(|i| i.parent))
+            .flatten()
+    };
+    let mut root = None;
+    let mut next = item.parent;
+    for _ in 0..=MAX_HIERARCHY_DEPTH {
+        let Some(id) = next else { break };
+        if imported.contains_key(&(org.clone(), id)) {
+            root = Some(id);
+        }
+        next = parent_of(id);
+    }
+    root
+}
+
+/// Creates or refreshes a Fjord task for each mapped work item, nests tasks under
+/// their topmost imported ancestor (Fjord has one level of subtasks), and moves
+/// tasks to done when their work item was closed in Azure.
 pub fn apply_import(
     store: &mut Store,
     settings: &ImportSettings,
-    items: &[WorkItem],
+    fetch: &ImportFetch,
 ) -> Result<ImportReport> {
     let mut report = ImportReport::default();
-    for item in items {
+    let mut task_of: HashMap<(String, u64), Task> = HashMap::new();
+    for item in &fetch.items {
         let target = settings.mappings.iter().find(|m| {
             m.org.eq_ignore_ascii_case(&item.org) && m.project.eq_ignore_ascii_case(&item.project)
         });
@@ -373,10 +469,69 @@ pub fn apply_import(
             report.unmapped += 1;
             continue;
         };
-        match store.upsert_imported_task(mapping.fjord_project_id, &item.to_external_item())? {
-            (task, ImportOutcome::Created) => report.created.push(task),
-            (_, ImportOutcome::Updated) => report.updated += 1,
-            (_, ImportOutcome::Unchanged) => report.unchanged += 1,
+        let (task, outcome) =
+            store.upsert_imported_task(mapping.fjord_project_id, &item.to_external_item())?;
+        match outcome {
+            ImportOutcome::Created => report.created.push(task.clone()),
+            ImportOutcome::Updated => report.updated += 1,
+            ImportOutcome::Unchanged => report.unchanged += 1,
+        }
+        task_of.insert((item.org.to_lowercase(), item.id), task);
+    }
+
+    // Match Azure's hierarchy.
+    let imported: HashMap<(String, u64), &WorkItem> = fetch
+        .items
+        .iter()
+        .filter(|i| task_of.contains_key(&(i.org.to_lowercase(), i.id)))
+        .map(|i| ((i.org.to_lowercase(), i.id), i))
+        .collect();
+    let mut wanted: Vec<(i64, Option<i64>)> = Vec::new();
+    for (key, item) in &imported {
+        let task = &task_of[key];
+        let parent_task = imported_root(item, fetch, &imported)
+            .and_then(|root| task_of.get(&(key.0.clone(), root)))
+            .filter(|p| p.project_id == task.project_id)
+            .map(|p| p.id);
+        if task.parent_id != parent_task {
+            wanted.push((task.id, parent_task));
+        }
+    }
+    // Release every task that changes place first, so a task that loses its
+    // subtasks can itself be nested, then nest.
+    for (task_id, _) in &wanted {
+        if store.get_task(*task_id)?.parent_id.is_some() {
+            store.set_task_parent(*task_id, None)?;
+        }
+    }
+    for (task_id, parent) in wanted {
+        if parent.is_none() || store.set_task_parent(task_id, parent).is_ok() {
+            report.regrouped += 1;
+        }
+    }
+
+    // Work items closed in Azure since they were imported.
+    for (external_id, task_id) in store.external_ids("azure")? {
+        let Some(key) = split_external_id(&external_id) else {
+            continue;
+        };
+        let Some(info) = fetch.info.get(&key) else {
+            continue;
+        };
+        if task_of.contains_key(&key) || !azure::CLOSED_STATES.contains(&info.state.as_str()) {
+            continue;
+        }
+        let task = store.get_task(task_id)?;
+        let Some(done) = store
+            .list_statuses(task.project_id)?
+            .into_iter()
+            .find(|s| s.is_done)
+        else {
+            continue;
+        };
+        if task.status_id != done.id && task.archived_at.is_none() {
+            store.move_task(task.id, done.id, None)?;
+            report.closed += 1;
         }
     }
     Ok(report)
@@ -559,13 +714,123 @@ mod tests {
             acceptance_md: String::new(),
             priority: Some(2),
             due: None,
+            parent: None,
         };
         let items = [wi(1, "Mobile App"), wi(2, "Other team")];
-        let report = apply_import(&mut s, &settings, &items).unwrap();
+        let fetch = ImportFetch {
+            items: items.to_vec(),
+            ..Default::default()
+        };
+        let report = apply_import(&mut s, &settings, &fetch).unwrap();
         assert_eq!((report.created.len(), report.unmapped), (1, 1));
         assert_eq!(report.created[0].title, "Item 1");
-        let again = apply_import(&mut s, &settings, &items).unwrap();
+        let again = apply_import(&mut s, &settings, &fetch).unwrap();
         assert_eq!((again.created.len(), again.unchanged), (0, 1));
+    }
+
+    #[test]
+    fn imported_work_items_follow_the_azure_hierarchy_and_closures() {
+        let (mut s, _d) = store();
+        let p = s
+            .create_project(NewProject {
+                name: "Bokost".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let settings = ImportSettings {
+            enabled: true,
+            mappings: vec![fjord_core::ImportMapping {
+                org: "contoso".into(),
+                project: "App".into(),
+                fjord_project_id: p,
+            }],
+        };
+        let wi = |id: u64, parent: Option<u64>| WorkItem {
+            org: "contoso".into(),
+            id,
+            rev: 1,
+            project: "App".into(),
+            kind: "Task".into(),
+            state: "Active".into(),
+            area: "App".into(),
+            title: format!("Item {id}"),
+            description_md: String::new(),
+            acceptance_md: String::new(),
+            priority: None,
+            due: None,
+            parent,
+        };
+        let info = |parent: Option<u64>, state: &str| WorkItemInfo {
+            parent,
+            state: state.into(),
+        };
+
+        // Without knowing Feature 2's parent, Task 4 nests under Story 3 (both mine).
+        let flat = ImportFetch {
+            items: vec![wi(1, None), wi(3, Some(2)), wi(4, Some(3)), wi(5, None)],
+            ..Default::default()
+        };
+        apply_import(&mut s, &settings, &flat).unwrap();
+        let link = |s: &Store, n: u64| {
+            s.external_link("azure", &format!("contoso/{n}"))
+                .unwrap()
+                .unwrap()
+                .task_id
+        };
+        let (story, task4) = (
+            s.get_task(link(&s, 3)).unwrap(),
+            s.get_task(link(&s, 4)).unwrap(),
+        );
+        assert_eq!((story.parent_id, task4.parent_id), (None, Some(story.id)));
+
+        // Epic 1 (mine) → Feature 2 (not mine) → Story 3 (mine) → Task 4 (mine):
+        // 3 and 4 both become subtasks of 1, Fjord's single level.
+        let mut tree = ImportFetch {
+            items: vec![wi(1, None), wi(3, Some(2)), wi(4, Some(3)), wi(5, None)],
+            ..Default::default()
+        };
+        tree.info
+            .insert(("contoso".into(), 2), info(Some(1), "Active"));
+        let report = apply_import(&mut s, &settings, &tree).unwrap();
+        let task = |s: &Store, n: u64| {
+            s.get_task(
+                s.external_link("azure", &format!("contoso/{n}"))
+                    .unwrap()
+                    .unwrap()
+                    .task_id,
+            )
+            .unwrap()
+        };
+        let epic = task(&s, 1);
+        assert_eq!(
+            (task(&s, 3).parent_id, task(&s, 4).parent_id),
+            (Some(epic.id), Some(epic.id))
+        );
+        assert_eq!(report.regrouped, 2);
+
+        // Item 5 was closed in Azure: it drops out of "assigned to me" and is checked off.
+        let mut later = ImportFetch {
+            items: vec![wi(1, None), wi(3, Some(2)), wi(4, Some(3))],
+            info: tree.info.clone(),
+        };
+        later
+            .info
+            .insert(("contoso".into(), 5), info(None, "Closed"));
+        let report = apply_import(&mut s, &settings, &later).unwrap();
+        let done = s
+            .list_statuses(p)
+            .unwrap()
+            .into_iter()
+            .find(|st| st.is_done)
+            .unwrap()
+            .id;
+        assert_eq!((report.closed, task(&s, 5).status_id), (1, done));
+        assert_eq!(
+            apply_import(&mut s, &settings, &later).unwrap().closed,
+            0,
+            "only once"
+        );
     }
 
     #[test]

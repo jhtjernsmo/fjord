@@ -150,6 +150,15 @@ impl Store {
         }
     }
 
+    /// External ids already imported from `source`, with their task ids.
+    pub fn external_ids(&self, source: &str) -> Result<Vec<(String, i64)>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT external_id, task_id FROM external_links WHERE source = ?1")?;
+        let rows = stmt.query_map([source], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
     /// Imported tasks an agent hasn't analyzed yet (oldest first), skipping archived ones.
     pub fn unanalyzed_imports(&self) -> Result<Vec<ImportedTask>> {
         let mut stmt = self.conn.prepare(
