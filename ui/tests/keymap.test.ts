@@ -74,3 +74,29 @@ describe('displayKeys', () => {
     expect(displayKeys('enter', 'space', false)).toBe('⏎')
   })
 })
+
+describe('default keymap', () => {
+  it('has no clashing shortcuts within a scope (plus the always-on global ones)', async () => {
+    const { DEFAULT_ACTIONS, DEFAULT_LEADER, parseSequence } = await import('../src/keymap')
+    const scopes = ['board', 'panel', 'notes'] as const
+    for (const scope of scopes) {
+      const active = DEFAULT_ACTIONS.filter((a) => a.scope === 'global' || a.scope === scope)
+      const seqs = active.map((a) => ({ id: a.id, seq: parseSequence(a.keys, DEFAULT_LEADER).join(' ') }))
+      for (const a of seqs) {
+        for (const b of seqs) {
+          if (a.id === b.id) continue
+          expect(a.seq === b.seq, `${scope}: ${a.id} and ${b.id} share "${a.seq}"`).toBe(false)
+          expect(b.seq.startsWith(a.seq + ' '), `${scope}: ${a.id} ("${a.seq}") blocks ${b.id} ("${b.seq}")`).toBe(false)
+        }
+      }
+    }
+  })
+
+  it('every action has a label', async () => {
+    const { DEFAULT_ACTIONS } = await import('../src/keymap')
+    const { translator } = await import('../src/i18n')
+    const t = translator('en') as (key: string) => string
+    for (const a of DEFAULT_ACTIONS) expect(t(`action.${a.id}`), a.id).not.toBe(`action.${a.id}`)
+  })
+})
+

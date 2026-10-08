@@ -2,12 +2,12 @@
 // and user overrides from ~/.config/fjord/keymap.json. The mouse always works
 // too — the keyboard is an option, never a requirement.
 
-export type Scope = 'global' | 'board'
+export type Scope = 'global' | 'board' | 'panel' | 'notes'
 
 export interface ActionDef {
   id: string
   /** i18n group key suffix, e.g. 'board' -> 'group.board' */
-  group: 'general' | 'go' | 'project' | 'search' | 'view' | 'task' | 'board'
+  group: 'general' | 'go' | 'project' | 'search' | 'view' | 'task' | 'board' | 'panel' | 'notes'
   scope: Scope
   keys: string
 }
@@ -19,7 +19,6 @@ export const DEFAULT_ACTIONS: ActionDef[] = [
   { id: 'panel.close', group: 'general', scope: 'global', keys: 'esc' },
   { id: 'go.home', group: 'go', scope: 'global', keys: '<leader>h' },
   { id: 'go.notes', group: 'go', scope: 'global', keys: '<leader>N' },
-  { id: 'task.addSubtask', group: 'board', scope: 'global', keys: 'A' },
   { id: 'project.pick', group: 'project', scope: 'global', keys: '<leader>p' },
   { id: 'project.new', group: 'project', scope: 'global', keys: '<leader>n' },
   { id: 'project.archive', group: 'project', scope: 'global', keys: '<leader>P a' },
@@ -34,6 +33,8 @@ export const DEFAULT_ACTIONS: ActionDef[] = [
   { id: 'theme.cycle', group: 'general', scope: 'global', keys: '<leader>T' },
   { id: 'view.archive', group: 'view', scope: 'global', keys: '<leader>A' },
   { id: 'view.git', group: 'view', scope: 'global', keys: '<leader>g' },
+  { id: 'git.sync', group: 'project', scope: 'global', keys: '<leader>r' },
+  { id: 'azure.import', group: 'project', scope: 'global', keys: '<leader>i' },
   { id: 'board.left', group: 'board', scope: 'board', keys: 'h' },
   { id: 'board.right', group: 'board', scope: 'board', keys: 'l' },
   { id: 'board.down', group: 'board', scope: 'board', keys: 'j' },
@@ -52,6 +53,26 @@ export const DEFAULT_ACTIONS: ActionDef[] = [
   { id: 'board.filter', group: 'board', scope: 'board', keys: '/' },
   { id: 'task.branch', group: 'board', scope: 'board', keys: 'B' },
   { id: 'task.delete', group: 'board', scope: 'board', keys: 'delete' },
+  { id: 'board.toggleSubtasks', group: 'board', scope: 'board', keys: 'S' },
+  { id: 'task.copyRef', group: 'board', scope: 'board', keys: 'y' },
+  { id: 'task.addSubtaskHere', group: 'board', scope: 'board', keys: 'a' },
+  { id: 'panel.prevColumn', group: 'panel', scope: 'panel', keys: '[' },
+  { id: 'panel.nextColumn', group: 'panel', scope: 'panel', keys: ']' },
+  { id: 'panel.priority', group: 'panel', scope: 'panel', keys: 'p' },
+  { id: 'panel.edit', group: 'panel', scope: 'panel', keys: 'e' },
+  { id: 'task.addSubtask', group: 'panel', scope: 'panel', keys: 'A' },
+  { id: 'panel.branch', group: 'panel', scope: 'panel', keys: 'B' },
+  { id: 'panel.linkBranch', group: 'panel', scope: 'panel', keys: 'L' },
+  { id: 'panel.openPr', group: 'panel', scope: 'panel', keys: 'P' },
+  { id: 'panel.copyRef', group: 'panel', scope: 'panel', keys: 'y' },
+  { id: 'panel.archive', group: 'panel', scope: 'panel', keys: 'd d' },
+  { id: 'notes.new', group: 'notes', scope: 'notes', keys: 'n' },
+  { id: 'notes.next', group: 'notes', scope: 'notes', keys: 'j' },
+  { id: 'notes.prev', group: 'notes', scope: 'notes', keys: 'k' },
+  { id: 'notes.filter', group: 'notes', scope: 'notes', keys: '/' },
+  { id: 'notes.edit', group: 'notes', scope: 'notes', keys: 'e' },
+  { id: 'notes.mode', group: 'notes', scope: 'notes', keys: 'v' },
+  { id: 'notes.pin', group: 'notes', scope: 'notes', keys: 'P' },
 ]
 
 export interface KeymapConfig {

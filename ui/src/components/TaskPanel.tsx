@@ -7,11 +7,12 @@ import { Archive, CircleCheck, ExternalLink, GitBranch, GitPullRequest, Link2, T
 import { useContextMenus, useEntityActions } from './actions'
 import { api, formatBytes, relativeTime, remoteOf } from '../api'
 import type { Attachment, Status, Task, TaskPatch } from '../api'
-import { useApp, useLive } from '../data'
+import { useActions, useApp, useLive } from '../data'
 import type { MessageKey } from '../i18n'
 import { AgentTag, FileTypeIcon } from './Icons'
 import { ChecksIcon, PrStateBadge, refreshPullRequests, usePullRequests } from './GitView'
 import { Backlinks } from './NoteEditor'
+import { copyTaskRef } from './taskRef'
 import { Subtasks } from './Subtasks'
 
 const PRIORITY_LEVELS = [0, 1, 2, 3]
@@ -61,7 +62,7 @@ interface Props {
 }
 
 export function TaskPanel({ taskId, statuses, onClose }: Props) {
-  const { run, t, locale } = useApp()
+  const { run, t, locale, toast } = useApp()
   const { deleteTask } = useEntityActions()
   const projectId = statuses[0].project_id
   // undefined while loading, null if the task disappeared (e.g. archived elsewhere).
@@ -81,6 +82,27 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
   useEffect(() => {
     if (task === null) onClose()
   }, [task, onClose])
+
+  // Keys while a task is open (the board's keys are off then).
+  const moveBy = (delta: number) => {
+    if (!task) return
+    const i = statuses.findIndex((s) => s.id === task.status_id)
+    const target = statuses[i + delta]
+    if (target) run(api.moveTask(task.id, target.id))
+  }
+  useActions(
+    task
+      ? {
+          'panel.prevColumn': () => moveBy(-1),
+          'panel.nextColumn': () => moveBy(1),
+          'panel.priority': () => run(api.updateTask(task.id, { priority: (task.priority + 1) % 4 })),
+          'panel.edit': () => setEditing(true),
+          'panel.copyRef': () => copyTaskRef(task, toast, t),
+          'panel.archive': () => run(api.archiveTask(task.id, true), t('toast.archivedTask', { name: task.title })),
+        }
+      : {},
+    'panel',
+  )
 
   if (!task) return null
 
@@ -282,7 +304,6 @@ function GitSection({ task }: { task: Task }) {
   useEffect(() => {
     if (hasGithub && prs === undefined) refreshPullRequests(task.project_id).catch(() => undefined)
   }, [hasGithub, prs, task.project_id])
-  if (repo === undefined) return null
 
   const openPr = async (draft: boolean) => {
     setBusy(true)
@@ -293,6 +314,19 @@ function GitSection({ task }: { task: Task }) {
     }
     setBusy(false)
   }
+
+  useActions(
+    repo
+      ? {
+          'panel.branch': () =>
+            run(api.startBranch(task.id)).then((r) => r && toast(t('git.branchStarted', { branch: r.branch }), 'success')),
+          'panel.linkBranch': () => !task.branch && setPicking(true),
+          'panel.openPr': () => task.branch && hasGithub && !pr && !busy && openPr(false),
+        }
+      : {},
+    'panel',
+  )
+  if (repo === undefined) return null
 
   return (
     <div>

@@ -19,6 +19,8 @@ import type { Board as BoardData, Status, Task } from '../api'
 import { useActions, useApp } from '../data'
 import type { MessageKey } from '../i18n'
 import { AgentTag } from './Icons'
+import { focusSubtaskOnOpen } from './Subtasks'
+import { copyTaskRef } from './taskRef'
 import { AddColumn, ColumnHeader, EMPTY_FILTER, FilterBar, isFiltering } from './Columns'
 import { useContextMenus, useEntityActions } from './actions'
 import { useLive } from '../data'
@@ -280,6 +282,13 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
       'task.branch': () =>
         current &&
         run(api.startBranch(current.id)).then((r) => r && toast(t('git.branchStarted', { branch: r.branch }), 'success')),
+      'board.toggleSubtasks': () => setFilter((f) => ({ ...f, subtasks: !f.subtasks })),
+      'task.copyRef': () => current && copyTaskRef(current, toast, t),
+      'task.addSubtaskHere': () => {
+        if (!current) return
+        focusSubtaskOnOpen.current = true
+        onOpenTask(current.id)
+      },
   }
   useActions(keysEnabled ? boardActions : {}, 'board')
 

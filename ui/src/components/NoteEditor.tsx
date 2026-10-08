@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { FolderKanban, NotebookText, Pin, PinOff, Square, Trash2 } from 'lucide-react'
 import { api, relativeTime } from '../api'
 import type { LinkTarget, Note, ProjectSummary } from '../api'
-import { useApp, useLive } from '../data'
+import { useActions, useApp, useLive } from '../data'
 import { useNav } from '../nav'
 import type { MessageKey } from '../i18n'
 import { useEntityActions } from './actions'
@@ -63,6 +63,17 @@ export function NoteEditor({ note, projects, onDeleted }: { note: Note; projects
     }, AUTOSAVE_MS)
     return () => window.clearTimeout(id)
   }, [body, note.id])
+
+  useActions(
+    {
+      'notes.edit': () => {
+        if (mode === 'preview') setMode('split')
+        window.setTimeout(() => textRef.current?.focus(), 0)
+      },
+      'notes.mode': () => setMode((m) => (m === 'edit' ? 'split' : m === 'split' ? 'preview' : 'edit')),
+    },
+    'notes',
+  )
 
   const saveTitle = () => {
     const next = title.trim()
