@@ -544,3 +544,11 @@ kbd {
 .import-mapping select { max-width: 160px; }
 .import-mapping .input.mono { flex: 0 0 110px; min-width: 0; }
 .import-mapping .input.grow { min-width: 90px; }
+
+/* Dialogs never run off short screens: they scroll, and the title (with the close button) stays put. */
+.dialog { max-height: calc(100vh - 12vh - 24px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+.dialog > .dialog-title { position: sticky; top: -22px; z-index: 1; background: var(--panel); margin: -22px -22px 0; padding: 22px 22px 10px; border-bottom: 1px solid transparent; }
+@media (max-height: 760px) {
+  .overlay { padding-top: 3vh; }
+  .dialog { max-height: calc(100vh - 3vh - 16px); }
+}
