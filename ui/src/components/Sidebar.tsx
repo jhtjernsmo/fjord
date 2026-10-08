@@ -1,4 +1,4 @@
-import { Bug, Command, House, Keyboard, Languages, NotebookText, Plus, Settings } from 'lucide-react'
+import { ArrowDownUp, Bug, Check, Command, House, Keyboard, Languages, NotebookText, Plus, Settings } from 'lucide-react'
 import type { ProjectSummary } from '../api'
 import { useApp } from '../data'
 import { reportBug } from '../reportBug'
@@ -7,9 +7,13 @@ import { displayKeys } from '../keymap'
 import { ProjectGlyph } from './Icons'
 import iconUrl from '../assets/icon.svg'
 import { useContextMenus } from './actions'
+import { useMenus } from './Menus'
+import { PROJECT_SORTS, type ProjectSort } from '../projectSort'
 
 interface Props {
   projects: ProjectSummary[]
+  sort: ProjectSort
+  onSort: (sort: ProjectSort) => void
   activeId: number | null
   onHome: () => void
   onSelect: (id: number) => void
@@ -26,9 +30,24 @@ export function ProgressRing({ done, total, color }: { done: number; total: numb
   return <span className="ring" style={{ ['--p' as string]: percent, ['--c' as string]: color }} title={`${percent} %`} />
 }
 
-export function Sidebar({ projects, activeId, onHome, onSelect, onNewProject, onPalette, onHelp, onSettings, onNotes, notesActive }: Props) {
+export function Sidebar({ projects, sort, onSort, activeId, onHome, onSelect, onNewProject, onPalette, onHelp, onSettings, onNotes, notesActive }: Props) {
   const { keymap, t, locale, setLocale } = useApp()
   const { projectMenu } = useContextMenus()
+  const { openMenu } = useMenus()
+  const sortMenu = (e: React.MouseEvent) =>
+    openMenu(e, [
+      ...PROJECT_SORTS.map((by) => ({
+        label: t(`projectSort.${by}`),
+        icon: by === sort.by ? <Check size={14} /> : <span style={{ width: 14 }} />,
+        onSelect: () => onSort({ ...sort, by }),
+      })),
+      {
+        label: t('projectSort.reversed'),
+        icon: sort.reversed ? <Check size={14} /> : <span style={{ width: 14 }} />,
+        separator: true,
+        onSelect: () => onSort({ ...sort, reversed: !sort.reversed }),
+      },
+    ])
   const keys = (id: string) => displayKeys(keymap.bindings[id], keymap.leader)
   const nextLocale = LOCALES[(LOCALES.findIndex((l) => l.id === locale) + 1) % LOCALES.length]
   return (
@@ -54,9 +73,14 @@ export function Sidebar({ projects, activeId, onHome, onSelect, onNewProject, on
 
       <div className="nav-section">
         {t('app.projects')}
-        <button onClick={onNewProject} title={t('app.newProject')} aria-label={t('app.newProject')}>
-          <Plus size={15} />
-        </button>
+        <span className="nav-section-actions">
+          <button onClick={sortMenu} title={t('projectSort.title')} aria-label={t('projectSort.title')}>
+            <ArrowDownUp size={14} />
+          </button>
+          <button onClick={onNewProject} title={t('app.newProject')} aria-label={t('app.newProject')}>
+            <Plus size={15} />
+          </button>
+        </span>
       </div>
       <nav className="project-list">
         {projects.map((p) => (
