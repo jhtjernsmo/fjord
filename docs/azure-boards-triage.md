@@ -23,6 +23,12 @@ because you or an agent may have added to it.
 
 Work items in Azure projects without a mapping are skipped.
 
+**Finished items.** By default the import also brings in work items assigned to you that
+are already finished (Done, Resolved, Closed, …) and changed in the last 30 days, so
+recent work shows up too. They land straight in the matching column (*Resolved* →
+*Resolved*) or your done column. Change the window, or turn it off, under
+**Settings → Integrations**.
+
 **Hierarchy.** If a work item assigned to you has a parent (or grandparent) that is
 also assigned to you, it becomes a subtask of it in Fjord, e.g. your Tasks under
 your User Story. Fjord has one level of subtasks, so deeper chains (Epic → Feature →

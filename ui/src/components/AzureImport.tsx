@@ -82,7 +82,8 @@ export function AzureImportRunner() {
   return null
 }
 
-const EMPTY: ImportSettings = { enabled: false, mappings: [] }
+const EMPTY: ImportSettings = { enabled: false, mappings: [], closed_days: 30 }
+const CLOSED_DAY_CHOICES = [0, 7, 30, 90]
 
 export function AzureImportSettings() {
   const { t, toast, run } = useApp()
@@ -130,6 +131,16 @@ export function AzureImportSettings() {
       <label className="toggle-label">
         <input type="checkbox" checked={settings.enabled} onChange={(e) => save({ ...settings, enabled: e.target.checked })} />
         {t('import.enabled')}
+      </label>
+      <label className="inline-select">
+        {t('import.closedDays')}
+        <select className="input" value={settings.closed_days} onChange={(e) => save({ ...settings, closed_days: Number(e.target.value) })} aria-label={t('import.closedDays')}>
+          {CLOSED_DAY_CHOICES.map((d) => (
+            <option key={d} value={d}>
+              {d === 0 ? t('import.closedOff') : t('import.closedLast', { n: d })}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="toggle-label">
         <input

@@ -639,6 +639,8 @@ kbd {
 .card-title { overflow-wrap: anywhere; min-width: 0; }
 .card { min-width: 0; }
 .import-mapping select { max-width: 160px; }
+.inline-select { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--text); }
+.inline-select .input { padding: 5px 9px; font-size: 12.5px; }
 .import-mapping .input.mono { flex: 0 0 110px; min-width: 0; }
 .import-mapping .input.grow { min-width: 90px; }
 

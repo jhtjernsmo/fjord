@@ -382,7 +382,7 @@ pub fn fetch_import(settings: &ImportSettings, known: &[String]) -> Result<Impor
     orgs.dedup();
     let mut fetch = ImportFetch::default();
     for org in orgs {
-        let items = assigned_work_items(&org)?;
+        let items = assigned_work_items(&org, settings.closed_days)?;
         let ids: std::collections::HashSet<u64> = items.iter().map(|i| i.id).collect();
         // Walk up from parents that aren't assigned to you, to find an ancestor that is.
         let mut seen = ids.clone();
@@ -464,6 +464,13 @@ fn column_for_state<'a>(
             NEW_STATES
                 .contains(&state.as_str())
                 .then(|| columns.first())
+                .flatten()
+        })
+        .or_else(|| {
+            azure::CLOSED_STATES
+                .iter()
+                .any(|s| s.eq_ignore_ascii_case(&state))
+                .then(|| columns.iter().find(|c| c.is_done))
                 .flatten()
         })
 }
@@ -770,6 +777,7 @@ mod tests {
                 project: "mobile app".into(),
                 fjord_project_id: p,
             }],
+            ..Default::default()
         };
         let wi = |id: u64, project: &str| WorkItem {
             org: "contoso".into(),
@@ -815,6 +823,7 @@ mod tests {
                 project: "App".into(),
                 fjord_project_id: p,
             }],
+            ..Default::default()
         };
         let wi = |id: u64, parent: Option<u64>| WorkItem {
             org: "contoso".into(),
@@ -1005,6 +1014,7 @@ mod tests {
                 project: "App".into(),
                 fjord_project_id: p,
             }],
+            ..Default::default()
         };
         let item = WorkItem {
             org: "contoso".into(),
@@ -1111,6 +1121,7 @@ mod tests {
                 project: "App".into(),
                 fjord_project_id: p,
             }],
+            ..Default::default()
         };
         let wi = |rev: i64, state: &str| WorkItem {
             org: "contoso".into(),
@@ -1168,6 +1179,78 @@ mod tests {
         s.move_task(task(&s).id, first, None).unwrap();
         import(&mut s, wi(5, "Active"));
         assert_eq!(task(&s).status_id, first);
+    }
+
+    #[test]
+    fn finished_items_land_in_a_done_column_on_first_import() {
+        let (mut s, _d) = store();
+        let p = s
+            .create_project(NewProject {
+                name: "Demo".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let resolved = s.create_status(p, "Resolved", None, false).unwrap();
+        let done = s
+            .list_statuses(p)
+            .unwrap()
+            .into_iter()
+            .find(|c| c.is_done && c.name != "Resolved")
+            .unwrap();
+        let settings = ImportSettings {
+            enabled: true,
+            mappings: vec![fjord_core::ImportMapping {
+                org: "contoso".into(),
+                project: "App".into(),
+                fjord_project_id: p,
+            }],
+            ..Default::default()
+        };
+        assert_eq!(settings.closed_days, fjord_core::DEFAULT_CLOSED_DAYS);
+        let wi = |id: u64, state: &str| WorkItem {
+            org: "contoso".into(),
+            id,
+            rev: 1,
+            project: "App".into(),
+            kind: "Task".into(),
+            state: state.into(),
+            area: "App".into(),
+            title: format!("Item {id}"),
+            description_md: String::new(),
+            acceptance_md: String::new(),
+            priority: None,
+            due: None,
+            parent: None,
+        };
+        let fetch = ImportFetch {
+            items: vec![wi(1, "Done"), wi(2, "Resolved"), wi(3, "Closed")],
+            ..Default::default()
+        };
+        apply_import(&mut s, &settings, &fetch).unwrap();
+        let column = |s: &Store, n: u64| {
+            s.get_task(
+                s.external_link("azure", &format!("contoso/{n}"))
+                    .unwrap()
+                    .unwrap()
+                    .task_id,
+            )
+            .unwrap()
+            .status_id
+        };
+        assert_eq!(column(&s, 1), done.id, "Done → the Done column");
+        assert_eq!(
+            column(&s, 2),
+            resolved.id,
+            "Resolved → the same-named column"
+        );
+        assert!(
+            s.list_statuses(p)
+                .unwrap()
+                .iter()
+                .any(|c| c.id == column(&s, 3) && c.is_done),
+            "Closed → a done column"
+        );
     }
 
     #[test]

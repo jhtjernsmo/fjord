@@ -511,10 +511,20 @@ pub fn disconnect_azure(org: &str) -> Result<()> {
 // ---------- Azure Boards (work items assigned to you) ----------
 
 /// Open work items assigned to the signed-in user, newest change first.
-const ASSIGNED_TO_ME: &str = "SELECT [System.Id] FROM WorkItems \
-     WHERE [System.AssignedTo] = @Me \
-     AND [System.State] NOT IN ('Closed', 'Done', 'Removed', 'Resolved', 'Completed') \
-     ORDER BY [System.ChangedDate] DESC";
+/// Work items assigned to you: open ones, plus finished ones changed in the last
+/// `closed_days` days (0 = open only), newest change first.
+pub fn assigned_query(closed_days: u32) -> String {
+    let open = "[System.State] NOT IN ('Closed', 'Done', 'Removed', 'Resolved', 'Completed')";
+    let states = if closed_days == 0 {
+        open.to_string()
+    } else {
+        format!("({open} OR [System.ChangedDate] >= @Today - {closed_days})")
+    };
+    format!(
+        "SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = @Me AND {states} \
+         ORDER BY [System.ChangedDate] DESC"
+    )
+}
 const MAX_WORK_ITEMS: usize = 200;
 const WORK_ITEM_FIELDS: &str = "System.Id,System.Rev,System.Parent,System.Title,System.Description,System.TeamProject,\
      System.AreaPath,System.WorkItemType,System.State,Microsoft.VSTS.Common.Priority,\
@@ -644,7 +654,7 @@ fn work_item_from(org: &str, item: ApiWorkItem) -> WorkItem {
 }
 
 /// Open work items assigned to you in one organization.
-pub fn assigned_work_items(org: &str) -> Result<Vec<WorkItem>> {
+pub fn assigned_work_items(org: &str, closed_days: u32) -> Result<Vec<WorkItem>> {
     let org = check_org(org)?;
     let (auth, _) = find_auth(org).ok_or_else(|| VcsError::NoAzureToken(org.to_string()))?;
     let agent = agent();
@@ -655,7 +665,7 @@ pub fn assigned_work_items(org: &str) -> Result<Vec<WorkItem>> {
         ))
         .header("Accept", "application/json")
         .header("Authorization", &auth.header())
-        .send_json(json!({ "query": ASSIGNED_TO_ME }))
+        .send_json(json!({ "query": assigned_query(closed_days) }))
         .map_err(|e| api_error(e, org))?;
     let wiql: WiqlResult = read_json(&mut res, org)?;
     let ids: Vec<String> = wiql
@@ -1046,5 +1056,13 @@ mod tests {
             ("Ada", "Repro on **iOS 18**")
         );
         assert_eq!(comments[1].created, "2026-10-08T09:00:00Z");
+    }
+
+    #[test]
+    fn query_includes_recently_finished_items_when_asked() {
+        assert!(!assigned_query(0).contains("ChangedDate] >="));
+        let q = assigned_query(30);
+        assert!(q.contains("OR [System.ChangedDate] >= @Today - 30"));
+        assert!(q.contains("[System.AssignedTo] = @Me"));
     }
 }
