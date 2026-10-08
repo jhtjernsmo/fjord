@@ -537,6 +537,10 @@ kbd {
 .markdown blockquote { margin: 6px 0; padding: 2px 12px; border-left: 3px solid var(--line-2); color: var(--muted); }
 .markdown hr { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
 
+/* Long titles: leave room for the AI badge and break long words instead of overflowing the card. */
+.agent-badge + .card-title { padding-right: 34px; }
+.card-title { overflow-wrap: anywhere; min-width: 0; }
+.card { min-width: 0; }
 .import-mapping select { max-width: 160px; }
 .import-mapping .input.mono { flex: 0 0 110px; min-width: 0; }
 .import-mapping .input.grow { min-width: 90px; }
