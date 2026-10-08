@@ -153,7 +153,7 @@ Run `fjord --help` for everything. Changes are recorded with an actor: `--actor`
 
 Link a project to a repository in the **Git** tab (or `fjord git link <project> <path>`). Fjord then:
 
-- starts a branch for a task — `fjord/12-fix-push-notifications` — and moves the task to the second column,
+- starts a branch for a task with a conventional name — `fix/12-fix-push-notifications`, type picked or guessed — and moves the task to the second column,
 - shows branches, recent commits and GitHub pull requests with their CI status,
 - links pull requests to tasks by branch name, and opens a PR straight from a task (title and description come from the task),
 - moves a task to done when its PR is merged (on **Sync**), unless you turn auto-move off.

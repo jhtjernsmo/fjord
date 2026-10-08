@@ -211,12 +211,13 @@ fn git_link_branch_and_status() {
         (Some("jhtjernsmo"), Some("demo"))
     );
 
+    // "Fix push" reads like a bug, so the conventional type is guessed as fix.
     let started = ok_json(&d, &["git", "branch", &id]);
-    assert_eq!(started["branch"], format!("fjord/{id}-fix-push"));
+    assert_eq!(started["branch"], format!("fix/{id}-fix-push"));
     assert_eq!(started["created"], true);
 
     let status = ok_json(&d, &["git", "status", "demo"]);
-    assert_eq!(status["current_branch"], format!("fjord/{id}-fix-push"));
+    assert_eq!(status["current_branch"], format!("fix/{id}-fix-push"));
     assert_eq!(status["commits"][0]["subject"], "init");
 
     ok_json(&d, &["git", "auto-move", "demo", "off"]);

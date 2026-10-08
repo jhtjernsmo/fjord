@@ -20,7 +20,10 @@ pub use azure::{
     azure_account, connect_azure, connect_azure_cli, disconnect_azure, parse_azure_remote,
     parse_work_item_url, work_item_comments, work_item_info,
 };
-pub use git::{Branch, Commit, Git, branch_name_for_task, task_id_from_branch};
+pub use git::{
+    BRANCH_TYPES, Branch, Commit, Git, branch_name_for_task, branch_type, guess_branch_type,
+    task_id_from_branch,
+};
 pub use github::{
     Checks, DeviceLogin, DevicePoll, GitHub, GitHubAccount, PullRequest, TokenSource,
     connect_github, disconnect_github, find_token, github_account, parse_github_remote,
@@ -200,13 +203,28 @@ pub fn overview_for(repo: ProjectRepo) -> Result<GitOverview> {
 
 /// Checks out the task's branch (creating `fjord/<id>-<slug>` the first time)
 /// and, with auto-move on, moves a task from the first column to the second.
-pub fn start_branch(store: &mut Store, task_id: i64) -> Result<StartedBranch> {
+/// The branch name a task would get: `<type>/<id>-<slug>`, with the type given or guessed.
+pub fn branch_for(task: &Task, kind: Option<&str>) -> Result<String> {
+    let kind = match kind {
+        Some(k) if BRANCH_TYPES.contains(&k) => k,
+        Some(k) => {
+            return Err(VcsError::InvalidBranch(format!(
+                "{k}/… (use one of {})",
+                BRANCH_TYPES.join(", ")
+            )));
+        }
+        None => guess_branch_type(&task.title, &task.body_md),
+    };
+    Ok(branch_name_for_task(kind, task.id, &task.title))
+}
+
+pub fn start_branch(store: &mut Store, task_id: i64, kind: Option<&str>) -> Result<StartedBranch> {
     let task = store.get_task(task_id)?;
     let (repo, git) = linked(store, task.project_id)?;
-    let branch = task
-        .branch
-        .clone()
-        .unwrap_or_else(|| branch_name_for_task(task.id, &task.title));
+    let branch = match task.branch.clone() {
+        Some(existing) => existing,
+        None => branch_for(&task, kind)?,
+    };
     let created = git.switch_or_create(&branch)?;
     let mut task = store.set_task_branch(task.id, Some(&branch))?;
     if repo.auto_move {
@@ -335,7 +353,13 @@ pub fn open_pull_request_for(task: &Task, repo: &ProjectRepo, draft: bool) -> Re
     forge.require_token()?;
     git.push_upstream(&branch)?;
     let base = forge.default_branch()?;
-    forge.create_pull_request(&branch, &base, &task.title, &pr_body(task), draft)
+    forge.create_pull_request(
+        &branch,
+        &base,
+        &pr_title(task, &branch),
+        &pr_body(task),
+        draft,
+    )
 }
 
 /// Result of importing Azure Boards work items.
@@ -617,6 +641,20 @@ pub fn apply_import(
     Ok(report)
 }
 
+/// "feat: Add login" for conventional branches (hotfix → fix); the plain title otherwise.
+fn pr_title(task: &Task, branch: &str) -> String {
+    let title = task.title.trim();
+    match branch_type(branch).map(|t| if t == "hotfix" { "fix" } else { t }) {
+        Some(kind)
+            if !title.to_lowercase().starts_with(&format!("{kind}:"))
+                && !title.to_lowercase().starts_with(&format!("{kind}(")) =>
+        {
+            format!("{kind}: {title}")
+        }
+        _ => title.to_string(),
+    }
+}
+
 fn pr_body(task: &Task) -> String {
     let description = task.body_md.trim();
     let mut body = String::new();
@@ -694,7 +732,7 @@ mod tests {
             .unwrap();
 
         assert!(matches!(
-            start_branch(&mut s, t.id),
+            start_branch(&mut s, t.id, None),
             Err(VcsError::NotLinked)
         ));
         let linked = link_repo(&mut s, p, repo.path()).unwrap();
@@ -706,8 +744,8 @@ mod tests {
             (Some("jhtjernsmo"), Some("demo"))
         );
 
-        let started = start_branch(&mut s, t.id).unwrap();
-        assert_eq!(started.branch, format!("fjord/{}-fix-push", t.id));
+        let started = start_branch(&mut s, t.id, None).unwrap();
+        assert_eq!(started.branch, format!("fix/{}-fix-push", t.id));
         assert!(started.created);
         let in_progress = s.list_statuses(p).unwrap()[1].id;
         assert_eq!(
@@ -715,7 +753,7 @@ mod tests {
             "auto-moved to the second column"
         );
 
-        let again = start_branch(&mut s, t.id).unwrap();
+        let again = start_branch(&mut s, t.id, None).unwrap();
         assert!(!again.created);
 
         let ov = overview(&s, p).unwrap();
@@ -1298,7 +1336,7 @@ mod tests {
         link_repo(&mut s, p, repo.path()).unwrap();
         s.set_repo_auto_move(p, false).unwrap();
         assert_eq!(
-            start_branch(&mut s, t.id).unwrap().task.status_id,
+            start_branch(&mut s, t.id, None).unwrap().task.status_id,
             t.status_id
         );
     }

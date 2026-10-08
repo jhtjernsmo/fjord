@@ -86,8 +86,15 @@ pub async fn git_overview(state: State<'_, AppState>, project_id: i64) -> CmdRes
 }
 
 #[tauri::command]
-pub async fn start_branch(state: State<'_, AppState>, task_id: i64) -> CmdResult<StartedBranch> {
-    with_store_bg(&state, move |s| fjord_vcs::start_branch(s, task_id)).await
+pub async fn start_branch(
+    state: State<'_, AppState>,
+    task_id: i64,
+    kind: Option<String>,
+) -> CmdResult<StartedBranch> {
+    with_store_bg(&state, move |s| {
+        fjord_vcs::start_branch(s, task_id, kind.as_deref())
+    })
+    .await
 }
 
 #[tauri::command]
@@ -255,4 +262,19 @@ pub fn task_external_link(
     task_id: i64,
 ) -> CmdResult<Option<fjord_core::ExternalLink>> {
     with_store(&state, |s| Ok(s.external_link_for_task(task_id)?))
+}
+
+/// The branch name a task would get for a type (guessed when None), and that type.
+#[tauri::command]
+pub fn suggest_branch(
+    state: State<AppState>,
+    task_id: i64,
+    kind: Option<String>,
+) -> CmdResult<(String, String)> {
+    with_store(&state, |s| {
+        let task = s.get_task(task_id)?;
+        let name = fjord_vcs::branch_for(&task, kind.as_deref())?;
+        let kind = fjord_vcs::branch_type(&name).unwrap_or("feat").to_string();
+        Ok((kind, name))
+    })
 }

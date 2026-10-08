@@ -223,8 +223,8 @@ fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "start_branch",
-            "Check out (or create) the git branch for a task, e.g. fjord/12-fix-push. Moves the task to in progress when auto-move is on.",
-            json!({ "id": { "type": "integer" } }),
+            "Check out (or create) the git branch for a task, named <type>/<id>-<title>, e.g. feat/12-add-login. type is feat, fix, chore, docs, refactor, test, perf, ci or hotfix (guessed from the task if omitted). Moves the task to in progress when auto-move is on.",
+            json!({ "id": { "type": "integer" }, "type": { "type": "string", "enum": ["feat", "fix", "chore", "docs", "refactor", "test", "perf", "ci", "hotfix"] } }),
             &["id"],
         ),
         tool(
@@ -483,9 +483,11 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
             let p = store.find_project(str_arg(args, "project")?)?;
             serde_json::to_value(fjord_vcs::overview(store, p.id)?)?
         }
-        "start_branch" => {
-            serde_json::to_value(fjord_vcs::start_branch(store, int_arg(args, "id")?)?)?
-        }
+        "start_branch" => serde_json::to_value(fjord_vcs::start_branch(
+            store,
+            int_arg(args, "id")?,
+            args.get("type").and_then(Value::as_str),
+        )?)?,
         "link_branch" => serde_json::to_value(fjord_vcs::link_branch(
             store,
             int_arg(args, "id")?,

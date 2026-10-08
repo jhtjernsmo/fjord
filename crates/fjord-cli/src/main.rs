@@ -195,7 +195,12 @@ enum GitCmd {
         on: bool,
     },
     /// Check out (or create) the branch for a task
-    Branch { task: i64 },
+    Branch {
+        task: i64,
+        /// feat, fix, chore, docs, refactor, test, perf, ci or hotfix (guessed if omitted)
+        #[arg(long = "type", short = 't')]
+        kind: Option<String>,
+    },
     /// Pull requests with CI state; moves tasks of merged PRs to done
     Prs { project: String },
     /// Push the task's branch and open a pull request
@@ -493,7 +498,9 @@ fn git(store: &mut Store, out: &output::Printer, cmd: GitCmd) -> Result<()> {
                 "Auto-move off."
             })
         }
-        GitCmd::Branch { task } => out.started_branch(&fjord_vcs::start_branch(store, task)?),
+        GitCmd::Branch { task, kind } => {
+            out.started_branch(&fjord_vcs::start_branch(store, task, kind.as_deref())?)
+        }
         GitCmd::Prs { project } => {
             let p = store.find_project(&project)?;
             out.sync_report(&fjord_vcs::sync(store, p.id)?)
