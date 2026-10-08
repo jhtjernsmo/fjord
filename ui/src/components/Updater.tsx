@@ -27,6 +27,16 @@ export function setUpdateCheckEnabled(on: boolean): void {
 }
 
 /** Shared by the banner and Settings → "Check for updates". */
+/** The installed app version, e.g. "0.2.7" (null in the browser preview). */
+export async function appVersion(): Promise<string | null> {
+  try {
+    const { getVersion } = await import('@tauri-apps/api/app')
+    return await getVersion()
+  } catch {
+    return null
+  }
+}
+
 export function useUpdater() {
   const { t, toast } = useApp()
   const [update, setUpdate] = useState<Update | null>(null)
@@ -39,7 +49,10 @@ export function useUpdater() {
       try {
         const found = await check()
         setUpdate(found)
-        if (!found && manual) toast(t('update.upToDate'), 'success')
+        if (!found && manual) {
+          const version = await appVersion()
+          toast(version ? `${t('update.upToDate')} (${version})` : t('update.upToDate'), 'success')
+        }
       } catch (err) {
         // Dev builds and offline machines end up here; only bother the user if they asked.
         if (manual) toast(`${t('update.failed')}: ${errorMessage(err)}`, 'error')
