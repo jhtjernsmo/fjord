@@ -108,7 +108,7 @@ export function NoteMarkdown({ markdown }: { markdown: string }) {
             return <LinkChip target={target} label={String(children)} resolved={target in resolved ? resolved[target] : undefined} />
           }
           return (
-            <a href={href} target="_blank" rel="noreferrer">
+            <a href={href} rel="noreferrer">
               {children}
             </a>
           )
