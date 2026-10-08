@@ -193,6 +193,12 @@ const MIGRATIONS: &[&str] = &[
         UNIQUE (source, external_id)
     );
     "#,
+    // v7: subtasks (one level), ordered within their parent
+    r#"
+    ALTER TABLE tasks ADD COLUMN parent_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE;
+    ALTER TABLE tasks ADD COLUMN child_order REAL NOT NULL DEFAULT 0;
+    CREATE INDEX tasks_parent ON tasks(parent_id);
+    "#,
 ];
 
 pub fn configure(conn: &Connection) -> Result<()> {

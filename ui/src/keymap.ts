@@ -19,6 +19,7 @@ export const DEFAULT_ACTIONS: ActionDef[] = [
   { id: 'panel.close', group: 'general', scope: 'global', keys: 'esc' },
   { id: 'go.home', group: 'go', scope: 'global', keys: '<leader>h' },
   { id: 'go.notes', group: 'go', scope: 'global', keys: '<leader>N' },
+  { id: 'task.addSubtask', group: 'board', scope: 'global', keys: 'A' },
   { id: 'project.pick', group: 'project', scope: 'global', keys: '<leader>p' },
   { id: 'project.new', group: 'project', scope: 'global', keys: '<leader>n' },
   { id: 'project.archive', group: 'project', scope: 'global', keys: '<leader>P a' },

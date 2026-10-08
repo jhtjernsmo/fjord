@@ -182,6 +182,27 @@ kbd {
 .panel-head { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 .panel-head .spacer { flex: 1; }
 .panel-body { padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
+
+/* subtasks (task panel + board cards) */
+.subtasks { display: flex; flex-direction: column; gap: 4px; }
+.subtasks .section-title { display: flex; align-items: center; justify-content: space-between; }
+.subtask-progress { display: inline-flex; align-items: center; gap: 8px; font: 500 11px var(--mono); color: var(--muted); text-transform: none; letter-spacing: 0; }
+.subtask-progress .bar { width: 70px; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.subtask-progress .bar span { display: block; height: 100%; background: var(--ok); transition: width .2s; }
+.subtask { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 7px; background: var(--panel); }
+.subtask:hover { background: var(--bg-2); }
+.subtask.dragging { opacity: .5; }
+.subtask input[type='checkbox'] { accent-color: var(--accent); }
+.subtask-grip { color: var(--dim); cursor: grab; display: grid; opacity: 0; }
+.subtask:hover .subtask-grip { opacity: 1; }
+.subtask-title { flex: 1; text-align: left; font-size: 13px; overflow-wrap: anywhere; }
+.subtask.done .subtask-title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--dim); }
+.subtask-add { display: flex; align-items: center; gap: 8px; padding: 5px 6px; color: var(--dim); }
+.subtask-add input { flex: 1; background: none; border: 0; outline: none; color: var(--text); font: inherit; font-size: 13px; }
+.subtask-hint { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--ok); padding: 6px 8px; border: 1px dashed color-mix(in oklab, var(--ok) 50%, transparent); border-radius: 8px; }
+.parent-link { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; font-size: 12.5px; color: var(--accent); }
+.card-parent { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--dim); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.subtask-chip.complete { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 45%, transparent); }
 .title-input { font-size: 20px; font-weight: 650; background: none; border: none; outline: none; width: 100%; letter-spacing: -0.01em; }
 .fields { display: grid; grid-template-columns: 90px 1fr; gap: 10px 12px; align-items: center; font-size: 13px; }
 .fields label { color: var(--muted); }
