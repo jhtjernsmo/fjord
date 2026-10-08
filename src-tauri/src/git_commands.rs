@@ -159,3 +159,26 @@ pub async fn connect_azure(org: String, token: String) -> CmdResult<AzureAccount
 pub async fn disconnect_azure(org: String) -> CmdResult<()> {
     off_thread(move || fjord_vcs::disconnect_azure(&org)).await
 }
+
+#[tauri::command]
+pub fn get_import_settings(state: State<AppState>) -> CmdResult<fjord_core::ImportSettings> {
+    with_store(&state, |s| Ok(s.import_settings()?))
+}
+
+#[tauri::command]
+pub fn set_import_settings(
+    state: State<AppState>,
+    settings: fjord_core::ImportSettings,
+) -> CmdResult<()> {
+    with_store(&state, |s| Ok(s.set_import_settings(&settings)?))
+}
+
+/// Fetches work items assigned to you in Azure Boards (off the UI thread) and
+/// creates or refreshes tasks in the mapped projects.
+#[tauri::command]
+pub async fn run_azure_import(state: State<'_, AppState>) -> CmdResult<fjord_vcs::ImportReport> {
+    let settings = with_store(&state, |s| Ok(s.import_settings()?))?;
+    let fetch_settings = settings.clone();
+    let items = off_thread(move || fjord_vcs::fetch_assigned_work_items(&fetch_settings)).await?;
+    with_store(&state, |s| fjord_vcs::apply_import(s, &settings, &items))
+}

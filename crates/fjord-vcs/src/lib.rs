@@ -9,12 +9,13 @@ pub mod github;
 
 use std::path::Path;
 
-use fjord_core::{ProjectRepo, RemoteHost, Store, Task};
+use fjord_core::{ImportOutcome, ImportSettings, ProjectRepo, RemoteHost, Store, Task};
 use serde::Serialize;
 use thiserror::Error;
 
 pub use azure::{
-    AzureAccount, AzureDevOps, azure_account, connect_azure, disconnect_azure, parse_azure_remote,
+    AzureAccount, AzureDevOps, WorkItem, assigned_work_items, azure_account, connect_azure,
+    disconnect_azure, parse_azure_remote,
 };
 pub use git::{Branch, Commit, Git, branch_name_for_task, task_id_from_branch};
 pub use github::{
@@ -296,6 +297,57 @@ pub fn open_pull_request_for(task: &Task, repo: &ProjectRepo, draft: bool) -> Re
     forge.create_pull_request(&branch, &base, &task.title, &pr_body(task), draft)
 }
 
+/// Result of importing Azure Boards work items.
+#[derive(Debug, Default, Serialize)]
+pub struct ImportReport {
+    pub created: Vec<Task>,
+    pub updated: usize,
+    pub unchanged: usize,
+    /// Work items in Azure projects that aren't mapped to a Fjord project.
+    pub unmapped: usize,
+}
+
+/// Network only: open work items assigned to you, for every organization in the
+/// mappings. Doesn't touch the store.
+pub fn fetch_assigned_work_items(settings: &ImportSettings) -> Result<Vec<WorkItem>> {
+    let mut orgs: Vec<String> = settings
+        .mappings
+        .iter()
+        .map(|m| m.org.to_lowercase())
+        .collect();
+    orgs.sort();
+    orgs.dedup();
+    let mut items = Vec::new();
+    for org in orgs {
+        items.extend(assigned_work_items(&org)?);
+    }
+    Ok(items)
+}
+
+/// Creates or refreshes a Fjord task for each mapped work item.
+pub fn apply_import(
+    store: &mut Store,
+    settings: &ImportSettings,
+    items: &[WorkItem],
+) -> Result<ImportReport> {
+    let mut report = ImportReport::default();
+    for item in items {
+        let target = settings.mappings.iter().find(|m| {
+            m.org.eq_ignore_ascii_case(&item.org) && m.project.eq_ignore_ascii_case(&item.project)
+        });
+        let Some(mapping) = target else {
+            report.unmapped += 1;
+            continue;
+        };
+        match store.upsert_imported_task(mapping.fjord_project_id, &item.to_external_item())? {
+            (task, ImportOutcome::Created) => report.created.push(task),
+            (_, ImportOutcome::Updated) => report.updated += 1,
+            (_, ImportOutcome::Unchanged) => report.unchanged += 1,
+        }
+    }
+    Ok(report)
+}
+
 fn pr_body(task: &Task) -> String {
     let description = task.body_md.trim();
     let mut body = String::new();
@@ -440,6 +492,46 @@ mod tests {
             (Some("contoso"), Some("Mobile App"), Some("bokost"))
         );
         assert!(matches!(Forge::for_repo(&linked), Ok(Forge::Azure(_))));
+    }
+
+    #[test]
+    fn imports_only_mapped_work_items() {
+        let (mut s, _d) = store();
+        let p = s
+            .create_project(NewProject {
+                name: "Bokost".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let settings = ImportSettings {
+            enabled: true,
+            mappings: vec![fjord_core::ImportMapping {
+                org: "Contoso".into(),
+                project: "mobile app".into(),
+                fjord_project_id: p,
+            }],
+        };
+        let wi = |id: u64, project: &str| WorkItem {
+            org: "contoso".into(),
+            id,
+            rev: 1,
+            project: project.into(),
+            kind: "Task".into(),
+            state: "Active".into(),
+            area: project.into(),
+            title: format!("Item {id}"),
+            description_md: String::new(),
+            acceptance_md: String::new(),
+            priority: Some(2),
+            due: None,
+        };
+        let items = [wi(1, "Mobile App"), wi(2, "Other team")];
+        let report = apply_import(&mut s, &settings, &items).unwrap();
+        assert_eq!((report.created.len(), report.unmapped), (1, 1));
+        assert_eq!(report.created[0].title, "Item 1");
+        let again = apply_import(&mut s, &settings, &items).unwrap();
+        assert_eq!((again.created.len(), again.unchanged), (0, 1));
     }
 
     #[test]

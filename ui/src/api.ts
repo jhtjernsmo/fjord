@@ -86,6 +86,24 @@ export interface GitHubAccount {
   private_repos: boolean
 }
 
+export interface ImportMapping {
+  org: string
+  project: string
+  fjord_project_id: number
+}
+
+export interface ImportSettings {
+  enabled: boolean
+  mappings: ImportMapping[]
+}
+
+export interface ImportReport {
+  created: Task[]
+  updated: number
+  unchanged: number
+  unmapped: number
+}
+
 export interface AzureAccount {
   org: string
   user: string
@@ -281,6 +299,9 @@ export const api = {
   azureAccount: (org: string) => invoke<AzureAccount | null>('azure_account', { org }),
   connectAzure: (org: string, token: string) => invoke<AzureAccount>('connect_azure', { org, token }),
   disconnectAzure: (org: string) => invoke<void>('disconnect_azure', { org }),
+  getImportSettings: () => invoke<ImportSettings>('get_import_settings'),
+  setImportSettings: (settings: ImportSettings) => invoke<void>('set_import_settings', { settings }),
+  runAzureImport: () => invoke<ImportReport>('run_azure_import'),
 }
 
 export function errorMessage(err: unknown): string {
