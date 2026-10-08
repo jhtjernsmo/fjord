@@ -6,6 +6,7 @@ pub mod azure;
 pub mod credentials;
 pub mod git;
 pub mod github;
+mod process;
 
 use std::path::Path;
 
@@ -15,12 +16,13 @@ use thiserror::Error;
 
 pub use azure::{
     AzureAccount, AzureDevOps, WorkItem, assigned_work_items, azure_account, connect_azure,
-    disconnect_azure, parse_azure_remote,
+    connect_azure_cli, disconnect_azure, parse_azure_remote,
 };
 pub use git::{Branch, Commit, Git, branch_name_for_task, task_id_from_branch};
 pub use github::{
-    Checks, GitHub, GitHubAccount, PullRequest, TokenSource, connect_github, disconnect_github,
-    find_token, github_account, parse_github_remote,
+    Checks, DeviceLogin, DevicePoll, GitHub, GitHubAccount, PullRequest, TokenSource,
+    connect_github, disconnect_github, find_token, github_account, parse_github_remote,
+    poll_github_login, start_github_login,
 };
 
 const RECENT_COMMITS: usize = 15;

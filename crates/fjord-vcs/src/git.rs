@@ -3,7 +3,6 @@
 //! hooks and credentials.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use serde::Serialize;
 
@@ -124,7 +123,7 @@ impl Git {
 }
 
 fn run(dir: &Path, args: &[&str]) -> Result<String> {
-    let output = Command::new("git")
+    let output = crate::process::tool("git")
         .arg("-C")
         .arg(dir)
         .args(args)
@@ -218,6 +217,7 @@ fn parse_commit(line: &str) -> Option<Commit> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
 
     #[test]
     fn branch_names_from_tasks() {
