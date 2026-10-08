@@ -88,7 +88,8 @@ export function AzureSettings() {
   const connect = async () => {
     setBusy(true)
     try {
-      const account = await api.connectAzure(org.trim(), token)
+      // No token: use the Azure CLI's sign-in (az login).
+      const account = token.trim() ? await api.connectAzure(org.trim(), token) : await api.connectAzureCli(org.trim())
       update([...orgs.filter((o) => o.toLowerCase() !== account.org.toLowerCase()), account.org])
       setOrg('')
       setToken('')
@@ -125,11 +126,11 @@ export function AzureSettings() {
           value={token}
           placeholder={t('azure.token')}
           onChange={(e) => setToken(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && org.trim() && token.trim() && connect()}
+          onKeyDown={(e) => e.key === 'Enter' && org.trim() && connect()}
           aria-label={t('azure.token')}
         />
-        <button className="btn primary" disabled={busy || !org.trim() || !token.trim()} onClick={connect}>
-          {t('github.connect')}
+        <button className="btn primary" disabled={busy || !org.trim()} onClick={connect}>
+          {token.trim() ? t('github.connect') : t('azure.useCli')}
         </button>
       </div>
       <span className="hint">

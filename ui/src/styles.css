@@ -544,3 +544,9 @@ kbd {
 .import-mapping select { max-width: 160px; }
 .import-mapping .input.mono { flex: 0 0 110px; min-width: 0; }
 .import-mapping .input.grow { min-width: 90px; }
+
+.github-signin { align-self: flex-start; }
+.device-login { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--bg-2); }
+.device-code { display: flex; align-items: center; gap: 8px; }
+.device-code .mono { font-size: 22px; letter-spacing: .12em; font-weight: 600; }
+.device-login .btn { align-self: flex-start; }

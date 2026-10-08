@@ -104,6 +104,20 @@ export interface ImportReport {
   unmapped: number
 }
 
+export interface DeviceLogin {
+  user_code: string
+  verification_uri: string
+  interval: number
+  expires_in: number
+}
+
+export type DevicePoll =
+  | { status: 'pending' }
+  | { status: 'slow_down'; interval: number }
+  | { status: 'done'; account: GitHubAccount }
+  | { status: 'expired' }
+  | { status: 'denied' }
+
 export interface AzureAccount {
   org: string
   user: string
@@ -296,6 +310,9 @@ export const api = {
   githubAccount: () => invoke<GitHubAccount | null>('github_account'),
   connectGithub: (token: string) => invoke<GitHubAccount>('connect_github', { token }),
   disconnectGithub: () => invoke<void>('disconnect_github'),
+  startGithubLogin: () => invoke<DeviceLogin>('start_github_login'),
+  pollGithubLogin: () => invoke<DevicePoll>('poll_github_login'),
+  connectAzureCli: (org: string) => invoke<AzureAccount>('connect_azure_cli', { org }),
   azureAccount: (org: string) => invoke<AzureAccount | null>('azure_account', { org }),
   connectAzure: (org: string, token: string) => invoke<AzureAccount>('connect_azure', { org, token }),
   disconnectAzure: (org: string) => invoke<void>('disconnect_azure', { org }),
