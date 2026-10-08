@@ -4,6 +4,7 @@
 
 pub mod azure;
 pub mod credentials;
+pub mod editor;
 pub mod git;
 pub mod github;
 mod process;
@@ -203,6 +204,23 @@ pub fn overview_for(repo: ProjectRepo) -> Result<GitOverview> {
 
 /// Checks out the task's branch (creating `fjord/<id>-<slug>` the first time)
 /// and, with auto-move on, moves a task from the first column to the second.
+/// Opens the project's repository in the editor `template` names (see [`editor`]).
+/// With a task, its branch is checked out first (created the first time), as
+/// with *Start branch*. Returns the folder that was opened.
+pub fn open_repo_in_editor(
+    store: &mut Store,
+    project_id: i64,
+    task_id: Option<i64>,
+    template: &str,
+) -> Result<String> {
+    if let Some(task_id) = task_id {
+        start_branch(store, task_id, None)?;
+    }
+    let (_, git) = linked(store, project_id)?;
+    editor::open_in_editor(template, git.root())?;
+    Ok(git.root().display().to_string())
+}
+
 /// The branch name a task would get: `<type>/<id>-<slug>`, with the type given or guessed.
 pub fn branch_for(task: &Task, kind: Option<&str>) -> Result<String> {
     let kind = match kind {

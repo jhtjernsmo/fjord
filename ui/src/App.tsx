@@ -1,3 +1,4 @@
+import { editorLabel, openInEditor } from './editor'
 import { useCallback, useEffect, useState } from 'react'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { Ellipsis, Paperclip } from 'lucide-react'
@@ -36,7 +37,7 @@ const TABS: Tab[] = ['board', 'notes', 'files', 'git', 'activity', 'archive']
 
 const GLOBAL_ACTIONS = [
   'palette.open', 'help.toggle', 'panel.close', 'go.home', 'go.notes', 'project.pick', 'project.new', 'project.archive',
-  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'theme.cycle', 'app.reportBug', 'git.sync', 'azure.import', 'view.archive', 'view.git',
+  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'theme.cycle', 'app.reportBug', 'git.sync', 'azure.import', 'view.archive', 'view.git', 'editor.open',
 ]
 
 export default function App() {
@@ -134,6 +135,12 @@ export default function App() {
       'settings.open': () => setSettings(true),
       'theme.cycle': () => themes.cycle(),
       'app.reportBug': () => void reportBug(),
+      'editor.open': () => {
+        if (!projectId) return toast(t('toast.pickProject'), 'info')
+        openInEditor(projectId, taskId)
+          .then(() => toast(t('editor.opened', { editor: editorLabel() }), 'success'))
+          .catch((err) => toast(errorMessage(err), 'error'))
+      },
       'git.sync': () => {
         if (!projectId) return
         refreshPullRequests(projectId)
