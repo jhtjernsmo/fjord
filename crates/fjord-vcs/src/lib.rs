@@ -219,6 +219,38 @@ pub fn start_branch(store: &mut Store, task_id: i64) -> Result<StartedBranch> {
     })
 }
 
+/// Branches a task can be linked to: local ones, then ones only on `origin`.
+pub fn branch_choices(store: &Store, project_id: i64) -> Result<Vec<String>> {
+    let (_, git) = linked(store, project_id)?;
+    git.branch_names()
+}
+
+/// Links a task to an existing branch (or unlinks it with `None`), so pull
+/// requests from that branch show up on the task. Nothing is checked out.
+pub fn link_branch(store: &mut Store, task_id: i64, branch: Option<&str>) -> Result<Task> {
+    let task = store.get_task(task_id)?;
+    let Some(name) = branch.map(str::trim).filter(|b| !b.is_empty()) else {
+        return Ok(store.set_task_branch(task.id, None)?);
+    };
+    let (_, git) = linked(store, task.project_id)?;
+    if !git.branch_names()?.iter().any(|b| b == name) {
+        return Err(VcsError::Git(format!(
+            "no branch named «{name}» in this repository"
+        )));
+    }
+    if let Some(other) = store
+        .list_tasks(task.project_id)?
+        .into_iter()
+        .find(|t| t.id != task.id && t.branch.as_deref() == Some(name))
+    {
+        return Err(VcsError::Git(format!(
+            "«{name}» is already linked to task #{} ({})",
+            other.id, other.title
+        )));
+    }
+    Ok(store.set_task_branch(task.id, Some(name))?)
+}
+
 fn link_tasks(
     store: &Store,
     project_id: i64,
@@ -798,6 +830,81 @@ mod tests {
             apply_import(&mut s, &settings, &later).unwrap().closed,
             0,
             "only once"
+        );
+    }
+
+    #[test]
+    fn link_existing_branch_to_a_task() {
+        let repo = temp_repo();
+        let run = |args: &[&str]| {
+            assert!(
+                Command::new("git")
+                    .arg("-C")
+                    .arg(repo.path())
+                    .args(args)
+                    .status()
+                    .unwrap()
+                    .success()
+            )
+        };
+        run(&["branch", "feature/login"]);
+        let (mut s, _d) = store();
+        let p = s
+            .create_project(NewProject {
+                name: "Demo".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let a = s
+            .create_task(NewTask {
+                project_id: p,
+                title: "A".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        let b = s
+            .create_task(NewTask {
+                project_id: p,
+                title: "B".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        link_repo(&mut s, p, repo.path()).unwrap();
+
+        assert!(
+            branch_choices(&s, p)
+                .unwrap()
+                .contains(&"feature/login".to_string())
+        );
+        assert_eq!(
+            link_branch(&mut s, a.id, Some("feature/login"))
+                .unwrap()
+                .branch
+                .as_deref(),
+            Some("feature/login")
+        );
+        assert!(
+            matches!(
+                link_branch(&mut s, a.id, Some("nope")),
+                Err(VcsError::Git(_))
+            ),
+            "unknown branch"
+        );
+        assert!(
+            matches!(
+                link_branch(&mut s, b.id, Some("feature/login")),
+                Err(VcsError::Git(_))
+            ),
+            "already linked elsewhere"
+        );
+        assert_eq!(link_branch(&mut s, a.id, None).unwrap().branch, None);
+        assert_eq!(
+            link_branch(&mut s, b.id, Some("feature/login"))
+                .unwrap()
+                .branch
+                .as_deref(),
+            Some("feature/login")
         );
     }
 

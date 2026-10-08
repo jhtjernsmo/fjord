@@ -100,10 +100,46 @@ impl Git {
 
     /// Checks out `name`, creating it from the current HEAD if it doesn't exist.
     /// Uncommitted changes come along, as with `git switch`.
+    /// Branch names on `origin` (without the `origin/` prefix).
+    pub fn remote_branches(&self) -> Result<Vec<String>> {
+        let out = self.git(&[
+            "for-each-ref",
+            "--format=%(refname:short)",
+            "--sort=-committerdate",
+            "refs/remotes/origin",
+        ])?;
+        Ok(out
+            .lines()
+            .filter_map(|l| l.strip_prefix("origin/"))
+            .filter(|b| *b != "HEAD" && !b.is_empty())
+            .map(str::to_string)
+            .collect())
+    }
+
+    /// Local branches first (most recent first), then branches only on `origin`.
+    pub fn branch_names(&self) -> Result<Vec<String>> {
+        let mut names: Vec<String> = self.branches()?.into_iter().map(|b| b.name).collect();
+        for remote in self.remote_branches().unwrap_or_default() {
+            if !names.contains(&remote) {
+                names.push(remote);
+            }
+        }
+        Ok(names)
+    }
+
     pub fn switch_or_create(&self, name: &str) -> Result<bool> {
         validate_branch_name(name)?;
         if self.branch_exists(name) {
             self.git(&["switch", name])?;
+            Ok(false)
+        } else if self
+            .remote_branches()
+            .unwrap_or_default()
+            .iter()
+            .any(|b| b == name)
+        {
+            // Only on the remote: check out a local branch that tracks it.
+            self.git(&["switch", "--track", &format!("origin/{name}")])?;
             Ok(false)
         } else {
             self.git(&["switch", "-c", name])?;

@@ -228,6 +228,12 @@ fn tool_definitions() -> Vec<Value> {
             &["id"],
         ),
         tool(
+            "link_branch",
+            "Link a task to a branch that already exists in the linked repository (or unlink with branch: null), so its pull requests show on the task. Doesn't check anything out.",
+            json!({ "id": { "type": "integer" }, "branch": { "type": ["string", "null"] } }),
+            &["id", "branch"],
+        ),
+        tool(
             "list_pull_requests",
             "GitHub pull requests of a project with CI state and linked tasks; moves tasks of merged PRs to done.",
             json!({ "project": project }),
@@ -480,6 +486,11 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
         "start_branch" => {
             serde_json::to_value(fjord_vcs::start_branch(store, int_arg(args, "id")?)?)?
         }
+        "link_branch" => serde_json::to_value(fjord_vcs::link_branch(
+            store,
+            int_arg(args, "id")?,
+            args.get("branch").and_then(Value::as_str),
+        )?)?,
         "list_pull_requests" => {
             let p = store.find_project(str_arg(args, "project")?)?;
             serde_json::to_value(fjord_vcs::sync(store, p.id)?)?
@@ -525,7 +536,7 @@ mod tests {
         );
         let tools =
             handle_line(&mut s, r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#).unwrap();
-        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 24);
+        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 25);
         let unknown = handle_line(&mut s, r#"{"jsonrpc":"2.0","id":3,"method":"nope"}"#).unwrap();
         assert_eq!(unknown["error"]["code"], -32601);
         let bad = handle_line(&mut s, "{not json").unwrap();

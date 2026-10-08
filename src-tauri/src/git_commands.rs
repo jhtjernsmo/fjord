@@ -207,3 +207,22 @@ pub async fn poll_github_login() -> CmdResult<fjord_vcs::DevicePoll> {
 pub async fn connect_azure_cli(org: String) -> CmdResult<AzureAccount> {
     off_thread(move || fjord_vcs::connect_azure_cli(&org)).await
 }
+
+/// Branches a task can be linked to (local first, then remote-only).
+#[tauri::command]
+pub async fn list_branches(state: State<'_, AppState>, project_id: i64) -> CmdResult<Vec<String>> {
+    with_store_bg(&state, move |s| fjord_vcs::branch_choices(s, project_id)).await
+}
+
+/// Links a task to an existing branch, or unlinks it with `branch: null`.
+#[tauri::command]
+pub async fn link_task_branch(
+    state: State<'_, AppState>,
+    task_id: i64,
+    branch: Option<String>,
+) -> CmdResult<Task> {
+    with_store_bg(&state, move |s| {
+        fjord_vcs::link_branch(s, task_id, branch.as_deref())
+    })
+    .await
+}
