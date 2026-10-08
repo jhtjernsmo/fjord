@@ -60,10 +60,30 @@ pub struct ImportMapping {
     pub fjord_project_id: i64,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+/// How many days back finished work items (Done, Resolved, …) are imported.
+pub const DEFAULT_CLOSED_DAYS: u32 = 30;
+
+fn default_closed_days() -> u32 {
+    DEFAULT_CLOSED_DAYS
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ImportSettings {
     pub enabled: bool,
     pub mappings: Vec<ImportMapping>,
+    /// Also import finished items changed in the last N days (0 = open items only).
+    #[serde(default = "default_closed_days")]
+    pub closed_days: u32,
+}
+
+impl Default for ImportSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            mappings: Vec::new(),
+            closed_days: DEFAULT_CLOSED_DAYS,
+        }
+    }
 }
 
 impl Store {
@@ -353,6 +373,7 @@ mod tests {
                 project: "Mobile App".into(),
                 fjord_project_id: p,
             }],
+            ..Default::default()
         };
         s.set_import_settings(&settings).unwrap();
         assert_eq!(s.import_settings().unwrap(), settings);

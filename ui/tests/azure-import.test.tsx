@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 // A tiny fake backend: saving bumps the change counter, like a real write does.
-const backend = vi.hoisted(() => ({ saved: { enabled: false, mappings: [] as unknown[] }, counter: 0 }))
+const backend = vi.hoisted(() => ({ saved: { enabled: false, mappings: [] as unknown[], closed_days: 30 }, counter: 0 }))
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(async (cmd: string, args?: { settings?: typeof backend.saved }) => {
     if (cmd === 'get_import_settings') return structuredClone(backend.saved)

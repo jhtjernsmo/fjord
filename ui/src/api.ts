@@ -98,6 +98,8 @@ export interface ImportMapping {
 export interface ImportSettings {
   enabled: boolean
   mappings: ImportMapping[]
+  /** Also import finished items changed in the last N days (0 = open items only). */
+  closed_days: number
 }
 
 export interface WorkItemComment {

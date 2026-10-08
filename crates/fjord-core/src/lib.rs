@@ -17,7 +17,8 @@ mod tasks;
 
 pub use error::{Error, Result};
 pub use imports::{
-    ExternalItem, ExternalLink, ImportMapping, ImportOutcome, ImportSettings, ImportedTask,
+    DEFAULT_CLOSED_DAYS, ExternalItem, ExternalLink, ImportMapping, ImportOutcome, ImportSettings,
+    ImportedTask,
 };
 pub use links::parse_links;
 pub use models::*;
