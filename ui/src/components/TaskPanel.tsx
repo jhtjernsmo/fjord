@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
 import { MARKDOWN_PLUGINS, ScrollTable } from './NoteMarkdown'
 import { motion } from 'motion/react'
-import { Archive, CircleCheck, ExternalLink, GitBranch, GitPullRequest, Trash2, X } from 'lucide-react'
+import { Archive, CircleCheck, ExternalLink, GitBranch, GitPullRequest, Link2, Trash2, Unlink, X } from 'lucide-react'
 import { useContextMenus, useEntityActions } from './actions'
 import { api, formatBytes, relativeTime, remoteOf } from '../api'
 import type { Attachment, Status, Task, TaskPatch } from '../api'
@@ -216,11 +216,66 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
   )
 }
 
+/** Pick an existing branch (local or on origin) to link to the task. */
+function LinkBranch({ task, onDone }: { task: Task; onDone: () => void }) {
+  const { run, t, toast } = useApp()
+  const [branches] = useLive(() => api.listBranches(task.project_id), [task.project_id])
+  const [query, setQuery] = useState('')
+  const [index, setIndex] = useState(0)
+  const needle = query.trim().toLowerCase()
+  const matches = (branches ?? []).filter((b) => b.toLowerCase().includes(needle)).slice(0, 8)
+  const link = async (branch: string) => {
+    const linked = await run(api.linkTaskBranch(task.id, branch))
+    if (linked) {
+      toast(t('git.branchLinked', { branch }), 'success')
+      refreshPullRequests(task.project_id).catch(() => undefined)
+      onDone()
+    }
+  }
+  return (
+    <div className="branch-picker">
+      <input
+        className="input mono"
+        autoFocus
+        value={query}
+        placeholder={t('git.findBranch')}
+        aria-label={t('git.findBranch')}
+        onChange={(e) => {
+          setQuery(e.target.value)
+          setIndex(0)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') setIndex((i) => Math.min(i + 1, matches.length - 1))
+          else if (e.key === 'ArrowUp') setIndex((i) => Math.max(i - 1, 0))
+          else if (e.key === 'Enter' && matches[index]) link(matches[index])
+          else if (e.key === 'Escape') onDone()
+          else return
+          e.preventDefault()
+          e.stopPropagation()
+        }}
+      />
+      <div className="branch-list" role="listbox">
+        {branches === undefined && <span className="hint">{t('github.checking')}</span>}
+        {branches && matches.length === 0 && <span className="hint">{t('git.noBranches')}</span>}
+        {matches.map((b, i) => (
+          <button key={b} role="option" aria-selected={i === index} className={i === index ? 'on' : ''} onMouseEnter={() => setIndex(i)} onClick={() => link(b)}>
+            <GitBranch size={13} /> <span className="mono">{b}</span>
+          </button>
+        ))}
+      </div>
+      <button className="btn ghost" onClick={onDone}>
+        {t('dialog.cancel')}
+      </button>
+    </div>
+  )
+}
+
 function GitSection({ task }: { task: Task }) {
   const { run, t, toast } = useApp()
   const [repo] = useLive(() => api.getProjectRepo(task.project_id), [task.project_id])
   const prs = usePullRequests(task.project_id)
   const [busy, setBusy] = useState(false)
+  const [picking, setPicking] = useState(false)
   const pr = prs?.find((p) => p.task_id === task.id)
   const hasGithub = !!remoteOf(repo)
   // Fetch PRs once if nothing has synced this project yet (e.g. Git tab never opened).
@@ -255,11 +310,21 @@ function GitSection({ task }: { task: Task }) {
               <button className="btn ghost" onClick={() => run(api.startBranch(task.id), t('git.branchStarted', { branch: task.branch ?? '' }))}>
                 {t('git.checkout')}
               </button>
+              <button className="icon-btn" onClick={() => run(api.linkTaskBranch(task.id, null))} title={t('git.unlinkBranch')} aria-label={t('git.unlinkBranch')}>
+                <Unlink size={13} />
+              </button>
             </div>
+          ) : picking ? (
+            <LinkBranch task={task} onDone={() => setPicking(false)} />
           ) : (
-            <button className="btn" onClick={() => run(api.startBranch(task.id)).then((r) => r && toast(t('git.branchStarted', { branch: r.branch }), 'success'))}>
-              <GitBranch size={14} /> {t('git.startBranch')} <kbd>B</kbd>
-            </button>
+            <div className="row-inline">
+              <button className="btn" onClick={() => run(api.startBranch(task.id)).then((r) => r && toast(t('git.branchStarted', { branch: r.branch }), 'success'))}>
+                <GitBranch size={14} /> {t('git.startBranch')} <kbd>B</kbd>
+              </button>
+              <button className="btn ghost" onClick={() => setPicking(true)}>
+                <Link2 size={14} /> {t('git.linkBranch')}
+              </button>
+            </div>
           )}
           {pr ? (
             <div className="pr-row">

@@ -91,6 +91,8 @@ pub fn run() {
             git_commands::get_import_settings,
             git_commands::set_import_settings,
             git_commands::run_azure_import,
+            git_commands::list_branches,
+            git_commands::link_task_branch,
             git_commands::start_github_login,
             git_commands::poll_github_login,
             git_commands::connect_azure_cli,

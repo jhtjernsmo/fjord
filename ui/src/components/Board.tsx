@@ -73,7 +73,8 @@ function CardBody({ task, statuses, className = '' }: { task: Task; statuses: St
   const priority = t(`priority.${task.priority}` as MessageKey)
   const { progress, titles } = useContext(SubtaskInfo)
   const subs = progress.get(task.id)
-  const parentTitle = task.parent_id !== null ? titles.get(task.parent_id) : undefined
+  const parentId = task.parent_id ?? null
+  const parentTitle = parentId !== null ? titles.get(parentId) : undefined
   return (
     <div className={`card ${done ? 'done' : ''} ${className}`}>
       {parentTitle && (
@@ -176,14 +177,15 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
   const { statuses, tasks: allTasks } = board
   const [filter, setFilter] = useState<BoardFilter>(EMPTY_FILTER)
   const filterRef = useRef<HTMLInputElement>(null)
-  const visible = useMemo(() => allTasks.filter((t) => filter.subtasks || t.parent_id === null), [allTasks, filter.subtasks])
+  const visible = useMemo(() => allTasks.filter((t) => filter.subtasks || (t.parent_id ?? null) === null), [allTasks, filter.subtasks])
   const subtaskInfo = useMemo(() => {
     const doneIds = new Set(statuses.filter((s) => s.is_done).map((s) => s.id))
     const progress = new Map<number, { done: number; total: number }>()
     for (const t of allTasks) {
-      if (t.parent_id === null) continue
-      const p = progress.get(t.parent_id) ?? { done: 0, total: 0 }
-      progress.set(t.parent_id, { done: p.done + (doneIds.has(t.status_id) ? 1 : 0), total: p.total + 1 })
+      const parentId = t.parent_id ?? null
+      if (parentId === null) continue
+      const p = progress.get(parentId) ?? { done: 0, total: 0 }
+      progress.set(parentId, { done: p.done + (doneIds.has(t.status_id) ? 1 : 0), total: p.total + 1 })
     }
     return { progress, titles: new Map(allTasks.map((t) => [t.id, t.title])) }
   }, [allTasks, statuses])
