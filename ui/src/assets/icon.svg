@@ -1,12 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <defs>
-    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="160" y1="160" x2="864" y2="864"><stop offset="0" stop-color="#7c9cff"/><stop offset="1" stop-color="#00d4b0"/></linearGradient>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#161a24"/><stop offset="1" stop-color="#0b0d12"/></linearGradient>
-  </defs>
-  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
-  <rect x="64" y="64" width="896" height="896" rx="200" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="6"/>
-  <!-- terminal prompt ">" whose top edge forms a mountain, plus a cursor as the water -->
-  <path d="M250 300 L470 512 L250 724" fill="none" stroke="url(#g)" stroke-width="72" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M560 700 H790" stroke="url(#g)" stroke-width="72" stroke-linecap="round"/>
-  <path d="M560 560 L640 430 L700 520 L745 460 L790 540" fill="none" stroke="#e8eaf0" stroke-opacity="0.85" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Fjord: two mountainsides meeting at a narrow fjord, flat colours -->
+  <rect x="64" y="64" width="896" height="896" rx="190" fill="#1f3a4d"/>
+  <path d="M64 700 V330 L300 520 L420 430 L512 700 Z" fill="#e9e4d8"/>
+  <path d="M960 700 V300 L760 470 L650 400 L540 700 Z" fill="#c9c2b2"/>
+  <path d="M64 700 H960 V770 C960 875 875 960 770 960 H254 C149 960 64 875 64 770 Z" fill="#5fa8c9"/>
 </svg>
