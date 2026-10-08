@@ -1,10 +1,11 @@
 // Shared entity actions (rename, delete, archive …) and the right-click menus built from them.
-import { Archive, ArchiveRestore, ArrowRight, ExternalLink, Flag, FolderOpen, GitBranch, Pencil, Trash2, X } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowRight, ExternalLink, Flag, FolderOpen, GitBranch, Palette, Pencil, Trash2, X } from 'lucide-react'
 import { api } from '../api'
 import type { Attachment, Note, Project, Status, Task } from '../api'
 import { useApp } from '../data'
 import type { MessageKey } from '../i18n'
 import { useMenus } from './Menus'
+import { useNav } from '../nav'
 import type { MenuItem } from './Menus'
 
 const ICON = 14
@@ -65,6 +66,7 @@ export function useEntityActions() {
 export function useContextMenus() {
   const { run, t, toast } = useApp()
   const { openMenu } = useMenus()
+  const nav = useNav()
   const actions = useEntityActions()
 
   const taskMenu = (task: Task, statuses: Status[], opts: { onOpen: () => void; hasRepo?: boolean }) => (e: React.MouseEvent) => {
@@ -106,6 +108,7 @@ export function useContextMenus() {
     const archived = !!project.archived_at
     openMenu(e, [
       { label: t('menu.open'), icon: <FolderOpen size={ICON} />, onSelect: opts.onOpen, disabled: archived },
+      { label: t('menu.editProject'), icon: <Palette size={ICON} />, onSelect: () => nav.editProject(project) },
       { label: t('menu.rename'), icon: <Pencil size={ICON} />, onSelect: () => actions.renameProject(project) },
       archived
         ? { label: t('archive.restore'), icon: <ArchiveRestore size={ICON} />, separator: true, onSelect: () => actions.archiveProject(project, false) }

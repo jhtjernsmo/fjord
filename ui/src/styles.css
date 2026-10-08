@@ -190,6 +190,17 @@ kbd {
 .branch-list button.on { background: var(--panel-2); }
 .branch-picker > .btn { align-self: flex-start; }
 
+/* Azure DevOps discussion in the task panel */
+.discussion-head { display: flex; align-items: center; justify-content: space-between; }
+.discussion-toggle { display: inline-flex; align-items: center; gap: 6px; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; }
+.discussion-toggle .chevron { transition: transform .15s; }
+.discussion.open .discussion-toggle .chevron { transform: rotate(90deg); }
+.discussion-body { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.comment { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--panel); }
+.comment-head { font-size: 12px; margin-bottom: 4px; }
+.comment .markdown { min-height: 0; cursor: default; padding: 0; }
+.comment .markdown:hover { background: none; }
+
 /* subtasks (task panel + board cards) */
 .subtasks { display: flex; flex-direction: column; gap: 4px; }
 .subtasks .section-title { display: flex; align-items: center; justify-content: space-between; }

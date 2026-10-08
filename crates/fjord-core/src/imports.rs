@@ -169,6 +169,19 @@ impl Store {
         Ok(previous)
     }
 
+    /// Where an imported task came from, if it was imported.
+    pub fn external_link_for_task(&self, task_id: i64) -> Result<Option<ExternalLink>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT task_id, source, external_id, url, imported_at, analyzed_at
+                 FROM external_links WHERE task_id = ?1",
+                [task_id],
+                link_from_row,
+            )
+            .optional()?)
+    }
+
     /// External ids already imported from `source`, with their task ids.
     pub fn external_ids(&self, source: &str) -> Result<Vec<(String, i64)>> {
         let mut stmt = self

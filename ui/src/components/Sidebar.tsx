@@ -1,6 +1,7 @@
-import { Command, House, Keyboard, Languages, NotebookText, Plus, Settings } from 'lucide-react'
+import { Bug, Command, House, Keyboard, Languages, NotebookText, Plus, Settings } from 'lucide-react'
 import type { ProjectSummary } from '../api'
 import { useApp } from '../data'
+import { reportBug } from '../reportBug'
 import { LOCALES } from '../i18n'
 import { displayKeys } from '../keymap'
 import { ProjectGlyph } from './Icons'
@@ -85,6 +86,11 @@ export function Sidebar({ projects, activeId, onHome, onSelect, onNewProject, on
           <Keyboard size={15} strokeWidth={1.6} />
           <span className="name">{t('app.allShortcuts')}</span>
           <kbd>{keys('help.toggle')}</kbd>
+        </button>
+        <button className="nav-item" onClick={() => void reportBug()} title={t('app.reportBugHint')}>
+          <Bug size={15} strokeWidth={1.6} />
+          <span className="name">{t('app.reportBug')}</span>
+          <kbd>{keys('app.reportBug')}</kbd>
         </button>
         <button className="nav-item" onClick={() => setLocale(nextLocale.id)} title={t('app.language')}>
           <Languages size={15} strokeWidth={1.6} />

@@ -14,6 +14,7 @@ import { ChecksIcon, PrStateBadge, refreshPullRequests, usePullRequests } from '
 import { Backlinks } from './NoteEditor'
 import { copyTaskRef } from './taskRef'
 import { Subtasks } from './Subtasks'
+import { AzureDiscussion } from './AzureDiscussion'
 
 const PRIORITY_LEVELS = [0, 1, 2, 3]
 
@@ -222,6 +223,8 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
           </div>
 
           <Subtasks task={task} statuses={statuses} />
+
+          <AzureDiscussion taskId={task.id} />
 
           <GitSection task={task} />
 
