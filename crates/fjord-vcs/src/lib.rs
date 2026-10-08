@@ -77,8 +77,10 @@ pub struct GitOverview {
 pub struct LinkedPullRequest {
     #[serde(flatten)]
     pub pr: PullRequest,
-    /// The Fjord task working in this PR's branch, if any.
+    /// The first Fjord task working in this PR's branch, if any.
     pub task_id: Option<i64>,
+    /// Every Fjord task linked to this PR's branch (a branch can serve several).
+    pub task_ids: Vec<i64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -257,16 +259,7 @@ pub fn link_branch(store: &mut Store, task_id: i64, branch: Option<&str>) -> Res
             "no branch named «{name}» in this repository"
         )));
     }
-    if let Some(other) = store
-        .list_tasks(task.project_id)?
-        .into_iter()
-        .find(|t| t.id != task.id && t.branch.as_deref() == Some(name))
-    {
-        return Err(VcsError::Git(format!(
-            "«{name}» is already linked to task #{} ({})",
-            other.id, other.title
-        )));
-    }
+    // Several tasks may share a branch (e.g. a story and its subtasks).
     Ok(store.set_task_branch(task.id, Some(name))?)
 }
 
@@ -279,14 +272,23 @@ fn link_tasks(
     Ok(prs
         .into_iter()
         .map(|pr| {
-            let task_id = tasks
+            let mut task_ids: Vec<i64> = tasks
                 .iter()
-                .find(|t| t.branch.as_deref() == Some(pr.head.as_str()))
-                .or_else(|| {
-                    task_id_from_branch(&pr.head).and_then(|id| tasks.iter().find(|t| t.id == id))
-                })
-                .map(|t| t.id);
-            LinkedPullRequest { pr, task_id }
+                .filter(|t| t.branch.as_deref() == Some(pr.head.as_str()))
+                .map(|t| t.id)
+                .collect();
+            // fjord/<id>-… branches belong to that task even before it records the branch.
+            if let Some(id) = task_id_from_branch(&pr.head)
+                && tasks.iter().any(|t| t.id == id)
+                && !task_ids.contains(&id)
+            {
+                task_ids.push(id);
+            }
+            LinkedPullRequest {
+                task_id: task_ids.first().copied(),
+                task_ids,
+                pr,
+            }
         })
         .collect())
 }
@@ -318,11 +320,12 @@ pub fn apply_sync(store: &mut Store, project_id: i64, prs: Vec<PullRequest>) -> 
         let columns = store.list_statuses(project_id)?;
         if let Some(done) = columns.iter().find(|c| c.is_done) {
             for lp in linked.iter().filter(|lp| lp.pr.state == "merged") {
-                let Some(task_id) = lp.task_id else { continue };
-                // Already in any done column (e.g. "Resolved"): leave it there.
-                let status = store.get_task(task_id)?.status_id;
-                if !columns.iter().any(|c| c.id == status && c.is_done) {
-                    completed.push(store.move_task(task_id, done.id, None)?);
+                for &task_id in &lp.task_ids {
+                    // Already in any done column (e.g. "Resolved"): leave it there.
+                    let status = store.get_task(task_id)?.status_id;
+                    if !columns.iter().any(|c| c.id == status && c.is_done) {
+                        completed.push(store.move_task(task_id, done.id, None)?);
+                    }
                 }
             }
         }
@@ -1008,12 +1011,33 @@ mod tests {
             ),
             "unknown branch"
         );
-        assert!(
-            matches!(
-                link_branch(&mut s, b.id, Some("feature/login")),
-                Err(VcsError::Git(_))
-            ),
-            "already linked elsewhere"
+        // The same branch can serve several tasks.
+        assert_eq!(
+            link_branch(&mut s, b.id, Some("feature/login"))
+                .unwrap()
+                .branch
+                .as_deref(),
+            Some("feature/login")
+        );
+        let pr = PullRequest {
+            number: 7,
+            title: "login".into(),
+            state: "merged".into(),
+            draft: false,
+            url: String::new(),
+            author: "j".into(),
+            head: "feature/login".into(),
+            base: "main".into(),
+            head_sha: "s".into(),
+            updated_at: String::new(),
+            checks: Checks::None,
+        };
+        let report = apply_sync(&mut s, p, vec![pr]).unwrap();
+        assert_eq!(report.pull_requests[0].task_ids, vec![a.id, b.id]);
+        assert_eq!(
+            report.completed.len(),
+            2,
+            "both tasks move to done when the PR merges"
         );
         assert_eq!(link_branch(&mut s, a.id, None).unwrap().branch, None);
         assert_eq!(

@@ -328,7 +328,7 @@ function GitSection({ task }: { task: Task }) {
   const [busy, setBusy] = useState(false)
   const [picking, setPicking] = useState(false)
   const [kind, setKind] = useState<string | null>(null)
-  const pr = prs?.find((p) => p.task_id === task.id)
+  const pr = prs?.find((p) => (p.task_ids ?? [p.task_id]).includes(task.id))
   const hasGithub = !!remoteOf(repo)
   // Fetch PRs once if nothing has synced this project yet (e.g. Git tab never opened).
   useEffect(() => {

@@ -244,6 +244,8 @@ export interface PullRequest {
 
 export interface LinkedPullRequest extends PullRequest {
   task_id: number | null
+  /** Every task linked to this PR's branch. */
+  task_ids: number[]
 }
 
 export interface SyncReport {

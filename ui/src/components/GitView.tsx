@@ -109,7 +109,7 @@ export function GitView({ projectId, onOpenTask }: { projectId: number; onOpenTa
         if (report.completed.length > 0) toast(t('git.completed', { n: report.completed.length }), 'success')
         else if (!quiet) toast(t('git.synced', { n: report.pull_requests.length }), 'success')
       } catch (err) {
-        setSyncError(errorMessage(err))
+        setSyncError(`${t('git.syncFailed')}: ${errorMessage(err)}`)
       } finally {
         setSyncing(false)
       }
@@ -159,11 +159,11 @@ export function GitView({ projectId, onOpenTask }: { projectId: number; onOpenTa
               <span className="pr-title">{pr.title}</span>
               <PrStateBadge pr={pr} />
               <span className="mono dim pr-branch">{pr.head}</span>
-              {pr.task_id && (
-                <button className="chip" onClick={() => onOpenTask(pr.task_id as number)}>
-                  {t('git.task', { id: pr.task_id })}
+              {(pr.task_ids ?? (pr.task_id ? [pr.task_id] : [])).map((id) => (
+                <button key={id} className="chip" onClick={() => onOpenTask(id)}>
+                  {t('git.task', { id })}
                 </button>
-              )}
+              ))}
               <button className="icon-btn" onClick={() => run(api.openUrl(pr.url))} title={t('git.openOnGithub')} aria-label={t('git.openOnGithub')}>
                 <ExternalLink size={14} />
               </button>

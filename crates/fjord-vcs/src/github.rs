@@ -196,8 +196,59 @@ pub struct GitHubAccount {
 pub(crate) fn agent() -> ureq::Agent {
     ureq::Agent::config_builder()
         .timeout_global(Some(TIMEOUT))
+        // Error responses are read by `checked`, so the service's own message survives.
+        .http_status_as_error(false)
         .build()
         .into()
+}
+
+/// A failed HTTP call: the status and the service's explanation when it sent one
+/// (GitHub and Azure DevOps both put it in a JSON `message` field), or a
+/// transport error (offline, timeout, …).
+#[derive(Debug)]
+pub(crate) enum HttpError {
+    Status(u16, Option<String>),
+    Transport(String),
+}
+
+impl From<ureq::Error> for HttpError {
+    fn from(e: ureq::Error) -> Self {
+        match e {
+            ureq::Error::StatusCode(code) => HttpError::Status(code, None),
+            other => HttpError::Transport(other.to_string()),
+        }
+    }
+}
+
+/// Passes successful responses through; turns 4xx/5xx into an `HttpError` with the message.
+pub(crate) fn checked(
+    mut res: ureq::http::Response<ureq::Body>,
+) -> std::result::Result<ureq::http::Response<ureq::Body>, HttpError> {
+    let status = res.status().as_u16();
+    if status < 400 {
+        return Ok(res);
+    }
+    let message = res
+        .body_mut()
+        .read_to_string()
+        .ok()
+        .and_then(|body| service_message(&body));
+    Err(HttpError::Status(status, message))
+}
+
+/// The human-readable `message` from an error body, if there is one.
+pub(crate) fn service_message(body: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(body).ok()?;
+    let message = value.get("message")?.as_str()?.trim();
+    (!message.is_empty()).then(|| message.to_string())
+}
+
+/// "… (403)" plus the service's own explanation, if it gave one.
+pub(crate) fn with_message(text: &str, message: &Option<String>) -> String {
+    match message {
+        Some(m) => format!("{text}: {m}"),
+        None => text.to_string(),
+    }
 }
 
 fn whoami(token: &str, source: TokenSource) -> Result<GitHubAccount> {
@@ -207,8 +258,10 @@ fn whoami(token: &str, source: TokenSource) -> Result<GitHubAccount> {
         .header("User-Agent", "fjord")
         .header("Authorization", &format!("Bearer {token}"))
         .call()
+        .map_err(HttpError::from)
+        .and_then(checked)
         .map_err(|e| match e {
-            ureq::Error::StatusCode(401) => {
+            HttpError::Status(401, _) => {
                 VcsError::GitHub("GitHub did not accept this token (401)".into())
             }
             other => api_error(other),
@@ -296,6 +349,8 @@ impl GitHub {
         let mut res = self
             .with_headers(self.agent.get(&self.url(path)))
             .call()
+            .map_err(HttpError::from)
+            .and_then(checked)
             .map_err(api_error)?;
         res.body_mut()
             .read_json()
@@ -344,6 +399,8 @@ impl GitHub {
         let mut res = self
             .with_headers(self.agent.post(&self.url("/pulls")))
             .send_json(&payload)
+            .map_err(HttpError::from)
+            .and_then(checked)
             .map_err(api_error)?;
         let pr: ApiPull = res
             .body_mut()
@@ -410,6 +467,8 @@ fn github_form<T: serde::de::DeserializeOwned>(url: &str, form: &[(&str, &str)])
         .header("Accept", "application/json")
         .header("User-Agent", "fjord")
         .send_form(form.iter().copied())
+        .map_err(HttpError::from)
+        .and_then(checked)
         .map_err(api_error)?;
     res.body_mut()
         .read_json()
@@ -479,23 +538,27 @@ fn device_poll_from(res: ApiDeviceToken) -> Result<DevicePoll> {
     })
 }
 
-fn api_error(e: ureq::Error) -> VcsError {
+fn api_error(e: HttpError) -> VcsError {
     match e {
-        ureq::Error::StatusCode(401) => VcsError::NoToken,
-        ureq::Error::StatusCode(403) => {
-            VcsError::GitHub("access denied or rate limited (403)".into())
-        }
-        ureq::Error::StatusCode(404) => {
+        HttpError::Status(401, _) => VcsError::NoToken,
+        HttpError::Status(403, message) => VcsError::GitHub(with_message(
+            "access denied (403)",
+            &message.or_else(|| {
+                Some("the token may lack access to this repository, or the organization restricts OAuth apps or requires SSO approval".into())
+            }),
+        )),
+        HttpError::Status(404, _) => {
             VcsError::GitHub(
                 "repository not found (404). If it is private, connect GitHub in Settings with a token that can read it"
                     .into(),
             )
         }
-        ureq::Error::StatusCode(422) => VcsError::GitHub(
-            "GitHub rejected the request (422): is the branch pushed, or does a PR already exist?"
-                .into(),
-        ),
-        other => VcsError::GitHub(other.to_string()),
+        HttpError::Status(422, message) => VcsError::GitHub(with_message(
+            "GitHub rejected the request (422): is the branch pushed, or does a PR already exist?",
+            &message,
+        )),
+        HttpError::Status(code, message) => VcsError::GitHub(with_message(&format!("HTTP {code}"), &message)),
+        HttpError::Transport(e) => VcsError::GitHub(e),
     }
 }
 
@@ -593,5 +656,31 @@ mod tests {
             poll_github_login().is_err(),
             "polling without a started sign-in fails cleanly"
         );
+    }
+
+    #[test]
+    fn errors_keep_the_services_own_explanation() {
+        // GitHub's answer when an organization restricts OAuth apps.
+        let body = r#"{"message":"Although you appear to have the correct authorization credentials, the `contoso` organization has enabled OAuth App access restrictions.","documentation_url":"https://docs.github.com"}"#;
+        let message = service_message(body);
+        assert!(
+            message
+                .as_deref()
+                .unwrap()
+                .contains("OAuth App access restrictions")
+        );
+        let err = api_error(HttpError::Status(403, message)).to_string();
+        assert!(
+            err.contains("403") && err.contains("OAuth App access restrictions"),
+            "{err}"
+        );
+        // Without a body there's still a helpful hint.
+        assert!(
+            api_error(HttpError::Status(403, None))
+                .to_string()
+                .contains("SSO")
+        );
+        assert_eq!(service_message("<html>nope</html>"), None);
+        assert_eq!(service_message(r#"{"message":"  "}"#), None);
     }
 }
