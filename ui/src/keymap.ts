@@ -30,6 +30,7 @@ export const DEFAULT_ACTIONS: ActionDef[] = [
   { id: 'task.new', group: 'task', scope: 'global', keys: '<leader>t' },
   { id: 'lang.toggle', group: 'general', scope: 'global', keys: '<leader>L' },
   { id: 'settings.open', group: 'general', scope: 'global', keys: '<leader>,' },
+  { id: 'theme.cycle', group: 'general', scope: 'global', keys: '<leader>T' },
   { id: 'view.archive', group: 'view', scope: 'global', keys: '<leader>A' },
   { id: 'view.git', group: 'view', scope: 'global', keys: '<leader>g' },
   { id: 'board.left', group: 'board', scope: 'board', keys: 'h' },
