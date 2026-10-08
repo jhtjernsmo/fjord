@@ -1,6 +1,6 @@
 // Azure Boards import: Settings section (which Azure project goes into which Fjord
 // project) and the background runner that imports every few minutes.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Download, Plus, X } from 'lucide-react'
 import { api, errorMessage } from '../api'
 import type { ImportMapping, ImportSettings } from '../api'
@@ -41,8 +41,13 @@ export function AzureImportSettings() {
   const [settings, setSettings] = useState<ImportSettings>(EMPTY)
   const [busy, setBusy] = useState(false)
 
+  // Load the saved settings once. Later reloads must not replace the form, or a
+  // half-filled row (saved without it, since it's incomplete) would vanish mid-edit.
+  const loaded = useRef(false)
   useEffect(() => {
-    if (saved) setSettings(saved)
+    if (!saved || loaded.current) return
+    loaded.current = true
+    setSettings(saved)
   }, [saved])
 
   const save = (next: ImportSettings) => {
