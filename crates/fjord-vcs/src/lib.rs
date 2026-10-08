@@ -525,19 +525,23 @@ pub fn apply_import(
         }
         let task = store.get_task(task_id)?;
         let columns = store.list_statuses(task.project_id)?;
-        // Already in any done column (e.g. your own "Resolved"): leave it there.
-        if task.archived_at.is_some() || columns.iter().any(|c| c.id == task.status_id && c.is_done)
-        {
+        if task.archived_at.is_some() {
             continue;
         }
-        // Prefer a column named like the Azure state ("Resolved"), else the first done column.
-        let target = columns
+        // A column named like the Azure state wins ("Resolved" → Resolved, "Done" → Done).
+        // Without one, the first done column, unless the task is already in a done column.
+        let target = match columns
             .iter()
             .find(|c| c.name.eq_ignore_ascii_case(&info.state))
-            .or_else(|| columns.iter().find(|c| c.is_done));
-        if let Some(target) = target
-            && target.id != task.status_id
         {
+            Some(same_name) => same_name,
+            None if columns.iter().any(|c| c.id == task.status_id && c.is_done) => continue,
+            None => match columns.iter().find(|c| c.is_done) {
+                Some(done) => done,
+                None => continue,
+            },
+        };
+        if target.id != task.status_id {
             store.move_task(task.id, target.id, None)?;
             report.closed += 1;
         }
@@ -988,6 +992,25 @@ mod tests {
             "moved to the same-named column, not Done"
         );
         assert_eq!(apply_import(&mut s, &settings, &gone).unwrap().closed, 0);
+        // Later set to Done in Azure: follows to the Done column.
+        gone.info.insert(
+            ("contoso".into(), 9),
+            WorkItemInfo {
+                parent: None,
+                state: "Done".into(),
+            },
+        );
+        apply_import(&mut s, &settings, &gone).unwrap();
+        assert_eq!(s.get_task(id).unwrap().status_id, done.id);
+        // Back to Resolved for the Git part below.
+        s.move_task(id, resolved.id, None).unwrap();
+        gone.info.insert(
+            ("contoso".into(), 9),
+            WorkItemInfo {
+                parent: None,
+                state: "Resolved".into(),
+            },
+        );
 
         // Git: a merged PR doesn't pull a task out of "Resolved" into "Done".
         let repo = temp_repo();
