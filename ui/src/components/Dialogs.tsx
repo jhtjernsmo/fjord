@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { NewProject, Project } from '../api'
 import { useApp } from '../data'
 import { PROJECT_GLYPHS, ProjectGlyph } from './Icons'
-import { setUpdateCheckEnabled, updateCheckEnabled, useUpdater } from './Updater'
+import { appVersion, setUpdateCheckEnabled, updateCheckEnabled, useUpdater } from './Updater'
 
 const COLORS = ['#7c9cff', '#00d4b0', '#3fb950', '#f5a524', '#ff7a1a', '#ff6b6b', '#e86bff', '#a78bfa']
 
@@ -98,9 +98,14 @@ export function UpdateSettings() {
   const { t } = useApp()
   const [auto, setAuto] = useState(updateCheckEnabled)
   const { update, checking, runCheck, install } = useUpdater()
+  const [version, setVersion] = useState<string | null>(null)
+  useEffect(() => {
+    void appVersion().then(setVersion)
+  }, [])
   return (
     <div className="row">
       {t('update.settings')}
+      {version && <span className="mono dim">{t('update.installed', { version })}</span>}
       <label className="toggle-label">
         <input
           type="checkbox"
