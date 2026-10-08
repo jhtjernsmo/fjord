@@ -604,6 +604,12 @@ kbd {
 
 .beta { font: 500 10px var(--mono); text-transform: uppercase; letter-spacing: .05em; color: var(--accent); border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent); border-radius: 4px; padding: 0 5px; margin-left: 6px; vertical-align: 1px; }
 
+/* mermaid diagrams in rendered markdown */
+.markdown .mermaid-diagram { margin: 10px 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-2); overflow-x: auto; text-align: center; }
+.markdown .mermaid-diagram svg { max-width: 100%; height: auto; }
+.markdown .mermaid-diagram.loading { min-height: 80px; }
+.markdown .mermaid-error { margin: 10px 0; display: flex; flex-direction: column; gap: 6px; }
+
 /* GFM tables, task lists and strikethrough in rendered markdown */
 .markdown .md-table { overflow-x: auto; margin: 8px 0; border: 1px solid var(--line); border-radius: 8px; }
 .markdown table { border-collapse: collapse; width: 100%; font-size: .95em; font-variant-numeric: tabular-nums; }

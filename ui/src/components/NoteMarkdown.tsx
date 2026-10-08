@@ -8,9 +8,22 @@ import { api } from '../api'
 import type { LinkTarget } from '../api'
 import { useApp } from '../data'
 import { useNav } from '../nav'
+import { MermaidDiagram } from './Mermaid'
 
 /** GitHub-flavored markdown: tables, task lists, strikethrough, autolinks. */
 export const MARKDOWN_PLUGINS = [remarkGfm]
+
+/** ```mermaid code blocks become diagrams; other code stays a code block. */
+export function CodeBlock({ node, children }: { node?: { children?: unknown[] }; children?: React.ReactNode }) {
+  const code = node?.children?.[0] as { tagName?: string; properties?: { className?: unknown }; children?: { value?: string }[] } | undefined
+  const classes = code?.properties?.className
+  const isMermaid = Array.isArray(classes) && classes.includes('language-mermaid')
+  if (isMermaid) return <MermaidDiagram code={(code?.children ?? []).map((c) => c.value ?? '').join('')} />
+  return <pre>{children}</pre>
+}
+
+/** Markdown overrides shared by notes and task descriptions. */
+export const MARKDOWN_COMPONENTS = { table: ScrollTable, pre: CodeBlock }
 
 /** Wide tables scroll sideways instead of stretching the page. */
 export function ScrollTable({ children }: { children?: React.ReactNode }) {
@@ -88,7 +101,7 @@ export function NoteMarkdown({ markdown }: { markdown: string }) {
       remarkPlugins={MARKDOWN_PLUGINS}
       urlTransform={(url) => (url.startsWith(SCHEME) ? url : defaultUrlTransform(url))}
       components={{
-        table: ScrollTable,
+        ...MARKDOWN_COMPONENTS,
         a: ({ href, children }) => {
           if (href?.startsWith(SCHEME)) {
             const target = decodeURIComponent(href.slice(SCHEME.length))
