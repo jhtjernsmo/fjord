@@ -20,6 +20,24 @@ fn validate_color(color: &str) -> Result<String> {
     }
 }
 
+/// Column names that mean "finished", so a new column called e.g. "Resolved"
+/// counts as done without having to tick the box.
+const DONE_NAMES: &[&str] = &[
+    "done",
+    "resolved",
+    "closed",
+    "completed",
+    "finished",
+    "ferdig",
+    "løst",
+    "lukket",
+    "fullført",
+];
+
+fn sounds_done(name: &str) -> bool {
+    DONE_NAMES.contains(&name.trim().to_lowercase().as_str())
+}
+
 impl Store {
     pub fn get_status(&self, id: i64) -> Result<Status> {
         self.conn
@@ -54,6 +72,7 @@ impl Store {
         let name = require_text(name, "column name")?;
         let color = validate_color(color.unwrap_or(DEFAULT_COLUMN_COLOR))?;
         self.get_project(project_id)?;
+        let is_done = is_done || sounds_done(&name);
         self.conn.execute(
             "INSERT INTO statuses (project_id, name, color, position, is_done)
              VALUES (?1, ?2, ?3, (SELECT coalesce(max(position), -1) + 1 FROM statuses WHERE project_id = ?1), ?4)",
@@ -260,5 +279,20 @@ mod tests {
             s.delete_status(cols[0].id),
             Err(Error::Invalid(_))
         ));
+    }
+
+    #[test]
+    fn columns_named_like_done_count_as_done() {
+        let (mut s, _d) = store();
+        let p = s
+            .create_project(crate::models::NewProject {
+                name: "P".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        assert!(s.create_status(p, "Resolved", None, false).unwrap().is_done);
+        assert!(s.create_status(p, " løst ", None, false).unwrap().is_done);
+        assert!(!s.create_status(p, "Review", None, false).unwrap().is_done);
     }
 }
