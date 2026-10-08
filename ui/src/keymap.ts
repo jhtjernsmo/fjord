@@ -35,6 +35,7 @@ export const DEFAULT_ACTIONS: ActionDef[] = [
   { id: 'view.archive', group: 'view', scope: 'global', keys: '<leader>A' },
   { id: 'view.git', group: 'view', scope: 'global', keys: '<leader>g' },
   { id: 'git.sync', group: 'project', scope: 'global', keys: '<leader>r' },
+  { id: 'editor.open', group: 'project', scope: 'global', keys: '<leader>e' },
   { id: 'azure.import', group: 'project', scope: 'global', keys: '<leader>i' },
   { id: 'board.left', group: 'board', scope: 'board', keys: 'h' },
   { id: 'board.right', group: 'board', scope: 'board', keys: 'l' },

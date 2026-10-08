@@ -279,6 +279,20 @@ pub fn suggest_branch(
     })
 }
 
+/// Opens the project's repository in the user's editor; with a task, on its branch.
+#[tauri::command]
+pub async fn open_in_editor(
+    state: State<'_, AppState>,
+    project_id: i64,
+    task_id: Option<i64>,
+    command: String,
+) -> CmdResult<String> {
+    with_store_bg(&state, move |s| {
+        fjord_vcs::open_repo_in_editor(s, project_id, task_id, &command)
+    })
+    .await
+}
+
 /// Switches the project's repository back to its main branch.
 #[tauri::command]
 pub async fn checkout_default(state: State<'_, AppState>, project_id: i64) -> CmdResult<String> {

@@ -166,6 +166,7 @@ Link a project to a repository in the **Git** tab (or `fjord git link <project> 
 - or links a task to a branch that already exists. Several tasks can share one branch, and its pull request shows on all of them,
 - shows branches, recent commits and GitHub pull requests with their CI status,
 - links pull requests to tasks by branch name, and opens a PR straight from a task (the title follows the branch type, e.g. `feat: Add login`, and the description comes from the task),
+- opens the repository in your editor or IDE (VS Code, Cursor, JetBrains IDEs, Visual Studio, Zed, Sublime, or your own command; set in **Settings → Integrations**), on the task's branch, with `Space e`,
 - moves the task (or all tasks on the branch) to done when the PR is merged (on **Sync**), unless you turn auto-move off.
 
 If GitHub or Azure DevOps refuses access, the Git tab shows their own explanation, for example an

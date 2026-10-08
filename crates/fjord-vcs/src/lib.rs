@@ -4,6 +4,7 @@
 
 pub mod azure;
 pub mod credentials;
+pub mod editor;
 pub mod git;
 pub mod github;
 mod process;
@@ -202,6 +203,23 @@ pub fn overview_for(repo: ProjectRepo) -> Result<GitOverview> {
         commits: git.commits(RECENT_COMMITS)?,
         repo,
     })
+}
+
+/// Opens the project's repository in the editor `template` names (see [`editor`]).
+/// With a task, its branch is checked out first (created the first time), as
+/// with *Start branch*. Returns the folder that was opened.
+pub fn open_repo_in_editor(
+    store: &mut Store,
+    project_id: i64,
+    task_id: Option<i64>,
+    template: &str,
+) -> Result<String> {
+    if let Some(task_id) = task_id {
+        start_branch(store, task_id, None)?;
+    }
+    let (_, git) = linked(store, project_id)?;
+    editor::open_in_editor(template, git.root())?;
+    Ok(git.root().display().to_string())
 }
 
 /// Switches the project's repository back to its main branch and returns its name.

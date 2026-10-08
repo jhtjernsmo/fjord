@@ -1,7 +1,8 @@
 // Git tab: link a repository, branches, recent commits and GitHub pull requests.
+import { editorLabel, openInEditor } from '../editor'
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
-import { CircleCheck, CircleDashed, CornerUpLeft, CircleX, ExternalLink, FolderGit2, GitBranch, GitMerge, GitPullRequest, RefreshCw, Unlink } from 'lucide-react'
+import { CircleCheck, CircleDashed, Code2, CircleX, ExternalLink, FolderGit2, GitBranch, GitMerge, GitPullRequest, RefreshCw, Unlink, CornerUpLeft } from 'lucide-react'
 import { api, errorMessage, relativeTime, remoteOf } from '../api'
 import type { Checks, LinkedPullRequest, ProjectRepo } from '../api'
 import { useApp, useLive } from '../data'
@@ -136,6 +137,9 @@ export function GitView({ projectId, onOpenTask }: { projectId: number; onOpenTa
         <div className="git-status">
           <GitBranch size={14} /> {t('git.onBranch', { branch: overview.current_branch || 'HEAD' })}
           {overview.dirty && <span className="chip warn-chip">{t('git.dirty')}</span>}
+          <button className="btn ghost" onClick={() => run(openInEditor(projectId)).then((p) => p && toast(t('editor.opened', { editor: editorLabel() }), 'success'))}>
+            <Code2 size={13} /> {t('editor.open')}
+          </button>
           {overview.default_branch && overview.current_branch !== overview.default_branch && (
             <button className="btn ghost" onClick={() => run(api.checkoutDefault(projectId)).then((b) => b && toast(t('git.switchedTo', { branch: b }), 'success'))}>
               <CornerUpLeft size={13} /> {t('git.backTo', { branch: overview.default_branch })}

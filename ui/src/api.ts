@@ -335,6 +335,9 @@ export const api = {
   unlinkRepo: (projectId: number) => invoke<void>('unlink_repo', { projectId }),
   setRepoAutoMove: (projectId: number, autoMove: boolean) => invoke<void>('set_repo_auto_move', { projectId, autoMove }),
   gitOverview: (projectId: number) => invoke<GitOverview>('git_overview', { projectId }),
+  /** Opens the repo in an editor (command template); with a task, checks out its branch first. */
+  openInEditor: (projectId: number, taskId: number | null, command: string) =>
+    invoke<string>('open_in_editor', { projectId, taskId, command }),
   /** Switches the repository back to its main branch; returns the branch name. */
   checkoutDefault: (projectId: number) => invoke<string>('checkout_default', { projectId }),
   startBranch: (taskId: number, kind: string | null = null) => invoke<StartedBranch>('start_branch', { taskId, kind }),

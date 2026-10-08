@@ -1,4 +1,5 @@
 // Settings window: a menu of sections on the left, the section on the right.
+import { EditorSettings } from './EditorSettings'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bot, Database, Keyboard, Palette, PlugZap, RefreshCw, Search, SlidersHorizontal, UserRound, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -25,7 +26,7 @@ const SECTIONS: Section[] = [
   { id: 'general', icon: SlidersHorizontal, keywords: 'name user language norsk english' },
   { id: 'appearance', icon: Palette, keywords: 'theme dark light color colour font size density accent tema farge' },
   { id: 'accounts', icon: UserRound, keywords: 'github azure devops token login sign in az' },
-  { id: 'integrations', icon: PlugZap, keywords: 'azure boards import work items' },
+  { id: 'integrations', icon: PlugZap, keywords: 'azure boards import work items editor ide vs code jetbrains' },
   { id: 'keyboard', icon: Keyboard, keywords: 'shortcuts keys keymap hurtigtaster' },
   { id: 'updates', icon: RefreshCw, keywords: 'update version release oppdatering' },
   { id: 'agents', icon: Bot, keywords: 'mcp ai agent claude' },
@@ -140,7 +141,12 @@ function SectionBody({ id }: { id: SectionId }) {
         </>
       )
     case 'integrations':
-      return <AzureImportSettings />
+      return (
+        <>
+          <EditorSettings />
+          <AzureImportSettings />
+        </>
+      )
     case 'updates':
       return <UpdateSettings />
     default:
