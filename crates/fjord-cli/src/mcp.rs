@@ -433,8 +433,13 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
             if settings.mappings.is_empty() {
                 bail!("no Azure Boards mappings yet: add them in Fjord's Settings → Azure DevOps");
             }
-            let items = fjord_vcs::fetch_assigned_work_items(&settings)?;
-            serde_json::to_value(fjord_vcs::apply_import(store, &settings, &items)?)?
+            let known: Vec<String> = store
+                .external_ids("azure")?
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            let fetch = fjord_vcs::fetch_import(&settings, &known)?;
+            serde_json::to_value(fjord_vcs::apply_import(store, &settings, &fetch)?)?
         }
         "backlinks" => {
             serde_json::to_value(store.backlinks(str_arg(args, "kind")?, int_arg(args, "id")?)?)?

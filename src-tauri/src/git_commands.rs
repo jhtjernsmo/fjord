@@ -177,10 +177,17 @@ pub fn set_import_settings(
 /// creates or refreshes tasks in the mapped projects.
 #[tauri::command]
 pub async fn run_azure_import(state: State<'_, AppState>) -> CmdResult<fjord_vcs::ImportReport> {
-    let settings = with_store(&state, |s| Ok(s.import_settings()?))?;
+    let (settings, known) = with_store(&state, |s| {
+        let known: Vec<String> = s
+            .external_ids("azure")?
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        Ok((s.import_settings()?, known))
+    })?;
     let fetch_settings = settings.clone();
-    let items = off_thread(move || fjord_vcs::fetch_assigned_work_items(&fetch_settings)).await?;
-    with_store(&state, |s| fjord_vcs::apply_import(s, &settings, &items))
+    let fetch = off_thread(move || fjord_vcs::fetch_import(&fetch_settings, &known)).await?;
+    with_store(&state, |s| fjord_vcs::apply_import(s, &settings, &fetch))
 }
 
 /// Starts "Sign in with GitHub": returns the code the user types on github.com.

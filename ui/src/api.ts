@@ -105,6 +105,8 @@ export interface ImportReport {
   updated: number
   unchanged: number
   unmapped: number
+  regrouped: number
+  closed: number
 }
 
 export interface DeviceLogin {
