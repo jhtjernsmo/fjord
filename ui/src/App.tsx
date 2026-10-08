@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { Ellipsis, Paperclip } from 'lucide-react'
 import { useContextMenus } from './components/actions'
-import { api } from './api'
+import { api, errorMessage } from './api'
 import type { SearchHit } from './api'
 import { useActions, useApp, useLive } from './data'
 import { NavContext } from './nav'
@@ -10,6 +10,7 @@ import type { Nav } from './nav'
 import { Notespace } from './components/Notespace'
 import { UpdateBanner } from './components/Updater'
 import { TitleBar } from './components/TitleBar'
+import { refreshPullRequests } from './components/GitView'
 import { AzureImportRunner } from './components/AzureImport'
 import { LOCALES } from './i18n'
 import type { MessageKey } from './i18n'
@@ -34,7 +35,7 @@ const TABS: Tab[] = ['board', 'notes', 'files', 'git', 'activity', 'archive']
 
 const GLOBAL_ACTIONS = [
   'palette.open', 'help.toggle', 'panel.close', 'go.home', 'go.notes', 'project.pick', 'project.new', 'project.archive',
-  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'theme.cycle', 'view.archive', 'view.git',
+  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'theme.cycle', 'git.sync', 'azure.import', 'view.archive', 'view.git',
 ]
 
 export default function App() {
@@ -130,6 +131,17 @@ export default function App() {
       'view.git': () => setTab('git'),
       'settings.open': () => setSettings(true),
       'theme.cycle': () => themes.cycle(),
+      'git.sync': () => {
+        if (!projectId) return
+        refreshPullRequests(projectId)
+          .then((r) => toast(t('git.synced', { n: r.pull_requests.length }), 'success'))
+          .catch((err) => toast(errorMessage(err), 'error'))
+      },
+      'azure.import': () =>
+        api
+          .runAzureImport()
+          .then((r) => toast(t('import.report', { created: r.created.length, updated: r.updated, closed: r.closed, unmapped: r.unmapped }), 'success'))
+          .catch((err) => toast(errorMessage(err), 'error')),
       'task.new': () => {
         if (!projectId) {
           toast(t('toast.pickProject'), 'info')

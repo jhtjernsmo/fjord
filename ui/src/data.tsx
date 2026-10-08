@@ -123,10 +123,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setWhichKey(null)
       window.clearTimeout(timer.current)
     }
+    // A scope is active while something has registered handlers in it
+    // (the board, an open task panel, the notes view).
     const activeScopes = (): Scope[] => {
-      const scopes: Scope[] = ['global']
-      if ((handlers.current.get('board.down') ?? []).length > 0) scopes.push('board')
-      return scopes
+      const scopes = new Set<Scope>(['global'])
+      for (const list of handlers.current.values()) for (const h of list) scopes.add(h.scope)
+      return [...scopes]
     }
     const fire = (id: string) => {
       const list = handlers.current.get(id) ?? []

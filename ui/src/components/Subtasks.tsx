@@ -1,6 +1,6 @@
 // Subtasks in the task panel: progress, check off, add (Enter), drag to reorder,
 // click to open. One level deep: a subtask shows its parent instead.
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -12,6 +12,9 @@ import { useActions, useApp, useLive } from '../data'
 import { useNav } from '../nav'
 
 const DRAG_ACTIVATION_PX = 4
+
+/** Set by the board's `a` key: focus "Add a subtask" when the panel opens. */
+export const focusSubtaskOnOpen = { current: false }
 
 function SubtaskRow({ sub, done, onToggle, onOpen }: { sub: Task; done: boolean; onToggle: () => void; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sub.id })
@@ -41,7 +44,12 @@ export function Subtasks({ task, statuses }: { task: Task; statuses: Status[] })
   const doneColumn = statuses.find((s) => s.is_done)
   const firstColumn = statuses[0]
 
-  useActions(task.parent_id ? {} : { 'task.addSubtask': () => inputRef.current?.focus() })
+  useActions(task.parent_id ? {} : { 'task.addSubtask': () => inputRef.current?.focus() }, 'panel')
+  useEffect(() => {
+    if (!focusSubtaskOnOpen.current || task.parent_id) return
+    focusSubtaskOnOpen.current = false
+    window.setTimeout(() => inputRef.current?.focus(), 50)
+  }, [task.id, task.parent_id])
 
   // A subtask shows where it belongs instead of its own list.
   if (task.parent_id) {

@@ -1,9 +1,9 @@
 // Notes list + editor. Used for the global notespace and for a project's Notes tab.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NotebookText, Pin, Plus, Search } from 'lucide-react'
 import { api, relativeTime } from '../api'
 import type { Note, ProjectSummary } from '../api'
-import { useApp, useLive } from '../data'
+import { useActions, useApp, useLive } from '../data'
 import { useContextMenus } from './actions'
 import { Backlinks, NoteEditor } from './NoteEditor'
 
@@ -21,6 +21,7 @@ export function Notespace({ projectId, projects, selectedId, onSelect }: Props) 
   const [notes] = useLive(() => (projectId === null ? api.listAllNotes(false) : api.listNotes(projectId)), [projectId])
   const [localId, setLocalId] = useState<number | null>(null)
   const [filter, setFilter] = useState('')
+  const filterRef = useRef<HTMLInputElement>(null)
   const activeId = selectedId ?? localId
   const select = (id: number | null) => (onSelect ? onSelect(id) : setLocalId(id))
   const active: Note | undefined = notes?.find((n) => n.id === activeId) ?? (activeId == null ? notes?.[0] : undefined)
@@ -44,10 +45,29 @@ export function Notespace({ projectId, projects, selectedId, onSelect }: Props) 
 
   const projectName = (id: number | null) => projects.find((p) => p.id === id)?.name
 
+  // j/k walk the list in the order it's shown.
+  const ordered = groups.flatMap(([, items]) => items)
+  const step = (delta: number) => {
+    if (ordered.length === 0) return
+    const i = ordered.findIndex((n) => n.id === active?.id)
+    select(ordered[Math.min(Math.max(i + delta, 0), ordered.length - 1)].id)
+  }
+
   const create = async () => {
     const note = await run(api.createNote(projectId, t('notes.untitled'), ''))
     if (note) select(note.id)
   }
+
+  useActions(
+    {
+      'notes.new': () => void create(),
+      'notes.next': () => step(1),
+      'notes.prev': () => step(-1),
+      'notes.filter': () => filterRef.current?.focus(),
+      'notes.pin': () => active && run(api.setNotePinned(active.id, !active.pinned)),
+    },
+    'notes',
+  )
 
   return (
     <div className="notespace">
@@ -57,7 +77,7 @@ export function Notespace({ projectId, projects, selectedId, onSelect }: Props) 
         </button>
         <label className="filter-search small-search">
           <Search size={13} />
-          <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('notes.filter')} aria-label={t('notes.filter')} />
+          <input ref={filterRef} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('notes.filter')} aria-label={t('notes.filter')} />
         </label>
         {groups.map(([folder, items]) => (
           <div key={folder} className="note-group">
