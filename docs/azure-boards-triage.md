@@ -53,7 +53,7 @@ You are triaging new work in Fjord (MCP server "fjord").
      - Acceptance criteria as a checklist (- [ ] …), from Azure or inferred
      - Open questions, if anything is unclear
      - Suggested steps; if it is bigger than a day of work, create subtasks with
-       create_task in the same project, titled "<parent title>: <step>"
+       create_task (parent = the task's id) in the same project
      - Rough size: S (< 2h), M (< 1 day) or L (more)
    - Set priority if the work item had none and urgency is obvious.
    - Call mark_analyzed with the task id.

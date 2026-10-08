@@ -111,6 +111,16 @@ pub fn archive_task(state: State<AppState>, id: i64, archived: bool) -> CmdResul
 }
 
 #[tauri::command]
+pub fn list_subtasks(state: State<AppState>, task_id: i64) -> CmdResult<Vec<Task>> {
+    with_store(&state, |s| s.list_subtasks(task_id))
+}
+
+#[tauri::command]
+pub fn move_subtask(state: State<AppState>, id: i64, index: usize) -> CmdResult<Vec<Task>> {
+    with_store(&state, |s| s.move_subtask(id, index))
+}
+
+#[tauri::command]
 pub fn list_archived_tasks(state: State<AppState>, project_id: i64) -> CmdResult<Vec<Task>> {
     with_store(&state, |s| s.list_archived_tasks(project_id))
 }

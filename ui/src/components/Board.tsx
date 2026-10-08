@@ -1,5 +1,5 @@
 // Kanban board: mouse drag & drop (dnd-kit) and vim-style keyboard control.
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -13,7 +13,7 @@ import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import confetti from 'canvas-confetti'
-import { AlignLeft, CalendarDays, GitBranch } from 'lucide-react'
+import { AlignLeft, CalendarDays, CornerLeftUp, GitBranch, ListChecks } from 'lucide-react'
 import { api, isOverdue } from '../api'
 import type { Board as BoardData, Status, Task } from '../api'
 import { useActions, useApp } from '../data'
@@ -25,6 +25,12 @@ import { useLive } from '../data'
 import type { BoardFilter } from './Columns'
 
 const PRIORITY_ICON = ['', '↓', '→', '↑']
+
+/** Subtask progress per parent and task titles, for the cards. */
+const SubtaskInfo = createContext<{ progress: Map<number, { done: number; total: number }>; titles: Map<number, string> }>({
+  progress: new Map(),
+  titles: new Map(),
+})
 const DRAG_ACTIVATION_PX = 5
 
 interface Props {
@@ -65,16 +71,29 @@ function CardBody({ task, statuses, className = '' }: { task: Task; statuses: St
   const { t } = useApp()
   const done = statuses.find((s) => s.id === task.status_id)?.is_done
   const priority = t(`priority.${task.priority}` as MessageKey)
+  const { progress, titles } = useContext(SubtaskInfo)
+  const subs = progress.get(task.id)
+  const parentTitle = task.parent_id !== null ? titles.get(task.parent_id) : undefined
   return (
     <div className={`card ${done ? 'done' : ''} ${className}`}>
+      {parentTitle && (
+        <div className="card-parent" title={parentTitle}>
+          <CornerLeftUp size={11} /> {parentTitle}
+        </div>
+      )}
       {task.created_by === 'claude' && (
         <span className="agent-badge">
           <AgentTag title={t('board.byAgent')} />
         </span>
       )}
       <div className="card-title">{task.title}</div>
-      {(task.priority > 0 || task.due_at || task.body_md || task.branch) && (
+      {(task.priority > 0 || task.due_at || task.body_md || task.branch || subs) && (
         <div className="card-meta">
+          {subs && (
+            <span className={`chip subtask-chip ${subs.done === subs.total ? 'complete' : ''}`} title={t('subtasks.title')}>
+              <ListChecks size={11} strokeWidth={1.8} /> {subs.done}/{subs.total}
+            </span>
+          )}
           {task.priority > 0 && (
             <span className={`prio-${task.priority}`} title={`${t('task.priority')}: ${priority}`}>
               {PRIORITY_ICON[task.priority]} {priority}
@@ -157,16 +176,27 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
   const { statuses, tasks: allTasks } = board
   const [filter, setFilter] = useState<BoardFilter>(EMPTY_FILTER)
   const filterRef = useRef<HTMLInputElement>(null)
+  const visible = useMemo(() => allTasks.filter((t) => filter.subtasks || t.parent_id === null), [allTasks, filter.subtasks])
+  const subtaskInfo = useMemo(() => {
+    const doneIds = new Set(statuses.filter((s) => s.is_done).map((s) => s.id))
+    const progress = new Map<number, { done: number; total: number }>()
+    for (const t of allTasks) {
+      if (t.parent_id === null) continue
+      const p = progress.get(t.parent_id) ?? { done: 0, total: 0 }
+      progress.set(t.parent_id, { done: p.done + (doneIds.has(t.status_id) ? 1 : 0), total: p.total + 1 })
+    }
+    return { progress, titles: new Map(allTasks.map((t) => [t.id, t.title])) }
+  }, [allTasks, statuses])
   const tasks = useMemo(() => {
-    if (!isFiltering(filter)) return allTasks
+    if (!isFiltering(filter)) return visible
     const needle = filter.text.trim().toLowerCase()
-    return allTasks.filter(
+    return visible.filter(
       (t) =>
         t.priority >= filter.minPriority &&
         (!filter.agentOnly || t.created_by === 'claude') &&
         (!needle || t.title.toLowerCase().includes(needle) || t.body_md.toLowerCase().includes(needle)),
     )
-  }, [allTasks, filter])
+  }, [visible, filter])
   const columns = useMemo(
     () => statuses.map((s) => ({ status: s, tasks: tasks.filter((t) => t.status_id === s.id) })),
     [statuses, tasks],
@@ -272,8 +302,9 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
   }
 
   return (
+    <SubtaskInfo.Provider value={subtaskInfo}>
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
-      <FilterBar filter={filter} onChange={setFilter} shown={tasks.length} total={allTasks.length} inputRef={filterRef} />
+      <FilterBar filter={filter} onChange={setFilter} shown={tasks.length} total={visible.length} inputRef={filterRef} />
       <div className="board">
         {columns.map((c, ci) => (
           <Column
@@ -296,5 +327,6 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
       </div>
       <DragOverlay>{dragging && <CardBody task={dragging} statuses={statuses} className="overlay" />}</DragOverlay>
     </DndContext>
+    </SubtaskInfo.Provider>
   )
 }

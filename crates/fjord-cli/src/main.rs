@@ -139,6 +139,9 @@ enum TaskCmd {
         /// Status name or id (default: first column)
         #[arg(long, short)]
         status: Option<String>,
+        /// Make it a subtask of this task id
+        #[arg(long)]
+        parent: Option<i64>,
     },
     /// Show one task
     Show { id: i64 },
@@ -397,6 +400,7 @@ fn task(store: &mut Store, out: &output::Printer, cmd: TaskCmd) -> Result<()> {
             priority,
             due,
             status,
+            parent,
         } => {
             let p = store.find_project(&project)?;
             let status_id = status
@@ -410,6 +414,7 @@ fn task(store: &mut Store, out: &output::Printer, cmd: TaskCmd) -> Result<()> {
                 priority,
                 due_at: due,
                 status_id,
+                parent_id: parent,
             };
             out.task(&store.create_task(new)?)
         }
