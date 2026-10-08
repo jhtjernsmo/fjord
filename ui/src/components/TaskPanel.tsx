@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
 import { MARKDOWN_COMPONENTS, MARKDOWN_PLUGINS } from './NoteMarkdown'
 import { motion } from 'motion/react'
-import { Archive, CircleCheck, ExternalLink, GitBranch, GitPullRequest, Link2, Trash2, Unlink, X } from 'lucide-react'
+import { Archive, CircleCheck, ExternalLink, GitBranch, CornerUpLeft, GitPullRequest, Link2, Trash2, Unlink, X } from 'lucide-react'
 import { useContextMenus, useEntityActions } from './actions'
 import { api, formatBytes, relativeTime, remoteOf } from '../api'
 import type { Attachment, Status, Task, TaskPatch } from '../api'
@@ -373,6 +373,9 @@ function GitSection({ task }: { task: Task }) {
               <span className="mono">{task.branch}</span>
               <button className="btn ghost" onClick={() => run(api.startBranch(task.id), t('git.branchStarted', { branch: task.branch ?? '' }))}>
                 {t('git.checkout')}
+              </button>
+              <button className="btn ghost" onClick={() => run(api.checkoutDefault(task.project_id)).then((b) => b && toast(t('git.switchedTo', { branch: b }), 'success'))} title={t('git.backToMainHint')}>
+                <CornerUpLeft size={13} /> {t('git.backToMain')}
               </button>
               <button className="icon-btn" onClick={() => run(api.linkTaskBranch(task.id, null))} title={t('git.unlinkBranch')} aria-label={t('git.unlinkBranch')}>
                 <Unlink size={13} />

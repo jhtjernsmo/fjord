@@ -221,6 +221,7 @@ export interface GitCommit {
 export interface GitOverview {
   repo: ProjectRepo
   current_branch: string
+  default_branch: string | null
   dirty: boolean
   branches: GitBranch[]
   commits: GitCommit[]
@@ -334,6 +335,8 @@ export const api = {
   unlinkRepo: (projectId: number) => invoke<void>('unlink_repo', { projectId }),
   setRepoAutoMove: (projectId: number, autoMove: boolean) => invoke<void>('set_repo_auto_move', { projectId, autoMove }),
   gitOverview: (projectId: number) => invoke<GitOverview>('git_overview', { projectId }),
+  /** Switches the repository back to its main branch; returns the branch name. */
+  checkoutDefault: (projectId: number) => invoke<string>('checkout_default', { projectId }),
   startBranch: (taskId: number, kind: string | null = null) => invoke<StartedBranch>('start_branch', { taskId, kind }),
   /** [type, name] the task's branch would get; the type is guessed when not given. */
   suggestBranch: (taskId: number, kind: string | null = null) => invoke<[string, string]>('suggest_branch', { taskId, kind }),

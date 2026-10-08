@@ -278,3 +278,9 @@ pub fn suggest_branch(
         Ok((kind, name))
     })
 }
+
+/// Switches the project's repository back to its main branch.
+#[tauri::command]
+pub async fn checkout_default(state: State<'_, AppState>, project_id: i64) -> CmdResult<String> {
+    with_store_bg(&state, move |s| fjord_vcs::checkout_default(s, project_id)).await
+}

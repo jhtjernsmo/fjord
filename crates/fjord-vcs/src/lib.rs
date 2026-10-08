@@ -68,6 +68,8 @@ pub type Result<T> = std::result::Result<T, VcsError>;
 pub struct GitOverview {
     pub repo: ProjectRepo,
     pub current_branch: String,
+    /// The repository's main branch, if Fjord can tell (origin/HEAD, main or master).
+    pub default_branch: Option<String>,
     pub dirty: bool,
     pub branches: Vec<Branch>,
     pub commits: Vec<Commit>,
@@ -194,6 +196,7 @@ pub fn overview_for(repo: ProjectRepo) -> Result<GitOverview> {
     let git = Git::open(Path::new(&repo.path))?;
     Ok(GitOverview {
         current_branch: git.current_branch()?,
+        default_branch: git.default_branch().ok(),
         dirty: git.has_uncommitted_changes()?,
         branches: git.branches()?,
         commits: git.commits(RECENT_COMMITS)?,
@@ -201,8 +204,15 @@ pub fn overview_for(repo: ProjectRepo) -> Result<GitOverview> {
     })
 }
 
-/// Checks out the task's branch (creating `fjord/<id>-<slug>` the first time)
-/// and, with auto-move on, moves a task from the first column to the second.
+/// Switches the project's repository back to its main branch and returns its name.
+/// Uncommitted changes come along, as with `git switch` (git refuses if they'd be overwritten).
+pub fn checkout_default(store: &Store, project_id: i64) -> Result<String> {
+    let (_, git) = linked(store, project_id)?;
+    let name = git.default_branch()?;
+    git.switch_or_create(&name)?;
+    Ok(name)
+}
+
 /// The branch name a task would get: `<type>/<id>-<slug>`, with the type given or guessed.
 pub fn branch_for(task: &Task, kind: Option<&str>) -> Result<String> {
     let kind = match kind {
@@ -218,6 +228,8 @@ pub fn branch_for(task: &Task, kind: Option<&str>) -> Result<String> {
     Ok(branch_name_for_task(kind, task.id, &task.title))
 }
 
+/// Checks out the task's branch (creating `<type>/<id>-<slug>` the first time)
+/// and, with auto-move on, moves a task from the first column to the second.
 pub fn start_branch(store: &mut Store, task_id: i64, kind: Option<&str>) -> Result<StartedBranch> {
     let task = store.get_task(task_id)?;
     let (repo, git) = linked(store, task.project_id)?;
@@ -761,6 +773,14 @@ mod tests {
         assert!(ov.branches.iter().any(|b| b.name == "main"));
         assert_eq!(ov.commits[0].subject, "init");
         assert!(!ov.dirty);
+
+        // Back to the main branch, whatever it's called in this repo.
+        let main = Git::open(repo.path()).unwrap().default_branch().unwrap();
+        assert_eq!(checkout_default(&s, p).unwrap(), main);
+        assert_eq!(
+            Git::open(repo.path()).unwrap().current_branch().unwrap(),
+            main
+        );
     }
 
     #[test]
