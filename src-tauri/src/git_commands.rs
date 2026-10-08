@@ -117,11 +117,12 @@ pub async fn open_pull_request(
     off_thread(move || fjord_vcs::open_pull_request_for(&task, &repo, draft)).await
 }
 
-/// Opens a GitHub link in the default browser (only https URLs).
+/// Opens a web or mail link in the system's default browser or mail app.
 #[tauri::command]
 pub fn open_url(url: String) -> CmdResult<()> {
-    if !url.starts_with("https://") {
-        return Err("only https links can be opened".into());
+    let allowed = ["https://", "http://", "mailto:"];
+    if !allowed.iter().any(|p| url.to_ascii_lowercase().starts_with(p)) {
+        return Err("only web and mail links can be opened".into());
     }
     tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
 }

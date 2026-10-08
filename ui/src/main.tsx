@@ -5,6 +5,9 @@ import App from './App'
 import { AppProvider } from './data'
 import { MenuProvider } from './components/Menus'
 import { ThemeProvider } from './themes'
+import { routeExternalLinks } from './externalLinks'
+
+routeExternalLinks()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
