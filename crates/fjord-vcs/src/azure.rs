@@ -729,6 +729,66 @@ pub fn work_item_info(
     Ok(out)
 }
 
+/// A comment in a work item's Discussion.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct WorkItemComment {
+    pub author: String,
+    /// ISO 8601
+    pub created: String,
+    pub text_md: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiComment {
+    text: String,
+    created_by: ApiIdentity,
+    created_date: String,
+}
+
+#[derive(Deserialize)]
+struct ApiComments {
+    comments: Vec<ApiComment>,
+}
+
+/// (org, project, id) from a work item's web URL, as stored for imported tasks.
+pub fn parse_work_item_url(url: &str) -> Option<(String, String, u64)> {
+    let rest = url.strip_prefix(&format!("{HOST}/"))?;
+    let mut parts = rest.split('/');
+    let (org, project) = (parts.next()?, parts.next()?);
+    let id = rest.rsplit('/').next()?.parse().ok()?;
+    rest.contains("/_workitems/edit/")
+        .then(|| (decode(org), decode(project), id))
+}
+
+fn comments_from(list: ApiComments) -> Vec<WorkItemComment> {
+    list.comments
+        .into_iter()
+        .map(|c| WorkItemComment {
+            author: c.created_by.display_name,
+            created: c.created_date,
+            text_md: html_to_markdown(&c.text),
+        })
+        .collect()
+}
+
+/// The Discussion of a work item, oldest first. Read-only.
+pub fn work_item_comments(org: &str, project: &str, id: u64) -> Result<Vec<WorkItemComment>> {
+    let org = check_org(org)?;
+    let (auth, _) = find_auth(org).ok_or_else(|| VcsError::NoAzureToken(org.to_string()))?;
+    let mut res = agent()
+        .get(&format!(
+            "{HOST}/{}/{}/_apis/wit/workItems/{id}/comments?$top=200&order=asc&api-version=7.1-preview.4",
+            encode(org),
+            encode(project)
+        ))
+        .header("Accept", "application/json")
+        .header("Authorization", &auth.header())
+        .call()
+        .map_err(|e| api_error(e, org))?;
+    Ok(comments_from(read_json(&mut res, org)?))
+}
+
 /// Good-enough HTML → markdown for work item descriptions: paragraphs, line breaks,
 /// lists, bold/italic, links and code; other tags are dropped, entities decoded.
 pub fn html_to_markdown(html: &str) -> String {
@@ -966,5 +1026,25 @@ mod tests {
                 .starts_with("App crashes\n\n### Acceptance criteria\n\n- No crash")
         );
         assert!(item.body_md.ends_with("Azure DevOps: [Bug 297](https://dev.azure.com/Contoso/Mobile%20App/_workitems/edit/297) · Active · Mobile App\\iOS"));
+    }
+
+    #[test]
+    fn reads_the_discussion_of_a_work_item() {
+        assert_eq!(
+            parse_work_item_url("https://dev.azure.com/contoso/Mobile%20App/_workitems/edit/297"),
+            Some(("contoso".to_string(), "Mobile App".to_string(), 297))
+        );
+        assert_eq!(parse_work_item_url("https://github.com/a/b/issues/1"), None);
+        // Trimmed from the "Comments - Get Comments" example response.
+        let json = r#"{"totalCount":2,"count":2,"comments":[
+          {"id":1,"text":"<div>Repro on <b>iOS 18</b></div>","createdBy":{"displayName":"Ada"},"createdDate":"2026-10-07T09:00:00Z"},
+          {"id":2,"text":"<p>Fixed in PR 14</p>","createdBy":{"displayName":"Jonas"},"createdDate":"2026-10-08T09:00:00Z"}]}"#;
+        let comments = comments_from(serde_json::from_str(json).unwrap());
+        assert_eq!(comments.len(), 2);
+        assert_eq!(
+            (comments[0].author.as_str(), comments[0].text_md.as_str()),
+            ("Ada", "Repro on **iOS 18**")
+        );
+        assert_eq!(comments[1].created, "2026-10-08T09:00:00Z");
     }
 }

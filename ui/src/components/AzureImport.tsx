@@ -3,11 +3,61 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, Plus, X } from 'lucide-react'
 import { api, errorMessage } from '../api'
-import type { ImportMapping, ImportSettings } from '../api'
+import type { ImportMapping, ImportReport, ImportSettings, Task } from '../api'
+import type { MessageKey } from '../i18n'
 import { useApp, useLive } from '../data'
 
 const IMPORT_EVERY_MS = 10 * 60 * 1000
 const FIRST_IMPORT_DELAY_MS = 8000
+const NOTIFY_KEY = 'fjord.importNotify'
+const TITLES_IN_NOTIFICATION = 3
+
+export function importNotificationsOn(): boolean {
+  try {
+    return localStorage.getItem(NOTIFY_KEY) !== 'off'
+  } catch {
+    return true
+  }
+}
+
+function setImportNotifications(on: boolean): void {
+  try {
+    localStorage.setItem(NOTIFY_KEY, on ? 'on' : 'off')
+  } catch {
+    /* non-fatal */
+  }
+}
+
+/** "A, B, C and 2 more" */
+export function listTitles(tasks: Task[], more: (n: number) => string): string {
+  const shown = tasks.slice(0, TITLES_IN_NOTIFICATION).map((t) => t.title)
+  const rest = tasks.length - shown.length
+  return rest > 0 ? `${shown.join(', ')} ${more(rest)}` : shown.join(', ')
+}
+
+/** A desktop notification, asking for permission the first time. Never throws. */
+async function notify(title: string, body: string): Promise<void> {
+  try {
+    const n = await import('@tauri-apps/plugin-notification')
+    let granted = await n.isPermissionGranted()
+    if (!granted) granted = (await n.requestPermission()) === 'granted'
+    if (granted) n.sendNotification({ title, body })
+  } catch {
+    /* no notification support (e.g. a browser); the in-app toast still shows */
+  }
+}
+
+/** Notifies about new and changed work items; says nothing when nothing changed. */
+export function announceImport(report: ImportReport, t: (key: MessageKey, vars?: Record<string, string | number>) => string, toast: (text: string, kind?: 'success' | 'error') => void): void {
+  const more = (n: number) => t('import.andMore', { n })
+  const messages: [string, string][] = []
+  if (report.created.length > 0) messages.push([t('import.created', { n: report.created.length }), listTitles(report.created, more)])
+  if (report.updated_tasks.length > 0) messages.push([t('import.updated', { n: report.updated_tasks.length }), listTitles(report.updated_tasks, more)])
+  for (const [title, body] of messages) {
+    toast(`${title}: ${body}`, 'success')
+    if (importNotificationsOn()) void notify(title, body)
+  }
+}
 
 /** Runs the import on startup and every 10 minutes while it's enabled. */
 export function AzureImportRunner() {
@@ -20,7 +70,7 @@ export function AzureImportRunner() {
     const run = () =>
       api
         .runAzureImport()
-        .then((r) => r.created.length > 0 && toast(t('import.created', { n: r.created.length }), 'success'))
+        .then((r) => announceImport(r, t, toast))
         .catch(() => undefined) // offline or token expired; Settings shows the error on "Import now"
     const first = window.setTimeout(run, FIRST_IMPORT_DELAY_MS)
     const every = window.setInterval(run, IMPORT_EVERY_MS)
@@ -40,6 +90,7 @@ export function AzureImportSettings() {
   const [saved] = useLive(() => api.getImportSettings(), [])
   const [settings, setSettings] = useState<ImportSettings>(EMPTY)
   const [busy, setBusy] = useState(false)
+  const [notifyOn, setNotifyOn] = useState(importNotificationsOn)
 
   // Load the saved settings once. Later reloads must not replace the form, or a
   // half-filled row (saved without it, since it's incomplete) would vanish mid-edit.
@@ -79,6 +130,17 @@ export function AzureImportSettings() {
       <label className="toggle-label">
         <input type="checkbox" checked={settings.enabled} onChange={(e) => save({ ...settings, enabled: e.target.checked })} />
         {t('import.enabled')}
+      </label>
+      <label className="toggle-label">
+        <input
+          type="checkbox"
+          checked={notifyOn}
+          onChange={(e) => {
+            setNotifyOn(e.target.checked)
+            setImportNotifications(e.target.checked)
+          }}
+        />
+        {t('import.notify')}
       </label>
       {settings.mappings.map((m, i) => (
         <div className="user-row import-mapping" key={i}>

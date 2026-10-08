@@ -18,6 +18,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let mut store = Store::open(&Store::default_dir(), &default_actor())?;
             // A name chosen in Settings wins over the OS user name ($FJORD_ACTOR still wins over both).
@@ -91,6 +92,8 @@ pub fn run() {
             git_commands::get_import_settings,
             git_commands::set_import_settings,
             git_commands::run_azure_import,
+            git_commands::azure_discussion,
+            git_commands::task_external_link,
             git_commands::list_branches,
             git_commands::link_task_branch,
             git_commands::start_github_login,

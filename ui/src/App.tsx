@@ -3,13 +3,14 @@ import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { Ellipsis, Paperclip } from 'lucide-react'
 import { useContextMenus } from './components/actions'
 import { api, errorMessage } from './api'
-import type { SearchHit } from './api'
+import type { SearchHit, Project } from './api'
 import { useActions, useApp, useLive } from './data'
 import { NavContext } from './nav'
 import type { Nav } from './nav'
 import { Notespace } from './components/Notespace'
 import { UpdateBanner } from './components/Updater'
 import { TitleBar } from './components/TitleBar'
+import { reportBug } from './reportBug'
 import { refreshPullRequests } from './components/GitView'
 import { AzureImportRunner } from './components/AzureImport'
 import { LOCALES } from './i18n'
@@ -35,7 +36,7 @@ const TABS: Tab[] = ['board', 'notes', 'files', 'git', 'activity', 'archive']
 
 const GLOBAL_ACTIONS = [
   'palette.open', 'help.toggle', 'panel.close', 'go.home', 'go.notes', 'project.pick', 'project.new', 'project.archive',
-  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'theme.cycle', 'git.sync', 'azure.import', 'view.archive', 'view.git',
+  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'theme.cycle', 'app.reportBug', 'git.sync', 'azure.import', 'view.archive', 'view.git',
 ]
 
 export default function App() {
@@ -44,6 +45,7 @@ export default function App() {
   const [view, setView] = useState<View>({ kind: 'home' })
   const [taskId, setTaskId] = useState<number | null>(null)
   const [noteId, setNoteId] = useState<number | null>(null)
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [palette, setPalette] = useState<PaletteMode | null>(null)
   const [newProject, setNewProject] = useState(false)
   const [help, setHelp] = useState(false)
@@ -131,6 +133,7 @@ export default function App() {
       'view.git': () => setTab('git'),
       'settings.open': () => setSettings(true),
       'theme.cycle': () => themes.cycle(),
+      'app.reportBug': () => void reportBug(),
       'git.sync': () => {
         if (!projectId) return
         refreshPullRequests(projectId)
@@ -169,6 +172,7 @@ export default function App() {
       setTaskId(null)
       setView(projectId === null ? { kind: 'notes' } : { kind: 'project', id: projectId, tab: 'notes' })
     },
+    editProject: (project) => setEditingProject(project),
     createNote: async (title) => {
       const note = await run(api.createNote(null, title, ''))
       if (note) nav.openNote(note.id, null)
@@ -287,6 +291,19 @@ export default function App() {
             const p = await run(api.createProject(input), t('toast.created', { name: input.name }))
             setNewProject(false)
             if (p) openProject(p.id)
+          }}
+        />
+      )}
+      {editingProject && (
+        <NewProjectDialog
+          project={editingProject}
+          onCancel={() => setEditingProject(null)}
+          onCreate={async (input) => {
+            const p = await run(
+              api.updateProject(editingProject.id, { name: input.name, description: input.description, icon: input.icon, color: input.color }),
+              t('toast.saved'),
+            )
+            if (p) setEditingProject(null)
           }}
         />
       )}

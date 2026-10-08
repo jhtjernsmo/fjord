@@ -226,3 +226,29 @@ pub async fn link_task_branch(
     })
     .await
 }
+
+/// The Azure DevOps Discussion of an imported task's work item (None if the task
+/// wasn't imported from Azure). Fetched off the UI thread; read-only.
+#[tauri::command]
+pub async fn azure_discussion(
+    state: State<'_, AppState>,
+    task_id: i64,
+) -> CmdResult<Option<Vec<fjord_vcs::WorkItemComment>>> {
+    let link = with_store(&state, |s| Ok(s.external_link_for_task(task_id)?))?;
+    let Some((org, project, id)) = link
+        .filter(|l| l.source == "azure")
+        .and_then(|l| fjord_vcs::parse_work_item_url(&l.url))
+    else {
+        return Ok(None);
+    };
+    off_thread(move || fjord_vcs::work_item_comments(&org, &project, id).map(Some)).await
+}
+
+/// Where an imported task came from (to show its link), or None.
+#[tauri::command]
+pub fn task_external_link(
+    state: State<AppState>,
+    task_id: i64,
+) -> CmdResult<Option<fjord_core::ExternalLink>> {
+    with_store(&state, |s| Ok(s.external_link_for_task(task_id)?))
+}

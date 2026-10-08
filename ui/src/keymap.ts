@@ -31,6 +31,7 @@ export const DEFAULT_ACTIONS: ActionDef[] = [
   { id: 'lang.toggle', group: 'general', scope: 'global', keys: '<leader>L' },
   { id: 'settings.open', group: 'general', scope: 'global', keys: '<leader>,' },
   { id: 'theme.cycle', group: 'general', scope: 'global', keys: '<leader>T' },
+  { id: 'app.reportBug', group: 'general', scope: 'global', keys: '<leader>?' },
   { id: 'view.archive', group: 'view', scope: 'global', keys: '<leader>A' },
   { id: 'view.git', group: 'view', scope: 'global', keys: '<leader>g' },
   { id: 'git.sync', group: 'project', scope: 'global', keys: '<leader>r' },

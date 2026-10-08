@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { NewProject } from '../api'
+import type { NewProject, Project } from '../api'
 import { useApp } from '../data'
 import { PROJECT_GLYPHS, ProjectGlyph } from './Icons'
 import { setUpdateCheckEnabled, updateCheckEnabled, useUpdater } from './Updater'
@@ -9,14 +9,18 @@ const COLORS = ['#7c9cff', '#00d4b0', '#3fb950', '#f5a524', '#ff7a1a', '#ff6b6b'
 interface Props {
   onCancel: () => void
   onCreate: (input: NewProject) => void
+  /** Editing an existing project instead of creating one. */
+  project?: Project
 }
 
-export function NewProjectDialog({ onCancel, onCreate }: Props) {
+/** Create a project, or edit an existing one's name, description, icon and colour. */
+export function NewProjectDialog({ onCancel, onCreate, project }: Props) {
   const { t, locale } = useApp()
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [color, setColor] = useState(COLORS[0])
-  const [icon, setIcon] = useState(PROJECT_GLYPHS[0])
+  const [name, setName] = useState(project?.name ?? '')
+  const [description, setDescription] = useState(project?.description ?? '')
+  const [color, setColor] = useState(project?.color ?? COLORS[0])
+  const [icon, setIcon] = useState(project?.icon ?? PROJECT_GLYPHS[0])
+  const colors = COLORS.includes(color) ? COLORS : [...COLORS, color]
 
   const submit = () => name.trim() && onCreate({ name: name.trim(), description, color, icon, locale })
 
@@ -31,10 +35,10 @@ export function NewProjectDialog({ onCancel, onCreate }: Props) {
         }}
         onKeyDown={(e) => e.key === 'Escape' && onCancel()}
         role="dialog"
-        aria-label={t('dialog.newProject')}
+        aria-label={project ? t('dialog.editProject') : t('dialog.newProject')}
       >
         <h2 className="dialog-title">
-          <ProjectGlyph glyph={icon} color={color} size="lg" /> {name.trim() || t('dialog.newProject')}
+          <ProjectGlyph glyph={icon} color={color} size="lg" /> {name.trim() || (project ? t('dialog.editProject') : t('dialog.newProject'))}
         </h2>
         <label className="row">
           {t('dialog.name')}
@@ -65,7 +69,7 @@ export function NewProjectDialog({ onCancel, onCreate }: Props) {
         <div className="row">
           {t('dialog.color')}
           <div className="swatches">
-            {COLORS.map((c) => (
+            {colors.map((c) => (
               <button
                 type="button"
                 key={c}
@@ -82,7 +86,7 @@ export function NewProjectDialog({ onCancel, onCreate }: Props) {
             {t('dialog.cancel')}
           </button>
           <button type="submit" className="btn primary" disabled={!name.trim()}>
-            {t('dialog.create')} <kbd>⏎</kbd>
+            {project ? t('settings.save') : t('dialog.create')} <kbd>⏎</kbd>
           </button>
         </div>
       </form>

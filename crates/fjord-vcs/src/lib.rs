@@ -16,8 +16,9 @@ use serde::Serialize;
 use thiserror::Error;
 
 pub use azure::{
-    AzureAccount, AzureDevOps, WorkItem, WorkItemInfo, assigned_work_items, azure_account,
-    connect_azure, connect_azure_cli, disconnect_azure, parse_azure_remote, work_item_info,
+    AzureAccount, AzureDevOps, WorkItem, WorkItemComment, WorkItemInfo, assigned_work_items,
+    azure_account, connect_azure, connect_azure_cli, disconnect_azure, parse_azure_remote,
+    parse_work_item_url, work_item_comments, work_item_info,
 };
 pub use git::{Branch, Commit, Git, branch_name_for_task, task_id_from_branch};
 pub use github::{
@@ -339,6 +340,8 @@ pub fn open_pull_request_for(task: &Task, repo: &ProjectRepo, draft: bool) -> Re
 pub struct ImportReport {
     pub created: Vec<Task>,
     pub updated: usize,
+    /// Tasks whose work item changed in Azure (title, priority, due date or state).
+    pub updated_tasks: Vec<Task>,
     pub unchanged: usize,
     /// Work items in Azure projects that aren't mapped to a Fjord project.
     pub unmapped: usize,
@@ -513,7 +516,10 @@ pub fn apply_import(
             store.upsert_imported_task(mapping.fjord_project_id, &item.to_external_item())?;
         match outcome {
             ImportOutcome::Created => report.created.push(task.clone()),
-            ImportOutcome::Updated => report.updated += 1,
+            ImportOutcome::Updated => {
+                report.updated += 1;
+                report.updated_tasks.push(task.clone());
+            }
             ImportOutcome::Unchanged => report.unchanged += 1,
         }
         // Follow Azure's state into a column with the same name, but only when the

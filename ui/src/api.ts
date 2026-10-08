@@ -100,9 +100,25 @@ export interface ImportSettings {
   mappings: ImportMapping[]
 }
 
+export interface WorkItemComment {
+  author: string
+  created: string
+  text_md: string
+}
+
+export interface ExternalLink {
+  task_id: number
+  source: string
+  external_id: string
+  url: string
+  imported_at: string
+  analyzed_at: string | null
+}
+
 export interface ImportReport {
   created: Task[]
   updated: number
+  updated_tasks: Task[]
   unchanged: number
   unmapped: number
   regrouped: number
@@ -277,6 +293,8 @@ export const api = {
   listSubtasks: (taskId: number) => invoke<Task[]>('list_subtasks', { taskId }),
   listBranches: (projectId: number) => invoke<string[]>('list_branches', { projectId }),
   linkTaskBranch: (taskId: number, branch: string | null) => invoke<Task>('link_task_branch', { taskId, branch }),
+  taskExternalLink: (taskId: number) => invoke<ExternalLink | null>('task_external_link', { taskId }),
+  azureDiscussion: (taskId: number) => invoke<WorkItemComment[] | null>('azure_discussion', { taskId }),
   moveSubtask: (id: number, index: number) => invoke<Task[]>('move_subtask', { id, index }),
   createStatus: (projectId: number, name: string, color: string | null, isDone: boolean) =>
     invoke<Status>('create_status', { projectId, name, color, isDone }),
