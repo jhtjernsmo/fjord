@@ -121,7 +121,10 @@ pub async fn open_pull_request(
 #[tauri::command]
 pub fn open_url(url: String) -> CmdResult<()> {
     let allowed = ["https://", "http://", "mailto:"];
-    if !allowed.iter().any(|p| url.to_ascii_lowercase().starts_with(p)) {
+    if !allowed
+        .iter()
+        .any(|p| url.to_ascii_lowercase().starts_with(p))
+    {
         return Err("only web and mail links can be opened".into());
     }
     tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
