@@ -74,6 +74,10 @@ pub struct Task {
     pub archived_at: Option<String>,
     /// Git branch started for this task, if the project is linked to a repo.
     pub branch: Option<String>,
+    /// Set for subtasks (one level deep).
+    pub parent_id: Option<i64>,
+    /// Order among the parent's subtasks.
+    pub child_order: f64,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -87,6 +91,9 @@ pub struct NewTask {
     pub due_at: Option<String>,
     /// Defaults to the project's first status.
     pub status_id: Option<i64>,
+    /// Makes this a subtask of another task in the same project.
+    #[serde(default)]
+    pub parent_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

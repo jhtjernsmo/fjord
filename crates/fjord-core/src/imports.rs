@@ -138,6 +138,7 @@ impl Store {
                     priority: item.priority,
                     due_at: item.due_at.clone(),
                     status_id: None,
+                    parent_id: None,
                 })?;
                 self.conn.execute(
                     "INSERT INTO external_links (task_id, source, external_id, url, rev)

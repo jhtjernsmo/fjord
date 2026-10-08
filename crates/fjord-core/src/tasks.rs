@@ -5,7 +5,7 @@ use crate::models::{NewTask, Task, TaskPatch};
 use crate::store::{Store, require_text};
 
 const TASK_COLS: &str = "id, project_id, status_id, title, body_md, priority, due_at, position,
-    created_by, created_at, updated_at, archived_at, branch";
+    created_by, created_at, updated_at, archived_at, branch, parent_id, child_order";
 
 fn task_from_row(row: &Row) -> rusqlite::Result<Task> {
     Ok(Task {
@@ -22,6 +22,8 @@ fn task_from_row(row: &Row) -> rusqlite::Result<Task> {
         updated_at: row.get(10)?,
         archived_at: row.get(11)?,
         branch: row.get(12)?,
+        parent_id: row.get(13)?,
+        child_order: row.get(14)?,
     })
 }
 
@@ -73,11 +75,44 @@ impl Store {
                 .map(|s| s.id)
                 .ok_or_else(|| Error::Invalid("project has no statuses".into()))?,
         };
+        let child_order = match new.parent_id {
+            Some(parent_id) => {
+                let parent = self.get_task(parent_id)?;
+                if parent.project_id != project.id {
+                    return Err(Error::Invalid(
+                        "a subtask must be in its parent's project".into(),
+                    ));
+                }
+                if parent.parent_id.is_some() {
+                    return Err(Error::Invalid(
+                        "subtasks can't have subtasks of their own".into(),
+                    ));
+                }
+                self.conn.query_row(
+                    "SELECT coalesce(max(child_order), 0) + 1 FROM tasks WHERE parent_id = ?1",
+                    [parent_id],
+                    |r| r.get::<_, f64>(0),
+                )?
+            }
+            None => 0.0,
+        };
         let position = self.next_position(status_id)?;
         self.conn.execute(
-            "INSERT INTO tasks (project_id, status_id, title, body_md, priority, due_at, position, created_by)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![project.id, status_id, title, new.body_md, priority, due, position, self.actor],
+            "INSERT INTO tasks (project_id, status_id, title, body_md, priority, due_at, position, created_by,
+                                parent_id, child_order)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                project.id,
+                status_id,
+                title,
+                new.body_md,
+                priority,
+                due,
+                position,
+                self.actor,
+                new.parent_id,
+                child_order
+            ],
         )?;
         let id = self.conn.last_insert_rowid();
         self.touch_project(project.id)?;
@@ -105,6 +140,40 @@ impl Store {
         ))?;
         let rows = stmt.query_map([project_id], task_from_row)?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// A task's subtasks (archived ones excluded), in their own order.
+    pub fn list_subtasks(&self, parent_id: i64) -> Result<Vec<Task>> {
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {TASK_COLS} FROM tasks
+             WHERE parent_id = ?1 AND archived_at IS NULL
+             ORDER BY child_order, id"
+        ))?;
+        let rows = stmt.query_map([parent_id], task_from_row)?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Moves a subtask to `index` among its siblings.
+    pub fn move_subtask(&mut self, id: i64, index: usize) -> Result<Vec<Task>> {
+        let task = self.get_task(id)?;
+        let parent_id = task
+            .parent_id
+            .ok_or_else(|| Error::Invalid(format!("task {id} is not a subtask")))?;
+        let mut siblings: Vec<i64> = self
+            .list_subtasks(parent_id)?
+            .into_iter()
+            .map(|t| t.id)
+            .filter(|&s| s != id)
+            .collect();
+        siblings.insert(index.min(siblings.len()), id);
+        for (i, sid) in siblings.iter().enumerate() {
+            self.conn.execute(
+                "UPDATE tasks SET child_order = ?1 WHERE id = ?2",
+                params![(i + 1) as f64, sid],
+            )?;
+        }
+        self.touch_project(task.project_id)?;
+        self.list_subtasks(parent_id)
     }
 
     /// Archived tasks of a project, most recently archived first.
@@ -192,7 +261,7 @@ impl Store {
         self.conn.execute(
             "UPDATE tasks SET archived_at = CASE WHEN ?1 THEN strftime('%Y-%m-%dT%H:%M:%fZ','now') END,
                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-             WHERE id = ?2",
+             WHERE id = ?2 OR parent_id = ?2",
             params![archived, id],
         )?;
         let action = if archived {
@@ -430,5 +499,91 @@ mod tests {
         s.set_task_archived(t.id, false).unwrap();
         assert_eq!(s.list_tasks(p).unwrap().len(), 1);
         assert!(s.list_archived_tasks(p).unwrap().is_empty());
+    }
+
+    #[test]
+    fn subtasks_are_one_level_ordered_and_follow_their_parent() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = Store::open(dir.path(), "tester").unwrap();
+        let p = s
+            .create_project(NewProject {
+                name: "P".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let other = s
+            .create_project(NewProject {
+                name: "Q".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let parent = s
+            .create_task(NewTask {
+                project_id: p,
+                title: "Parent".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        let sub = |s: &mut Store, title: &str| {
+            s.create_task(NewTask {
+                project_id: p,
+                title: title.into(),
+                parent_id: Some(parent.id),
+                ..Default::default()
+            })
+            .unwrap()
+        };
+        let a = sub(&mut s, "A");
+        let b = sub(&mut s, "B");
+        let c = sub(&mut s, "C");
+        assert_eq!(a.parent_id, Some(parent.id));
+        let titles = |s: &Store| {
+            s.list_subtasks(parent.id)
+                .unwrap()
+                .into_iter()
+                .map(|t| t.title)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(titles(&s), ["A", "B", "C"]);
+
+        s.move_subtask(c.id, 0).unwrap();
+        assert_eq!(titles(&s), ["C", "A", "B"]);
+        assert!(
+            s.move_subtask(parent.id, 0).is_err(),
+            "only subtasks can be reordered"
+        );
+
+        // One level only, and only within the same project.
+        assert!(
+            s.create_task(NewTask {
+                project_id: p,
+                title: "X".into(),
+                parent_id: Some(a.id),
+                ..Default::default()
+            })
+            .is_err()
+        );
+        assert!(
+            s.create_task(NewTask {
+                project_id: other,
+                title: "Y".into(),
+                parent_id: Some(parent.id),
+                ..Default::default()
+            })
+            .is_err()
+        );
+
+        // Archiving the parent archives its subtasks; restoring brings them back.
+        s.set_task_archived(parent.id, true).unwrap();
+        assert!(s.list_subtasks(parent.id).unwrap().is_empty());
+        assert!(s.get_task(b.id).unwrap().archived_at.is_some());
+        s.set_task_archived(parent.id, false).unwrap();
+        assert_eq!(titles(&s).len(), 3);
+
+        // Deleting the parent deletes its subtasks.
+        s.delete_task(parent.id).unwrap();
+        assert!(s.get_task(a.id).is_err());
     }
 }

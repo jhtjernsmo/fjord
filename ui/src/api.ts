@@ -44,6 +44,9 @@ export interface Task {
   updated_at: string
   archived_at: string | null
   branch: string | null
+  /** Set for subtasks (one level deep). */
+  parent_id: number | null
+  child_order: number
 }
 
 export interface Board {
@@ -258,7 +261,7 @@ export const api = {
   updateProject: (id: number, patch: Partial<NewProject>) => invoke<Project>('update_project', { id, patch }),
   archiveProject: (id: number, archived: boolean) => invoke<Project>('archive_project', { id, archived }),
   getBoard: (projectId: number) => invoke<Board>('get_board', { projectId }),
-  createTask: (input: { project_id: number; title: string; status_id?: number; priority?: number; due_at?: string }) =>
+  createTask: (input: { project_id: number; title: string; status_id?: number; priority?: number; due_at?: string; parent_id?: number }) =>
     invoke<Task>('create_task', { input }),
   updateTask: (id: number, patch: TaskPatch) => invoke<Task>('update_task', { id, patch }),
   moveTask: (id: number, statusId: number, beforeTaskId: number | null = null) =>
@@ -269,6 +272,8 @@ export const api = {
   deleteNote: (id: number) => invoke<void>('delete_note', { id }),
   renameUser: (name: string, rewriteHistory: boolean) => invoke<string>('rename_user', { name, rewriteHistory }),
   listArchivedTasks: (projectId: number) => invoke<Task[]>('list_archived_tasks', { projectId }),
+  listSubtasks: (taskId: number) => invoke<Task[]>('list_subtasks', { taskId }),
+  moveSubtask: (id: number, index: number) => invoke<Task[]>('move_subtask', { id, index }),
   createStatus: (projectId: number, name: string, color: string | null, isDone: boolean) =>
     invoke<Status>('create_status', { projectId, name, color, isDone }),
   updateStatus: (id: number, patch: { name?: string; color?: string; is_done?: boolean }) =>

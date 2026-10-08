@@ -112,8 +112,9 @@ fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "create_task",
-            "Add a task to a project.",
+            "Add a task to a project. Pass parent (a task id in the same project) to create a subtask; subtasks can't have subtasks.",
             json!({ "project": project, "title": { "type": "string" }, "body": { "type": "string", "description": "Markdown" },
+                    "parent": { "type": "integer", "description": "Parent task id, to create a subtask" },
                     "priority": { "type": "integer", "minimum": 0, "maximum": 3 },
                     "due": { "type": "string", "description": "YYYY-MM-DD" },
                     "status": { "type": "string", "description": "Column name or id (default: first)" } }),
@@ -347,6 +348,7 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
                 priority: args.get("priority").and_then(Value::as_i64).unwrap_or(0),
                 due_at: opt_str(args, "due"),
                 status_id,
+                parent_id: args.get("parent").and_then(Value::as_i64),
             })?)?
         }
         "update_task" => {
