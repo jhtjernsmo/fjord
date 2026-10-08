@@ -17,8 +17,9 @@ import { ProjectGlyph } from './components/Icons'
 import { Board } from './components/Board'
 import { CommandPalette } from './components/CommandPalette'
 import type { PaletteMode } from './components/CommandPalette'
-import { applyTheme, loadTheme, NewProjectDialog, SettingsDialog } from './components/Dialogs'
-import type { Theme } from './components/Dialogs'
+import { NewProjectDialog } from './components/Dialogs'
+import { SettingsWindow } from './components/Settings'
+import { useThemes } from './themes'
 import { Home } from './components/Home'
 import { ActivityView, ArchiveView, FilesView, NotesView } from './components/ProjectViews'
 import { GitView } from './components/GitView'
@@ -33,7 +34,7 @@ const TABS: Tab[] = ['board', 'notes', 'files', 'git', 'activity', 'archive']
 
 const GLOBAL_ACTIONS = [
   'palette.open', 'help.toggle', 'panel.close', 'go.home', 'go.notes', 'project.pick', 'project.new', 'project.archive',
-  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'view.archive', 'view.git',
+  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'theme.cycle', 'view.archive', 'view.git',
 ]
 
 export default function App() {
@@ -46,8 +47,7 @@ export default function App() {
   const [newProject, setNewProject] = useState(false)
   const [help, setHelp] = useState(false)
   const [settings, setSettings] = useState(false)
-  const [theme, setTheme] = useState<Theme>(loadTheme)
-  useEffect(() => applyTheme(theme), [theme])
+  const themes = useThemes()
   const [dropping, setDropping] = useState(false)
   const [quickAddSignal, setQuickAddSignal] = useState(0)
 
@@ -66,10 +66,11 @@ export default function App() {
 
   const overlayOpen = palette !== null || newProject || help || settings
 
-  // Accent colour follows the active project.
+  // The accent follows the active project's colour, unless turned off in Appearance.
+  const projectColor = themes.prefs.projectAccent ? activeBoard?.project.color : null
   useEffect(() => {
-    document.documentElement.style.setProperty('--accent', activeBoard?.project.color ?? '#7c9cff')
-  }, [activeBoard?.project.color])
+    document.documentElement.style.setProperty('--accent', projectColor ?? themes.current.colors.accent)
+  }, [projectColor, themes.current])
 
   // Dropped files go to the open task, else to the current project.
   useEffect(() => {
@@ -128,6 +129,7 @@ export default function App() {
       'view.archive': () => setTab('archive'),
       'view.git': () => setTab('git'),
       'settings.open': () => setSettings(true),
+      'theme.cycle': () => themes.cycle(),
       'task.new': () => {
         if (!projectId) {
           toast(t('toast.pickProject'), 'info')
@@ -277,7 +279,7 @@ export default function App() {
         />
       )}
       {help && <HelpSheet onClose={() => setHelp(false)} />}
-      {settings && <SettingsDialog theme={theme} onTheme={setTheme} onClose={() => setSettings(false)} />}
+      {settings && <SettingsWindow onClose={() => setSettings(false)} />}
       <WhichKey />
     </div>
     </NavContext.Provider>
