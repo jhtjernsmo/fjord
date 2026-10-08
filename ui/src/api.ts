@@ -221,6 +221,7 @@ export interface GitCommit {
 export interface GitOverview {
   repo: ProjectRepo
   current_branch: string
+  default_branch: string | null
   dirty: boolean
   branches: GitBranch[]
   commits: GitCommit[]
@@ -337,6 +338,8 @@ export const api = {
   /** Opens the repo in an editor (command template); with a task, checks out its branch first. */
   openInEditor: (projectId: number, taskId: number | null, command: string) =>
     invoke<string>('open_in_editor', { projectId, taskId, command }),
+  /** Switches the repository back to its main branch; returns the branch name. */
+  checkoutDefault: (projectId: number) => invoke<string>('checkout_default', { projectId }),
   startBranch: (taskId: number, kind: string | null = null) => invoke<StartedBranch>('start_branch', { taskId, kind }),
   /** [type, name] the task's branch would get; the type is guessed when not given. */
   suggestBranch: (taskId: number, kind: string | null = null) => invoke<[string, string]>('suggest_branch', { taskId, kind }),

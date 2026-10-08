@@ -1,4 +1,5 @@
 import { editorLabel, openInEditor } from './editor'
+import { useProjectSort } from './projectSort'
 import { useCallback, useEffect, useState } from 'react'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { Ellipsis, Paperclip } from 'lucide-react'
@@ -58,6 +59,7 @@ export default function App() {
   const [actor] = useLive(() => api.actor(), [])
   const [projects] = useLive(() => api.listProjects(false), [])
   const projectId = view.kind === 'project' ? view.id : null
+  const { sorted: sortedProjects, sort: projectSort, setSort: setProjectSort } = useProjectSort(projects ?? [], projectId)
   const [board] = useLive(() => (projectId ? api.getBoard(projectId) : Promise.resolve(null)), [projectId])
   const activeBoard = board && board.project.id === projectId ? board : null
   const windowTitle = view.kind === 'notes' ? t('nav.notes') : activeBoard ? activeBoard.project.name : 'Fjord'
@@ -199,7 +201,9 @@ export default function App() {
       <TitleBar title={windowTitle} />
       <AzureImportRunner />
       <Sidebar
-        projects={projects ?? []}
+        projects={sortedProjects}
+        sort={projectSort}
+        onSort={setProjectSort}
         activeId={projectId}
         onHome={() => runAction('go.home')}
         onNotes={() => runAction('go.notes')}
@@ -225,7 +229,7 @@ export default function App() {
         )}
 
         {view.kind === 'home' && (
-          <Home actor={actor ?? ''} projects={projects ?? []} onOpen={openProject} onNewProject={() => setNewProject(true)} />
+          <Home actor={actor ?? ''} projects={sortedProjects} onOpen={openProject} onNewProject={() => setNewProject(true)} />
         )}
 
         {view.kind === 'project' && activeBoard && (
@@ -284,7 +288,7 @@ export default function App() {
       {palette && (
         <CommandPalette
           mode={palette}
-          projects={projects ?? []}
+          projects={sortedProjects}
           onClose={() => setPalette(null)}
           onAction={runAction}
           onProject={(id) => openProject(id)}

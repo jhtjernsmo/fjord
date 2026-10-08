@@ -22,20 +22,21 @@ the same projects, and you can always see who did what.
 
 ## Features
 
-- **Projects & kanban boards** — drag and drop, or move tasks with `H`/`L`. Rename, recolor, reorder and add columns.
+- **Projects & kanban boards** — drag and drop, or move tasks with `H`/`L`. Rename, recolor, reorder and add columns, and mark one or more as done columns (e.g. Resolved and Done). Right-click a project to change its icon and colour.
 - **Tasks** — markdown descriptions, priority, due dates, overdue warnings, archive & restore.
 - **Files** — drop files onto the window to attach them to a project or task. Stored content-addressed (deduplicated) with image previews.
 - **Themes** — five built-in themes (Fjord Dark/Light, Nord, Solarized Light, High Contrast), follow the OS with separate light/dark picks, or build your own with live preview: colours, text size, rounding and density; share themes as JSON. `Space T` cycles themes.
 - **Subtasks** — break a task into subtasks (one level) with their own status, priority and branch; cards show progress (2/5), the task panel lists them with check-off, drag to reorder and `A` to add.
-- **Notespace** — Obsidian-style markdown notes, inside a project or free-floating, with folders and pins. Link anything with `[[Project]]`, `[[#12]]` (a task) or `[[Another note]]` — type `[[` for autocomplete — and see backlinks (“mentioned in”) on tasks, projects and notes.
+- **Notespace** — Obsidian-style markdown notes, inside a project or free-floating, with folders and pins. Link anything with `[[Project]]`, `[[#12]]` (a task) or `[[Another note]]` — type `[[` for autocomplete — and see backlinks (“mentioned in”) on tasks, projects and notes. Tables, task lists and [Mermaid](https://mermaid.js.org) diagrams render in notes and task descriptions; web links open in your browser.
 - **Full-text search** across tasks, notes and file names (`Space f`).
 - **Keyboard-first** — a leader key with a which-key popup, vim motions on the board, a `Ctrl+K` command palette, and every binding configurable. The mouse works for everything too.
-- **Git & GitHub** — link a project to a repo, start a branch from any task (`B`), see pull requests with CI status, open PRs from a task, and let merged PRs move tasks to done.
+- **Git, GitHub & Azure DevOps** — link a project to a repo, start a branch with a conventional name from any task (`B`, e.g. `feat/12-add-login`) or link an existing one, see pull requests with CI status, open PRs from a task, and let merged PRs move tasks to done.
+- **Azure Boards import** — work items assigned to you show up as tasks in the project you choose, with their state mapped to your columns, child items as subtasks, and the discussion readable in the task.
 - **AI-agent ready** — `fjord mcp` exposes 25 tools to MCP clients such as Claude. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
 - **Activity log** — what changed, when, and by whom (you or an agent).
 - **Live updates** — changes from the CLI or an agent appear in the open app within a second or two.
 - **English and Norwegian** — English by default; adding a language is one file.
-- **Dark and light themes** — follows your system, or pick one in Settings.
+- **Updates itself** — signed in-app updates; Settings shows the installed version.
 
 <table>
   <tr>
@@ -67,9 +68,9 @@ Grab the installer for your system from [Releases](https://github.com/jhtjernsmo
 | Windows 10/11 | `.msi` or `-setup.exe` |
 | macOS | `.dmg` (Apple Silicon or Intel) |
 
-The CLI is attached separately as `fjord-cli-<platform>`. Builds aren't code-signed yet: Windows
-may show a SmartScreen warning (More info → Run anyway), and on macOS right-click the app → Open
-the first time.
+The CLI is attached separately as `fjord-cli-<platform>`. From 0.2.9 the macOS app is signed with
+an Apple Developer ID and notarized, so it opens normally. Windows builds aren't code-signed yet and
+may show a SmartScreen warning (More info → Run anyway); signing through SignPath is in progress.
 
 ### Build from source
 
@@ -99,7 +100,7 @@ For development with hot reload: `npx --prefix ui tauri dev`.
 
 ### Updates
 
-From 0.2.1 on, Fjord checks GitHub Releases on startup and offers **Update & restart** (Windows, macOS and the Linux AppImage; `.deb`/`.rpm` update via your package manager). Updates are signed and verified before installing; the check can be turned off in Settings.
+From 0.2.1 on, Fjord checks GitHub Releases on startup and offers **Update & restart** (Windows, macOS and the Linux AppImage; `.deb`/`.rpm` update via your package manager). Updates are signed and verified before installing; the check can be turned off in Settings. **Settings → Updates** shows the installed version and has a *Check now* button. Versions before 0.2.1 have no updater, so install the latest release once by hand.
 
 ## Keyboard
 
@@ -117,7 +118,15 @@ what comes next.
 | `Space ,` | Settings | `d d` | Archive task |
 | `Space L` | Switch language | `p` | Cycle priority |
 | `Space N` | Notespace | `/` | Filter the board |
-| `Esc` | Close | `B` | Start branch for task |
+| `Space g` | Git tab | `B` | Start branch for task |
+| `Space r` | Sync pull requests | `a` | Add subtask to task |
+| `Space i` | Import from Azure Boards | `S` | Show or hide subtasks |
+| `Space T` | Cycle themes | `y` | Copy task reference (`[[#12]]`) |
+| `Space ?` | Report a bug | `g g` / `G` | First / last task |
+| `Esc` | Close | `Delete` | Delete task |
+
+In an open task: `[` / `]` move it to the previous/next column, `e` edits, `A` adds a subtask, `B`
+starts a branch, `L` links an existing one and `P` opens a pull request.
 
 On macOS, `Ctrl` shortcuts use `⌘` instead. Remap anything in `keymap.json` (see [Data](#data) for where it lives):
 
@@ -153,10 +162,15 @@ Run `fjord --help` for everything. Changes are recorded with an actor: `--actor`
 
 Link a project to a repository in the **Git** tab (or `fjord git link <project> <path>`). Fjord then:
 
-- starts a branch for a task with a conventional name — `fix/12-fix-push-notifications`, type picked or guessed — and moves the task to the second column,
+- starts a branch for a task with a conventional name — `fix/12-fix-push-notifications`. Pick the type (feat, fix, chore, docs, refactor, test, perf, ci, hotfix) in the task, or let Fjord guess: `fix` for bug-like tasks and Azure Bugs, `feat` otherwise. The task moves to the second column,
+- or links a task to a branch that already exists. Several tasks can share one branch, and its pull request shows on all of them,
 - shows branches, recent commits and GitHub pull requests with their CI status,
-- links pull requests to tasks by branch name, and opens a PR straight from a task (title and description come from the task),
-- moves a task to done when its PR is merged (on **Sync**), unless you turn auto-move off.
+- links pull requests to tasks by branch name, and opens a PR straight from a task (the title follows the branch type, e.g. `feat: Add login`, and the description comes from the task),
+- opens the repository in your editor or IDE (VS Code, Cursor, JetBrains IDEs, Visual Studio, Zed, Sublime, or your own command; set in **Settings → Integrations**), on the task's branch, with `Space e`,
+- moves the task (or all tasks on the branch) to done when the PR is merged (on **Sync**), unless you turn auto-move off.
+
+If GitHub or Azure DevOps refuses access, the Git tab shows their own explanation, for example an
+organization that restricts OAuth apps or requires SSO approval.
 
 Git runs through your installed `git`, so your config, hooks and credentials apply. GitHub access
 (needed for private repositories and opening PRs) comes from, in order: `GITHUB_TOKEN`/`GH_TOKEN`, a
@@ -171,7 +185,10 @@ task, opening PRs from a task, and moving tasks to done when their PR completes.
 (scopes: Code Read & Write, Build Read; stored in the OS credential store), or the Azure CLI: add the organization in Settings without a token and Fjord uses `az login`.
 
 **Azure Boards import (beta).** Work items assigned to you can be imported into chosen Fjord projects
-(on start and every 10 minutes, no duplicates), and an AI agent can analyze new ones through the MCP
+(on start and every 10 minutes, no duplicates). Each item lands in the column named like its Azure
+state (Active falls back to your in-progress column, New to the first), child items become subtasks,
+items finished in the last 30 days (configurable) are included, and a notification tells you what
+was added or changed. The task panel shows the work item's discussion. An AI agent can analyze new ones through the MCP
 server (`import_azure`, `list_new_imports`, `mark_analyzed`). Setup, a ready-made triage prompt and
 how to schedule it: [docs/azure-boards-triage.md](docs/azure-boards-triage.md).
 
@@ -182,6 +199,7 @@ how to schedule it: [docs/azure-boards-triage.md](docs/azure-boards-triage.md).
 ```sh
 fjord git link bokost ~/code/bokost
 fjord git branch 12          # check out (or create) the task's branch
+fjord git main bokost        # back to the main branch
 fjord git status bokost      # branches and recent commits
 fjord git prs bokost         # pull requests + CI; moves merged tasks to done
 fjord git pr 12 --draft      # push the branch and open a pull request
@@ -211,8 +229,6 @@ delete tool.
 
 ## Data
 
-| What | Where |
-|---|---|
 | | Linux | Windows | macOS |
 |---|---|---|---|
 | Data (`fjord.db`, `files/`) | `~/.local/share/fjord` | `%APPDATA%\fjord` | `~/Library/Application Support/fjord` |
@@ -225,7 +241,7 @@ locations (for example a separate test database). Back up by copying the data fo
 
 ```
 crates/fjord-core   Rust library: schema & migrations, projects, columns, tasks, files, notes, search, activity
-crates/fjord-vcs    Git (via the git CLI) and GitHub REST integration
+crates/fjord-vcs    Git (via the git CLI), GitHub and Azure DevOps REST integration
 crates/fjord-cli    `fjord` CLI and MCP server
 src-tauri           Tauri desktop shell — thin commands over fjord-core
 ui                  React + TypeScript interface (dnd-kit, Lucide, Motion)
@@ -253,7 +269,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Translations are welcome: copy the `no` 
 - Tags and saved filters
 - Desktop notifications for due dates
 - Paste images from the clipboard, PDF previews
+- Writing status back to Azure Boards (opt-in)
 - GitHub issues ↔ tasks, review status on cards
+- Windows code signing
 - Timeline and calendar views
 
 ## License
