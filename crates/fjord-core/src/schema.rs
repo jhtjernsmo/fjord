@@ -180,6 +180,19 @@ const MIGRATIONS: &[&str] = &[
     ALTER TABLE project_repos ADD COLUMN azure_project TEXT;
     ALTER TABLE project_repos ADD COLUMN azure_repo TEXT;
     "#,
+    // v6: tasks imported from other systems (Azure Boards work items)
+    r#"
+    CREATE TABLE external_links (
+        task_id     INTEGER PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE,
+        source      TEXT NOT NULL,
+        external_id TEXT NOT NULL,
+        url         TEXT NOT NULL,
+        rev         INTEGER NOT NULL DEFAULT 0,
+        imported_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        analyzed_at TEXT,
+        UNIQUE (source, external_id)
+    );
+    "#,
 ];
 
 pub fn configure(conn: &Connection) -> Result<()> {

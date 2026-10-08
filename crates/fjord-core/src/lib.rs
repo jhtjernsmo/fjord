@@ -3,6 +3,7 @@
 
 mod error;
 mod files;
+mod imports;
 mod links;
 mod models;
 mod notes;
@@ -15,6 +16,9 @@ mod store;
 mod tasks;
 
 pub use error::{Error, Result};
+pub use imports::{
+    ExternalItem, ExternalLink, ImportMapping, ImportOutcome, ImportSettings, ImportedTask,
+};
 pub use links::parse_links;
 pub use models::*;
 pub use projects::{slugify, status_names};

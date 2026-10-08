@@ -493,6 +493,268 @@ pub fn disconnect_azure(org: &str) -> Result<()> {
     credentials::delete(&account_for(check_org(org)?))
 }
 
+// ---------- Azure Boards (work items assigned to you) ----------
+
+/// Open work items assigned to the signed-in user, newest change first.
+const ASSIGNED_TO_ME: &str = "SELECT [System.Id] FROM WorkItems \
+     WHERE [System.AssignedTo] = @Me \
+     AND [System.State] NOT IN ('Closed', 'Done', 'Removed', 'Resolved', 'Completed') \
+     ORDER BY [System.ChangedDate] DESC";
+const MAX_WORK_ITEMS: usize = 200;
+const WORK_ITEM_FIELDS: &str = "System.Id,System.Rev,System.Title,System.Description,System.TeamProject,\
+     System.AreaPath,System.WorkItemType,System.State,Microsoft.VSTS.Common.Priority,\
+     Microsoft.VSTS.Scheduling.DueDate,Microsoft.VSTS.Scheduling.TargetDate,\
+     Microsoft.VSTS.Common.AcceptanceCriteria,Microsoft.VSTS.TCM.ReproSteps";
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WiqlResult {
+    work_items: Vec<WiqlRef>,
+}
+
+#[derive(Deserialize)]
+struct WiqlRef {
+    id: u64,
+}
+
+#[derive(Deserialize)]
+struct ApiWorkItem {
+    id: u64,
+    rev: i64,
+    fields: serde_json::Map<String, serde_json::Value>,
+}
+
+/// An Azure Boards work item, with HTML fields already turned into markdown.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct WorkItem {
+    pub org: String,
+    pub id: u64,
+    pub rev: i64,
+    pub project: String,
+    pub kind: String,
+    pub state: String,
+    pub area: String,
+    pub title: String,
+    pub description_md: String,
+    pub acceptance_md: String,
+    /// Azure priority 1 (highest) to 4.
+    pub priority: Option<i64>,
+    /// YYYY-MM-DD
+    pub due: Option<String>,
+}
+
+impl WorkItem {
+    pub fn url(&self) -> String {
+        format!(
+            "{HOST}/{}/{}/_workitems/edit/{}",
+            encode(&self.org),
+            encode(&self.project),
+            self.id
+        )
+    }
+
+    /// Fjord's fields: Azure 1/2/3/4 → high/medium/low/none, plus a footer linking back.
+    pub fn to_external_item(&self) -> fjord_core::ExternalItem {
+        let mut body = self.description_md.trim().to_string();
+        if !self.acceptance_md.trim().is_empty() {
+            body.push_str("\n\n### Acceptance criteria\n\n");
+            body.push_str(self.acceptance_md.trim());
+        }
+        body.push_str(&format!(
+            "\n\n---\nAzure DevOps: [{} {}]({}) · {} · {}",
+            self.kind,
+            self.id,
+            self.url(),
+            self.state,
+            self.area
+        ));
+        fjord_core::ExternalItem {
+            source: "azure".into(),
+            external_id: format!("{}/{}", self.org.to_lowercase(), self.id),
+            url: self.url(),
+            rev: self.rev,
+            title: self.title.clone(),
+            body_md: body.trim_start().to_string(),
+            priority: match self.priority {
+                Some(1) => 3,
+                Some(2) => 2,
+                Some(3) => 1,
+                _ => 0,
+            },
+            due_at: self.due.clone(),
+        }
+    }
+}
+
+fn field_str(fields: &serde_json::Map<String, serde_json::Value>, key: &str) -> String {
+    fields
+        .get(key)
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn work_item_from(org: &str, item: ApiWorkItem) -> WorkItem {
+    let f = &item.fields;
+    let description = match field_str(f, "System.Description") {
+        d if d.trim().is_empty() => field_str(f, "Microsoft.VSTS.TCM.ReproSteps"),
+        d => d,
+    };
+    let due = [
+        field_str(f, "Microsoft.VSTS.Scheduling.DueDate"),
+        field_str(f, "Microsoft.VSTS.Scheduling.TargetDate"),
+    ]
+    .into_iter()
+    .find(|d| d.len() >= 10)
+    .map(|d| d[..10].to_string());
+    WorkItem {
+        org: org.to_string(),
+        id: item.id,
+        rev: item.rev,
+        project: field_str(f, "System.TeamProject"),
+        kind: field_str(f, "System.WorkItemType"),
+        state: field_str(f, "System.State"),
+        area: field_str(f, "System.AreaPath"),
+        title: field_str(f, "System.Title"),
+        description_md: html_to_markdown(&description),
+        acceptance_md: html_to_markdown(&field_str(f, "Microsoft.VSTS.Common.AcceptanceCriteria")),
+        priority: f
+            .get("Microsoft.VSTS.Common.Priority")
+            .and_then(|v| v.as_i64()),
+        due,
+    }
+}
+
+/// Open work items assigned to you in one organization.
+pub fn assigned_work_items(org: &str) -> Result<Vec<WorkItem>> {
+    let org = check_org(org)?;
+    let (auth, _) = find_auth(org).ok_or_else(|| VcsError::NoAzureToken(org.to_string()))?;
+    let agent = agent();
+    let mut res = agent
+        .post(&format!(
+            "{HOST}/{}/_apis/wit/wiql?api-version={API_VERSION}",
+            encode(org)
+        ))
+        .header("Accept", "application/json")
+        .header("Authorization", &auth.header())
+        .send_json(json!({ "query": ASSIGNED_TO_ME }))
+        .map_err(|e| api_error(e, org))?;
+    let wiql: WiqlResult = read_json(&mut res, org)?;
+    let ids: Vec<String> = wiql
+        .work_items
+        .iter()
+        .take(MAX_WORK_ITEMS)
+        .map(|w| w.id.to_string())
+        .collect();
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut res = agent
+        .get(&format!(
+            "{HOST}/{}/_apis/wit/workitems?ids={}&fields={WORK_ITEM_FIELDS}&api-version={API_VERSION}",
+            encode(org),
+            ids.join(",")
+        ))
+        .header("Accept", "application/json")
+        .header("Authorization", &auth.header())
+        .call()
+        .map_err(|e| api_error(e, org))?;
+    let items: List<ApiWorkItem> = read_json(&mut res, org)?;
+    Ok(items
+        .value
+        .into_iter()
+        .map(|i| work_item_from(org, i))
+        .collect())
+}
+
+/// Good-enough HTML → markdown for work item descriptions: paragraphs, line breaks,
+/// lists, bold/italic, links and code; other tags are dropped, entities decoded.
+pub fn html_to_markdown(html: &str) -> String {
+    let mut out = String::new();
+    let mut rest = html;
+    let mut link_href: Option<String> = None;
+    let mut list_depth: usize = 0;
+    while let Some(start) = rest.find('<') {
+        out.push_str(&decode_entities(&rest[..start]));
+        let Some(end) = rest[start..].find('>') else {
+            rest = &rest[start..];
+            break;
+        };
+        let tag = &rest[start + 1..start + end];
+        rest = &rest[start + end + 1..];
+        let closing = tag.starts_with('/');
+        let name: String = tag
+            .trim_start_matches('/')
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric())
+            .collect::<String>()
+            .to_ascii_lowercase();
+        match (name.as_str(), closing) {
+            ("br", _) => out.push('\n'),
+            ("p" | "div" | "h1" | "h2" | "h3" | "h4" | "tr", true) => out.push_str("\n\n"),
+            ("p" | "div", false) if !out.is_empty() && !out.ends_with('\n') => out.push('\n'),
+            ("h1" | "h2" | "h3" | "h4", false) => out.push_str("\n### "),
+            ("ul" | "ol", false) => list_depth += 1,
+            ("ul" | "ol", true) => {
+                list_depth = list_depth.saturating_sub(1);
+                // A blank line ends the list, so following text isn't swallowed by the last item.
+                out.push_str("\n\n");
+            }
+            ("li", false) => {
+                if !out.ends_with('\n') && !out.is_empty() {
+                    out.push('\n');
+                }
+                out.push_str(&"  ".repeat(list_depth.saturating_sub(1)));
+                out.push_str("- ");
+            }
+            ("b" | "strong", _) => out.push_str("**"),
+            ("i" | "em", _) => out.push('*'),
+            ("code", _) => out.push('`'),
+            ("td" | "th", true) => out.push_str(" | "),
+            ("a", false) => {
+                link_href = tag
+                    .split("href=\"")
+                    .nth(1)
+                    .and_then(|h| h.split('"').next())
+                    .map(decode_entities);
+                out.push('[');
+            }
+            ("a", true) => match link_href.take() {
+                Some(href) => out.push_str(&format!("]({href})")),
+                None => out.push(']'),
+            },
+            _ => {}
+        }
+    }
+    out.push_str(&decode_entities(rest));
+    // Tidy whitespace: trim lines, collapse 3+ newlines.
+    let lines: Vec<&str> = out.lines().map(str::trim_end).collect();
+    let mut tidy = String::new();
+    let mut blank = 0;
+    for line in lines {
+        if line.trim().is_empty() {
+            blank += 1;
+            if blank > 1 {
+                continue;
+            }
+        } else {
+            blank = 0;
+        }
+        tidy.push_str(line);
+        tidy.push('\n');
+    }
+    tidy.trim().to_string()
+}
+
+fn decode_entities(s: &str) -> String {
+    s.replace("&nbsp;", " ")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&amp;", "&")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -597,5 +859,49 @@ mod tests {
         assert!(connect_azure("", "pat").is_err());
         assert!(connect_azure("dev.azure.com/contoso", "pat").is_err());
         assert!(connect_azure("contoso", "  ").is_err());
+    }
+
+    #[test]
+    fn converts_work_item_html_to_markdown() {
+        let html = "<div>Users get logged out.</div><div><br></div><div><b>Steps</b>:</div>\
+            <ol><li>Open app</li><li>Wait &amp; see</li></ol>\
+            <div>See <a href=\"https://example.com/log\">the log</a> &lt;3</div>";
+        assert_eq!(
+            html_to_markdown(html),
+            "Users get logged out.\n\n**Steps**:\n\n- Open app\n- Wait & see\n\nSee [the log](https://example.com/log) <3"
+        );
+        assert_eq!(html_to_markdown(""), "");
+    }
+
+    #[test]
+    fn maps_work_items_from_the_documented_shape() {
+        // Trimmed from the "Work Items - List" example response.
+        let json = r#"{"count":1,"value":[{"id":297,"rev":4,"fields":{
+            "System.Id":297,"System.TeamProject":"Mobile App","System.AreaPath":"Mobile App\\iOS",
+            "System.WorkItemType":"Bug","System.State":"Active","System.Title":"Crash on login",
+            "System.Description":"<div>App crashes</div>",
+            "Microsoft.VSTS.Common.AcceptanceCriteria":"<ul><li>No crash</li></ul>",
+            "Microsoft.VSTS.Common.Priority":1,"Microsoft.VSTS.Scheduling.DueDate":"2026-10-20T00:00:00Z"}}]}"#;
+        let list: List<ApiWorkItem> = serde_json::from_str(json).unwrap();
+        let wi = work_item_from("Contoso", list.value.into_iter().next().unwrap());
+        assert_eq!(
+            (wi.id, wi.rev, wi.kind.as_str(), wi.due.as_deref()),
+            (297, 4, "Bug", Some("2026-10-20"))
+        );
+        assert_eq!(
+            wi.url(),
+            "https://dev.azure.com/Contoso/Mobile%20App/_workitems/edit/297"
+        );
+
+        let item = wi.to_external_item();
+        assert_eq!(
+            (item.external_id.as_str(), item.priority, item.rev),
+            ("contoso/297", 3, 4)
+        );
+        assert!(
+            item.body_md
+                .starts_with("App crashes\n\n### Acceptance criteria\n\n- No crash")
+        );
+        assert!(item.body_md.ends_with("Azure DevOps: [Bug 297](https://dev.azure.com/Contoso/Mobile%20App/_workitems/edit/297) · Active · Mobile App\\iOS"));
     }
 }

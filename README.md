@@ -29,7 +29,7 @@ the same projects, and you can always see who did what.
 - **Full-text search** across tasks, notes and file names (`Space f`).
 - **Keyboard-first** — a leader key with a which-key popup, vim motions on the board, a `Ctrl+K` command palette, and every binding configurable. The mouse works for everything too.
 - **Git & GitHub** — link a project to a repo, start a branch from any task (`B`), see pull requests with CI status, open PRs from a task, and let merged PRs move tasks to done.
-- **AI-agent ready** — `fjord mcp` exposes 21 tools to MCP clients such as Claude. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
+- **AI-agent ready** — `fjord mcp` exposes 24 tools to MCP clients such as Claude. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
 - **Activity log** — what changed, when, and by whom (you or an agent).
 - **Live updates** — changes from the CLI or an agent appear in the open app within a second or two.
 - **English and Norwegian** — English by default; adding a language is one file.
@@ -168,6 +168,11 @@ task, opening PRs from a task, and moving tasks to done when their PR completes.
 `AZURE_DEVOPS_EXT_PAT`, a personal access token per organization in **Settings → Azure DevOps**
 (scopes: Code Read & Write, Build Read; stored in the OS credential store), or `az login`.
 
+**Azure Boards import (beta).** Work items assigned to you can be imported into chosen Fjord projects
+(on start and every 10 minutes, no duplicates), and an AI agent can analyze new ones through the MCP
+server (`import_azure`, `list_new_imports`, `mark_analyzed`). Setup, a ready-made triage prompt and
+how to schedule it: [docs/azure-boards-triage.md](docs/azure-boards-triage.md).
+
 | | |
 |---|---|
 | ![Git tab](docs/screenshots/git.png) | ![Git in a task](docs/screenshots/task-git.png) |
@@ -199,7 +204,7 @@ Other clients:
 
 Tools: `list_projects`, `get_board`, `create_project`, `create_task`, `update_task`, `move_task`,
 `complete_task`, `archive_task`, `add_note`, `attach_file`, `search`, `recent_activity`, `link_repo`,
-`git_status`, `start_branch`, `list_pull_requests`, `open_pull_request`, `list_notes`, `get_note`, `update_note`, `backlinks`. There is deliberately no
+`git_status`, `start_branch`, `list_pull_requests`, `open_pull_request`, `list_notes`, `get_note`, `update_note`, `backlinks`, `import_azure`, `list_new_imports`, `mark_analyzed`. There is deliberately no
 delete tool.
 
 ## Data
