@@ -427,6 +427,44 @@ pub fn fetch_assigned_work_items(settings: &ImportSettings) -> Result<Vec<WorkIt
     Ok(fetch_import(settings, &[])?.items)
 }
 
+const IN_PROGRESS_STATES: &[&str] = &["active", "committed", "in progress", "doing"];
+const IN_PROGRESS_COLUMNS: &[&str] = &[
+    "in progress",
+    "doing",
+    "active",
+    "pågår",
+    "i gang",
+    "under arbeid",
+];
+const NEW_STATES: &[&str] = &["new", "proposed", "to do", "approved"];
+
+/// The column an open Azure state belongs in: one with the same name, else the
+/// usual in-progress column for Active/Committed, else the first column for New.
+fn column_for_state<'a>(
+    columns: &'a [fjord_core::Status],
+    state: &str,
+) -> Option<&'a fjord_core::Status> {
+    let state = state.trim().to_lowercase();
+    let named = |names: &[&str]| {
+        columns
+            .iter()
+            .find(|c| names.contains(&c.name.trim().to_lowercase().as_str()))
+    };
+    named(&[state.as_str()])
+        .or_else(|| {
+            IN_PROGRESS_STATES
+                .contains(&state.as_str())
+                .then(|| named(IN_PROGRESS_COLUMNS))
+                .flatten()
+        })
+        .or_else(|| {
+            NEW_STATES
+                .contains(&state.as_str())
+                .then(|| columns.first())
+                .flatten()
+        })
+}
+
 /// The topmost ancestor of `item` that is also being imported, if any.
 fn imported_root(
     item: &WorkItem,
@@ -478,6 +516,20 @@ pub fn apply_import(
             ImportOutcome::Updated => report.updated += 1,
             ImportOutcome::Unchanged => report.unchanged += 1,
         }
+        // Follow Azure's state into a column with the same name, but only when the
+        // state changed there (or on first import), so manual moves stick.
+        let previous = store.swap_external_state(task.id, &item.state)?;
+        let task = if previous.as_deref() != Some(item.state.as_str()) {
+            let columns = store.list_statuses(task.project_id)?;
+            match column_for_state(&columns, &item.state) {
+                Some(column) if column.id != task.status_id => {
+                    store.move_task(task.id, column.id, None)?
+                }
+                _ => task,
+            }
+        } else {
+            task
+        };
         task_of.insert((item.org.to_lowercase(), item.id), task);
     }
 
@@ -1033,6 +1085,83 @@ mod tests {
         assert!(report.completed.is_empty());
         assert_eq!(s.get_task(t.id).unwrap().status_id, resolved.id);
         assert_ne!(resolved.id, done.id);
+    }
+
+    #[test]
+    fn open_azure_states_follow_into_same_named_columns() {
+        let (mut s, _d) = store();
+        let p = s
+            .create_project(NewProject {
+                name: "Demo".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let first = s.list_statuses(p).unwrap()[0].id;
+        let settings = ImportSettings {
+            enabled: true,
+            mappings: vec![fjord_core::ImportMapping {
+                org: "contoso".into(),
+                project: "App".into(),
+                fjord_project_id: p,
+            }],
+        };
+        let wi = |rev: i64, state: &str| WorkItem {
+            org: "contoso".into(),
+            id: 7,
+            rev,
+            project: "App".into(),
+            kind: "Task".into(),
+            state: state.into(),
+            area: "App".into(),
+            title: "T".into(),
+            description_md: String::new(),
+            acceptance_md: String::new(),
+            priority: None,
+            due: None,
+            parent: None,
+        };
+        let import = |s: &mut Store, item: WorkItem| {
+            apply_import(
+                s,
+                &settings,
+                &ImportFetch {
+                    items: vec![item],
+                    ..Default::default()
+                },
+            )
+            .unwrap()
+        };
+        let task = |s: &Store| {
+            s.get_task(
+                s.external_link("azure", "contoso/7")
+                    .unwrap()
+                    .unwrap()
+                    .task_id,
+            )
+            .unwrap()
+        };
+
+        // "New" with no "New" column: stays in the first column.
+        import(&mut s, wi(1, "New"));
+        assert_eq!(task(&s).status_id, first);
+
+        // Active without an "Active" column: the In progress column.
+        let in_progress = s.list_statuses(p).unwrap()[1].id;
+        import(&mut s, wi(2, "Active"));
+        assert_eq!(task(&s).status_id, in_progress);
+        import(&mut s, wi(3, "New"));
+        assert_eq!(task(&s).status_id, first, "back to New: first column");
+
+        // Active again, now with an "Active" column: the same name wins.
+        let active = s.create_status(p, "Active", None, false).unwrap();
+        import(&mut s, wi(4, "Active"));
+        assert_eq!(task(&s).status_id, active.id);
+
+        // Moved by hand; Azure edits the title but not the state: the manual move sticks.
+        s.move_task(task(&s).id, first, None).unwrap();
+        import(&mut s, wi(5, "Active"));
+        assert_eq!(task(&s).status_id, first);
     }
 
     #[test]

@@ -150,6 +150,25 @@ impl Store {
         }
     }
 
+    /// The last state recorded for an imported item, and records a new one.
+    /// Returns the previous state (None the first time).
+    pub fn swap_external_state(&mut self, task_id: i64, state: &str) -> Result<Option<String>> {
+        let previous: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT state FROM external_links WHERE task_id = ?1",
+                [task_id],
+                |r| r.get(0),
+            )
+            .optional()?
+            .flatten();
+        self.conn.execute(
+            "UPDATE external_links SET state = ?1 WHERE task_id = ?2",
+            params![state, task_id],
+        )?;
+        Ok(previous)
+    }
+
     /// External ids already imported from `source`, with their task ids.
     pub fn external_ids(&self, source: &str) -> Result<Vec<(String, i64)>> {
         let mut stmt = self
