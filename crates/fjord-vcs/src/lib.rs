@@ -300,7 +300,9 @@ pub fn apply_sync(store: &mut Store, project_id: i64, prs: Vec<PullRequest>) -> 
         if let Some(done) = columns.iter().find(|c| c.is_done) {
             for lp in linked.iter().filter(|lp| lp.pr.state == "merged") {
                 let Some(task_id) = lp.task_id else { continue };
-                if store.get_task(task_id)?.status_id != done.id {
+                // Already in any done column (e.g. "Resolved"): leave it there.
+                let status = store.get_task(task_id)?.status_id;
+                if !columns.iter().any(|c| c.id == status && c.is_done) {
                     completed.push(store.move_task(task_id, done.id, None)?);
                 }
             }
@@ -522,15 +524,21 @@ pub fn apply_import(
             continue;
         }
         let task = store.get_task(task_id)?;
-        let Some(done) = store
-            .list_statuses(task.project_id)?
-            .into_iter()
-            .find(|s| s.is_done)
-        else {
+        let columns = store.list_statuses(task.project_id)?;
+        // Already in any done column (e.g. your own "Resolved"): leave it there.
+        if task.archived_at.is_some() || columns.iter().any(|c| c.id == task.status_id && c.is_done)
+        {
             continue;
-        };
-        if task.status_id != done.id && task.archived_at.is_none() {
-            store.move_task(task.id, done.id, None)?;
+        }
+        // Prefer a column named like the Azure state ("Resolved"), else the first done column.
+        let target = columns
+            .iter()
+            .find(|c| c.name.eq_ignore_ascii_case(&info.state))
+            .or_else(|| columns.iter().find(|c| c.is_done));
+        if let Some(target) = target
+            && target.id != task.status_id
+        {
+            store.move_task(task.id, target.id, None)?;
             report.closed += 1;
         }
     }
@@ -906,6 +914,102 @@ mod tests {
                 .as_deref(),
             Some("feature/login")
         );
+    }
+
+    #[test]
+    fn auto_moves_leave_tasks_in_any_done_column() {
+        let (mut s, _d) = store();
+        let p = s
+            .create_project(NewProject {
+                name: "Demo".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let resolved = s.create_status(p, "Resolved", None, false).unwrap();
+        assert!(resolved.is_done);
+        let done = s
+            .list_statuses(p)
+            .unwrap()
+            .into_iter()
+            .find(|c| c.is_done && c.name != "Resolved")
+            .unwrap();
+
+        // Azure: a work item resolved there lands in the column of the same name, and stays.
+        let settings = ImportSettings {
+            enabled: true,
+            mappings: vec![fjord_core::ImportMapping {
+                org: "contoso".into(),
+                project: "App".into(),
+                fjord_project_id: p,
+            }],
+        };
+        let item = WorkItem {
+            org: "contoso".into(),
+            id: 9,
+            rev: 1,
+            project: "App".into(),
+            kind: "Bug".into(),
+            state: "Active".into(),
+            area: "App".into(),
+            title: "Crash".into(),
+            description_md: String::new(),
+            acceptance_md: String::new(),
+            priority: None,
+            due: None,
+            parent: None,
+        };
+        apply_import(
+            &mut s,
+            &settings,
+            &ImportFetch {
+                items: vec![item],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let mut gone = ImportFetch::default();
+        gone.info.insert(
+            ("contoso".into(), 9),
+            WorkItemInfo {
+                parent: None,
+                state: "Resolved".into(),
+            },
+        );
+        apply_import(&mut s, &settings, &gone).unwrap();
+        let id = s
+            .external_link("azure", "contoso/9")
+            .unwrap()
+            .unwrap()
+            .task_id;
+        assert_eq!(
+            s.get_task(id).unwrap().status_id,
+            resolved.id,
+            "moved to the same-named column, not Done"
+        );
+        assert_eq!(apply_import(&mut s, &settings, &gone).unwrap().closed, 0);
+
+        // Git: a merged PR doesn't pull a task out of "Resolved" into "Done".
+        let repo = temp_repo();
+        link_repo(&mut s, p, repo.path()).unwrap();
+        let t = s.set_task_branch(id, Some("fix/crash")).unwrap();
+        let pr = PullRequest {
+            number: 1,
+            title: "t".into(),
+            state: "merged".into(),
+            draft: false,
+            url: String::new(),
+            author: "j".into(),
+            head: "fix/crash".into(),
+            base: "main".into(),
+            head_sha: "s".into(),
+            updated_at: String::new(),
+            checks: Checks::None,
+        };
+        let report = apply_sync(&mut s, p, vec![pr]).unwrap();
+        assert!(report.completed.is_empty());
+        assert_eq!(s.get_task(t.id).unwrap().status_id, resolved.id);
+        assert_ne!(resolved.id, done.id);
     }
 
     #[test]
