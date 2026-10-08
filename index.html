@@ -82,13 +82,13 @@
 
   <h2>What it does</h2>
   <ul>
-    <li>Boards with your own columns, priorities, due dates and drag and drop.</li>
+    <li>Boards with your own columns, priorities, due dates and drag and drop. Right-click a project to change its icon or colour.</li>
     <li>Subtasks, so a big task can be broken into steps. The card shows how far along it is.</li>
-    <li>Notes in markdown, inside a project or on their own. Link to anything with <code>[[Project]]</code>, <code>[[#12]]</code> or <code>[[Another note]]</code>, and see what links back.</li>
+    <li>Notes in markdown, inside a project or on their own. Link to anything with <code>[[Project]]</code>, <code>[[#12]]</code> or <code>[[Another note]]</code>, and see what links back. Tables and Mermaid diagrams work too.</li>
     <li>Files attached to projects or tasks, copied into Fjord so they don't go missing.</li>
     <li>Search across tasks, notes and file names.</li>
     <li>Themes: five to pick from, or make your own colours, text size and spacing.</li>
-    <li>Updates itself when a new version is out.</li>
+    <li>Updates itself when a new version is out. Settings shows which version you have.</li>
     <li>English and Norwegian.</li>
   </ul>
 
@@ -115,9 +115,10 @@
   <p class="muted">Every binding can be changed in <code>keymap.json</code>.</p>
 
   <h2>Git, GitHub and Azure DevOps</h2>
-  <p>Link a project to a local repository and each task can get its own branch. Fjord shows open pull requests with their CI status, can open a PR from a task, and moves the task to Done when the PR is merged. This works for repositories on GitHub and on Azure DevOps.</p>
+  <p>Link a project to a local repository and each task can get its own branch, named the usual way: <code>feat/12-add-login</code>, <code>fix/7-crash-on-start</code>. You pick the type, or Fjord guesses it from the task. A task can also be linked to a branch you already have, and several tasks can share one.</p>
+  <p>Fjord shows open pull requests with their CI status, can open a PR from a task, and moves the task to Done when the PR is merged. This works for repositories on GitHub and on Azure DevOps. If access is refused, it tells you why instead of just showing an error code.</p>
   <p>Sign in to GitHub from the settings with your browser, or let Fjord use <code>gh</code>. For Azure DevOps you can use <code>az login</code> or a token. Tokens are kept in your system's keychain, not in Fjord's files.</p>
-  <p>If you work in Azure Boards, Fjord can also pull in the work items assigned to you, so they show up as tasks in the right project.</p>
+  <p>If you work in Azure Boards, Fjord can also pull in the work items assigned to you, so they show up as tasks in the right project. Each one lands in the column with the same name as its state in Azure, child items become subtasks, and you can read the discussion on the work item without leaving Fjord. Items finished in the last month come along too, and you get a notification when something new arrives.</p>
   <figure>
     <img src="assets/git.png" alt="The Git tab with pull requests, branches and recent commits" width="1280" height="800" loading="lazy">
   </figure>
@@ -140,7 +141,7 @@
     <tr data-os="mac"><td>macOS</td><td><a data-asset="aarch64.dmg" href="https://github.com/jhtjernsmo/fjord/releases/latest">Apple Silicon</a> or <a data-asset="x64.dmg" href="https://github.com/jhtjernsmo/fjord/releases/latest">Intel</a></td></tr>
     <tr data-os="linux"><td>Linux</td><td><a data-asset=".AppImage" href="https://github.com/jhtjernsmo/fjord/releases/latest">AppImage</a>, <a data-asset=".deb" href="https://github.com/jhtjernsmo/fjord/releases/latest">.deb</a> or <a data-asset=".rpm" href="https://github.com/jhtjernsmo/fjord/releases/latest">.rpm</a></td></tr>
   </table>
-  <p class="muted">The builds aren't code-signed yet. On Windows, click "More info" and then "Run anyway". On macOS, right-click the app and choose Open the first time. Older versions are on the <a href="https://github.com/jhtjernsmo/fjord/releases">releases page</a>.</p>
+  <p class="muted">The macOS app is signed and notarized by Apple, so it opens like any other app. The Windows builds aren't code-signed yet: if SmartScreen warns you, click "More info" and then "Run anyway". Older versions are on the <a href="https://github.com/jhtjernsmo/fjord/releases">releases page</a>.</p>
 
   <h2>Questions</h2>
   <dl>
