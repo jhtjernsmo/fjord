@@ -1,7 +1,7 @@
 // Slide-in task details: title, status, priority, due date, markdown, files.
 import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
-import { MARKDOWN_PLUGINS, ScrollTable } from './NoteMarkdown'
+import { MARKDOWN_COMPONENTS, MARKDOWN_PLUGINS } from './NoteMarkdown'
 import { motion } from 'motion/react'
 import { Archive, CircleCheck, ExternalLink, GitBranch, GitPullRequest, Link2, Trash2, Unlink, X } from 'lucide-react'
 import { useContextMenus, useEntityActions } from './actions'
@@ -204,7 +204,7 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
               />
             ) : (
               <div className={`markdown ${task.body_md ? '' : 'empty'}`} onClick={() => setEditing(true)}>
-                {task.body_md ? <Markdown remarkPlugins={MARKDOWN_PLUGINS} components={{ table: ScrollTable }}>{task.body_md}</Markdown> : t('task.addDescription')}
+                {task.body_md ? <Markdown remarkPlugins={MARKDOWN_PLUGINS} components={MARKDOWN_COMPONENTS}>{task.body_md}</Markdown> : t('task.addDescription')}
               </div>
             )}
           </div>
