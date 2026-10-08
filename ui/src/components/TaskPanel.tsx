@@ -377,6 +377,7 @@ function GitSection({ task }: { task: Task }) {
               </button>
               <button className="btn ghost" onClick={() => run(openInEditor(task.project_id, task.id)).then((p) => p && toast(t('editor.opened', { editor: editorLabel() }), 'success'))} title={t('editor.openTaskHint')}>
                 <Code2 size={13} /> {t('editor.open')}
+              </button>
               <button className="btn ghost" onClick={() => run(api.checkoutDefault(task.project_id)).then((b) => b && toast(t('git.switchedTo', { branch: b }), 'success'))} title={t('git.backToMainHint')}>
                 <CornerUpLeft size={13} /> {t('git.backToMain')}
               </button>
