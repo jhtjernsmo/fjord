@@ -3,7 +3,6 @@
 //! OS credential store) or the GitHub CLI (`gh auth token`);
 //! public repositories can also be read without a token.
 
-use std::process::Command;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -177,7 +176,10 @@ fn find_token_with_source() -> Option<(String, TokenSource)> {
     if let Some(t) = credentials::get(credentials::GITHUB) {
         return Some((t, TokenSource::Saved));
     }
-    let out = Command::new("gh").args(["auth", "token"]).output().ok()?;
+    let out = crate::process::tool("gh")
+        .args(["auth", "token"])
+        .output()
+        .ok()?;
     let token = String::from_utf8_lossy(&out.stdout).trim().to_string();
     (out.status.success() && !token.is_empty()).then_some((token, TokenSource::GhCli))
 }
@@ -351,6 +353,132 @@ impl GitHub {
     }
 }
 
+// ---------- Sign in with GitHub (OAuth device flow) ----------
+
+/// Fjord's OAuth app (public; the device flow needs no client secret).
+const GITHUB_CLIENT_ID: &str = "Ov23liDvWabnMjXYNAXk";
+const DEVICE_SCOPES: &str = "repo read:org";
+
+/// The device code stays in the backend; the UI only sees the code to type in.
+static PENDING_DEVICE_CODE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// What the user needs to finish signing in on github.com.
+#[derive(Debug, Clone, Serialize)]
+pub struct DeviceLogin {
+    pub user_code: String,
+    pub verification_uri: String,
+    /// Seconds between polls.
+    pub interval: u64,
+    /// Seconds until the code expires.
+    pub expires_in: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum DevicePoll {
+    Pending,
+    /// GitHub asked us to poll less often.
+    SlowDown {
+        interval: u64,
+    },
+    Done {
+        account: GitHubAccount,
+    },
+    Expired,
+    Denied,
+}
+
+#[derive(Deserialize)]
+struct ApiDeviceCode {
+    device_code: String,
+    user_code: String,
+    verification_uri: String,
+    expires_in: u64,
+    interval: u64,
+}
+
+#[derive(Deserialize)]
+struct ApiDeviceToken {
+    access_token: Option<String>,
+    error: Option<String>,
+    interval: Option<u64>,
+}
+
+fn github_form<T: serde::de::DeserializeOwned>(url: &str, form: &[(&str, &str)]) -> Result<T> {
+    let mut res = agent()
+        .post(url)
+        .header("Accept", "application/json")
+        .header("User-Agent", "fjord")
+        .send_form(form.iter().copied())
+        .map_err(api_error)?;
+    res.body_mut()
+        .read_json()
+        .map_err(|e| VcsError::GitHub(e.to_string()))
+}
+
+/// Starts a sign-in: the user opens `verification_uri` and types `user_code`.
+pub fn start_github_login() -> Result<DeviceLogin> {
+    let code: ApiDeviceCode = github_form(
+        "https://github.com/login/device/code",
+        &[("client_id", GITHUB_CLIENT_ID), ("scope", DEVICE_SCOPES)],
+    )?;
+    *PENDING_DEVICE_CODE
+        .lock()
+        .map_err(|_| VcsError::GitHub("sign-in state poisoned".into()))? = Some(code.device_code);
+    Ok(DeviceLogin {
+        user_code: code.user_code,
+        verification_uri: code.verification_uri,
+        interval: code.interval,
+        expires_in: code.expires_in,
+    })
+}
+
+/// Checks once whether the user has approved; on success the token is verified
+/// and saved in the OS credential store, like a pasted one.
+pub fn poll_github_login() -> Result<DevicePoll> {
+    let device_code = PENDING_DEVICE_CODE
+        .lock()
+        .map_err(|_| VcsError::GitHub("sign-in state poisoned".into()))?
+        .clone()
+        .ok_or_else(|| VcsError::GitHub("no sign-in in progress".into()))?;
+    let res: ApiDeviceToken = github_form(
+        "https://github.com/login/oauth/access_token",
+        &[
+            ("client_id", GITHUB_CLIENT_ID),
+            ("device_code", &device_code),
+            ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+        ],
+    )?;
+    let poll = device_poll_from(res)?;
+    if !matches!(poll, DevicePoll::Pending | DevicePoll::SlowDown { .. }) {
+        PENDING_DEVICE_CODE
+            .lock()
+            .map_err(|_| VcsError::GitHub("sign-in state poisoned".into()))?
+            .take();
+    }
+    Ok(poll)
+}
+
+fn device_poll_from(res: ApiDeviceToken) -> Result<DevicePoll> {
+    if let Some(token) = res.access_token {
+        return connect_github(&token).map(|account| DevicePoll::Done { account });
+    }
+    Ok(match res.error.as_deref() {
+        Some("authorization_pending") => DevicePoll::Pending,
+        Some("slow_down") => DevicePoll::SlowDown {
+            interval: res.interval.unwrap_or(10),
+        },
+        Some("expired_token") => DevicePoll::Expired,
+        Some("access_denied") => DevicePoll::Denied,
+        other => {
+            return Err(VcsError::GitHub(format!(
+                "sign-in failed: {}",
+                other.unwrap_or("unexpected response")
+            )));
+        }
+    })
+}
+
 fn api_error(e: ureq::Error) -> VcsError {
     match e {
         ureq::Error::StatusCode(401) => VcsError::NoToken,
@@ -434,6 +562,36 @@ mod tests {
         assert_eq!(
             (pr.state.as_str(), pr.head.as_str(), pr.base.as_str()),
             ("merged", "fjord/12-fix-push", "main")
+        );
+    }
+
+    #[test]
+    fn device_flow_responses_map_to_poll_states() {
+        let r = |error: &str, interval: Option<u64>| ApiDeviceToken {
+            access_token: None,
+            error: Some(error.into()),
+            interval,
+        };
+        assert!(matches!(
+            device_poll_from(r("authorization_pending", None)),
+            Ok(DevicePoll::Pending)
+        ));
+        assert!(matches!(
+            device_poll_from(r("slow_down", Some(15))),
+            Ok(DevicePoll::SlowDown { interval: 15 })
+        ));
+        assert!(matches!(
+            device_poll_from(r("expired_token", None)),
+            Ok(DevicePoll::Expired)
+        ));
+        assert!(matches!(
+            device_poll_from(r("access_denied", None)),
+            Ok(DevicePoll::Denied)
+        ));
+        assert!(device_poll_from(r("incorrect_client_credentials", None)).is_err());
+        assert!(
+            poll_github_login().is_err(),
+            "polling without a started sign-in fails cleanly"
         );
     }
 }

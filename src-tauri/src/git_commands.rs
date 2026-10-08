@@ -182,3 +182,21 @@ pub async fn run_azure_import(state: State<'_, AppState>) -> CmdResult<fjord_vcs
     let items = off_thread(move || fjord_vcs::fetch_assigned_work_items(&fetch_settings)).await?;
     with_store(&state, |s| fjord_vcs::apply_import(s, &settings, &items))
 }
+
+/// Starts "Sign in with GitHub": returns the code the user types on github.com.
+#[tauri::command]
+pub async fn start_github_login() -> CmdResult<fjord_vcs::DeviceLogin> {
+    off_thread(fjord_vcs::start_github_login).await
+}
+
+/// Polls the sign-in once; the UI calls this every `interval` seconds.
+#[tauri::command]
+pub async fn poll_github_login() -> CmdResult<fjord_vcs::DevicePoll> {
+    off_thread(fjord_vcs::poll_github_login).await
+}
+
+/// Adds an Azure DevOps organization using the Azure CLI's sign-in (no token).
+#[tauri::command]
+pub async fn connect_azure_cli(org: String) -> CmdResult<AzureAccount> {
+    off_thread(move || fjord_vcs::connect_azure_cli(&org)).await
+}

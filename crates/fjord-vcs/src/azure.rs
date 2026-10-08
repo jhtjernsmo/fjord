@@ -5,8 +5,6 @@
 //! Auth, in order: $AZURE_DEVOPS_EXT_PAT, a personal access token saved in Settings
 //! for the organization (OS credential store), or the Azure CLI (`az login`).
 
-use std::process::Command;
-
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -131,7 +129,12 @@ fn find_auth(org: &str) -> Option<(Auth, TokenSource)> {
     if let Some(t) = credentials::get(&account_for(org)) {
         return Some((Auth::Pat(t), TokenSource::Saved));
     }
-    let out = Command::new("az")
+    az_cli_token()
+}
+
+/// A Microsoft Entra token for Azure DevOps from the Azure CLI's sign-in.
+fn az_cli_token() -> Option<(Auth, TokenSource)> {
+    let out = crate::process::tool("az")
         .args([
             "account",
             "get-access-token",
@@ -487,6 +490,18 @@ pub fn connect_azure(org: &str, pat: &str) -> Result<AzureAccount> {
     let account = whoami(org, &Auth::Pat(pat.to_string()), TokenSource::Saved)?;
     credentials::set(&account_for(org), pat)?;
     Ok(account)
+}
+
+/// Adds an organization without a token, using the Azure CLI's sign-in (`az login`).
+pub fn connect_azure_cli(org: &str) -> Result<AzureAccount> {
+    let org = check_org(org)?;
+    let (token, _) = az_cli_token().ok_or_else(|| {
+        VcsError::Azure(
+            "the Azure CLI isn't installed or signed in: run `az login`, or paste a token instead"
+                .into(),
+        )
+    })?;
+    whoami(org, &token, TokenSource::Cli)
 }
 
 pub fn disconnect_azure(org: &str) -> Result<()> {
