@@ -541,3 +541,6 @@ kbd {
 .agent-badge + .card-title { padding-right: 34px; }
 .card-title { overflow-wrap: anywhere; min-width: 0; }
 .card { min-width: 0; }
+.import-mapping select { max-width: 160px; }
+.import-mapping .input.mono { flex: 0 0 110px; min-width: 0; }
+.import-mapping .input.grow { min-width: 90px; }

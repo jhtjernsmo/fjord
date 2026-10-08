@@ -173,6 +173,24 @@ fn tool_definitions() -> Vec<Value> {
             &["id"],
         ),
         tool(
+            "list_new_imports",
+            "Tasks imported from Azure Boards that no agent has analyzed yet, with their task and link. Analyze each one (update_task to append a short summary, acceptance criteria and suggested subtasks to the body; create_task for subtasks if useful), then call mark_analyzed.",
+            json!({}),
+            &[],
+        ),
+        tool(
+            "mark_analyzed",
+            "Mark an imported task as analyzed so it no longer shows up in list_new_imports.",
+            json!({ "task": { "type": "integer" } }),
+            &["task"],
+        ),
+        tool(
+            "import_azure",
+            "Fetch work items assigned to the user in Azure Boards and create or refresh tasks in the mapped Fjord projects (mappings are set in Fjord's Settings).",
+            json!({}),
+            &[],
+        ),
+        tool(
             "backlinks",
             "Notes that link to a project, task or note.",
             json!({ "kind": { "type": "string", "enum": ["project", "task", "note"] }, "id": { "type": "integer" } }),
@@ -404,6 +422,18 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
             json!({ "note": note, "links": links })
         }
         "update_note" => serde_json::to_value(update_note(store, args)?)?,
+        "list_new_imports" => serde_json::to_value(store.unanalyzed_imports()?)?,
+        "mark_analyzed" => {
+            serde_json::to_value(store.mark_import_analyzed(int_arg(args, "task")?)?)?
+        }
+        "import_azure" => {
+            let settings = store.import_settings()?;
+            if settings.mappings.is_empty() {
+                bail!("no Azure Boards mappings yet: add them in Fjord's Settings → Azure DevOps");
+            }
+            let items = fjord_vcs::fetch_assigned_work_items(&settings)?;
+            serde_json::to_value(fjord_vcs::apply_import(store, &settings, &items)?)?
+        }
         "backlinks" => {
             serde_json::to_value(store.backlinks(str_arg(args, "kind")?, int_arg(args, "id")?)?)?
         }
@@ -488,7 +518,7 @@ mod tests {
         );
         let tools =
             handle_line(&mut s, r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#).unwrap();
-        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 21);
+        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 24);
         let unknown = handle_line(&mut s, r#"{"jsonrpc":"2.0","id":3,"method":"nope"}"#).unwrap();
         assert_eq!(unknown["error"]["code"], -32601);
         let bad = handle_line(&mut s, "{not json").unwrap();
@@ -630,5 +660,47 @@ mod tests {
             moved_back["structuredContent"]["result"]["project_id"],
             Value::Null
         );
+    }
+
+    #[test]
+    fn agent_triages_imported_tasks() {
+        let (mut s, _d) = store();
+        call(&mut s, 1, "create_project", json!({ "name": "Bokost" }));
+        let p = s.find_project("bokost").unwrap().id;
+        let item = fjord_core::ExternalItem {
+            source: "azure".into(),
+            external_id: "contoso/7".into(),
+            url: "https://dev.azure.com/contoso/App/_workitems/edit/7".into(),
+            rev: 1,
+            title: "Crash on login".into(),
+            body_md: "App crashes".into(),
+            priority: 3,
+            due_at: None,
+        };
+        let (task, _) = s.upsert_imported_task(p, &item).unwrap();
+
+        let pending = call(&mut s, 2, "list_new_imports", json!({}));
+        assert_eq!(
+            pending["structuredContent"]["result"][0]["task"]["id"],
+            task.id
+        );
+        assert_eq!(
+            pending["structuredContent"]["result"][0]["link"]["external_id"],
+            "contoso/7"
+        );
+
+        call(
+            &mut s,
+            3,
+            "update_task",
+            json!({ "id": task.id, "body": "App crashes\n\n## Analysis\n- Likely token refresh" }),
+        );
+        let marked = call(&mut s, 4, "mark_analyzed", json!({ "task": task.id }));
+        assert!(marked["structuredContent"]["result"]["analyzed_at"].is_string());
+        let empty = call(&mut s, 5, "list_new_imports", json!({}));
+        assert_eq!(empty["structuredContent"]["result"], json!([]));
+
+        let no_mappings = call(&mut s, 6, "import_azure", json!({}));
+        assert_eq!(no_mappings["isError"], true);
     }
 }

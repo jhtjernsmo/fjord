@@ -10,6 +10,7 @@ import type { Nav } from './nav'
 import { Notespace } from './components/Notespace'
 import { UpdateBanner } from './components/Updater'
 import { TitleBar } from './components/TitleBar'
+import { AzureImportRunner } from './components/AzureImport'
 import { LOCALES } from './i18n'
 import type { MessageKey } from './i18n'
 import { ProjectGlyph } from './components/Icons'
@@ -171,6 +172,7 @@ export default function App() {
     <NavContext.Provider value={nav}>
     <div className="app">
       <TitleBar title={windowTitle} />
+      <AzureImportRunner />
       <Sidebar
         projects={projects ?? []}
         activeId={projectId}
