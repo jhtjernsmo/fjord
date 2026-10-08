@@ -274,6 +274,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Translations are welcome: copy the `no` 
 - Windows code signing
 - Timeline and calendar views
 
+## Changes and security
+
+What changed in each version is in [CHANGELOG.md](CHANGELOG.md). Please report security problems
+privately, as described in [SECURITY.md](SECURITY.md).
+
 ## License
 
 Licensed under either of [Apache License 2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at your option.
