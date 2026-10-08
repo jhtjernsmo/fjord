@@ -5,11 +5,12 @@ import {
   DragOverlay,
   PointerSensor,
   closestCorners,
+  pointerWithin,
   useDroppable,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core'
+import type { CollisionDetection, DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import confetti from 'canvas-confetti'
@@ -27,6 +28,19 @@ import { useLive } from '../data'
 import type { BoardFilter } from './Columns'
 
 const PRIORITY_ICON = ['', '↓', '→', '↑']
+
+/**
+ * The column (or card) under the pointer wins. Comparing corners alone made tall
+ * columns on big screens only accept a drop near their bottom edge.
+ */
+export const boardCollision: CollisionDetection = (args) => {
+  const under = pointerWithin(args)
+  if (under.length > 0) {
+    const card = under.find((c) => !String(c.id).startsWith('col-'))
+    return card ? [card] : under
+  }
+  return closestCorners(args)
+}
 
 /** Subtask progress per parent and task titles, for the cards. */
 const SubtaskInfo = createContext<{ progress: Map<number, { done: number; total: number }>; titles: Map<number, string> }>({
@@ -141,10 +155,10 @@ function Column(props: {
   const { t } = useApp()
   const [draft, setDraft] = useState('')
   return (
-    <section className={`column ${props.focused ? 'focused' : ''} ${props.over ? 'over' : ''}`}>
+    <section ref={setNodeRef} className={`column ${props.focused ? 'focused' : ''} ${props.over ? 'over' : ''}`}>
       <ColumnHeader status={props.status} count={props.tasks.length} index={props.index} columnCount={props.columnCount} />
       <SortableContext items={props.tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-        <div className="column-body" ref={setNodeRef}>
+        <div className="column-body">
           {props.tasks.map((t) => (
             <TaskCard key={t.id} task={t} statuses={props.statuses} cursor={t.id === props.cursorTaskId} onOpen={() => props.onOpen(t.id)} onMenu={props.onMenu(t)} />
           ))}
@@ -314,7 +328,7 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
 
   return (
     <SubtaskInfo.Provider value={subtaskInfo}>
-    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
+    <DndContext sensors={sensors} collisionDetection={boardCollision} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
       <FilterBar filter={filter} onChange={setFilter} shown={tasks.length} total={visible.length} inputRef={filterRef} />
       <div className="board">
         {columns.map((c, ci) => (
