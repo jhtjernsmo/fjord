@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fjord</title>
-<meta name="description" content="Fjord is a free, open-source desktop app for kanban boards, notes and files. Everything stays in one SQLite file on your machine. Linux first, also on Windows and macOS.">
+<meta name="description" content="Fjord is a free, open-source desktop app for kanban boards with subtasks, notes and files, with GitHub and Azure DevOps built in. Everything stays in one SQLite file on your machine. Linux first, also on Windows and macOS.">
 <meta property="og:title" content="Fjord">
 <meta property="og:description" content="A desktop app for kanban boards, notes and files. Local, keyboard-friendly, open source.">
 <meta property="og:image" content="https://jhtjernsmo.github.io/fjord/assets/board.png">
@@ -83,9 +83,11 @@
   <h2>What it does</h2>
   <ul>
     <li>Boards with your own columns, priorities, due dates and drag and drop.</li>
+    <li>Subtasks, so a big task can be broken into steps. The card shows how far along it is.</li>
     <li>Notes in markdown, inside a project or on their own. Link to anything with <code>[[Project]]</code>, <code>[[#12]]</code> or <code>[[Another note]]</code>, and see what links back.</li>
     <li>Files attached to projects or tasks, copied into Fjord so they don't go missing.</li>
     <li>Search across tasks, notes and file names.</li>
+    <li>Themes: five to pick from, or make your own colours, text size and spacing.</li>
     <li>Updates itself when a new version is out.</li>
     <li>English and Norwegian.</li>
   </ul>
@@ -93,6 +95,11 @@
   <figure>
     <img src="assets/notes.png" alt="The notes view with a markdown editor and live preview showing links to a project, tasks and another note" width="1440" height="900" loading="lazy">
     <figcaption>Notes with links to a project, two tasks and another note. The dashed one doesn't exist yet; clicking it creates it.</figcaption>
+  </figure>
+
+  <figure>
+    <img src="assets/subtasks.png" alt="A task with four subtasks, two of them checked off, and a progress bar" width="1180" height="835" loading="lazy">
+    <figcaption>Subtasks in the task panel. The card on the board shows 2/4.</figcaption>
   </figure>
 
   <h2>Keyboard</h2>
@@ -107,14 +114,23 @@
   </table>
   <p class="muted">Every binding can be changed in <code>keymap.json</code>.</p>
 
-  <h2>Git and GitHub</h2>
-  <p>Link a project to a local repository and each task can get its own branch. Fjord shows open pull requests with their CI status, can open a PR from a task, and moves the task to Done when the PR is merged. It uses your existing <code>git</code> and <code>gh</code> login.</p>
+  <h2>Git, GitHub and Azure DevOps</h2>
+  <p>Link a project to a local repository and each task can get its own branch. Fjord shows open pull requests with their CI status, can open a PR from a task, and moves the task to Done when the PR is merged. This works for repositories on GitHub and on Azure DevOps.</p>
+  <p>Sign in to GitHub from the settings with your browser, or let Fjord use <code>gh</code>. For Azure DevOps you can use <code>az login</code> or a token. Tokens are kept in your system's keychain, not in Fjord's files.</p>
+  <p>If you work in Azure Boards, Fjord can also pull in the work items assigned to you, so they show up as tasks in the right project.</p>
   <figure>
     <img src="assets/git.png" alt="The Git tab with pull requests, branches and recent commits" width="1280" height="800" loading="lazy">
   </figure>
 
+  <h2>Make it yours</h2>
+  <p>Pick a theme, let it follow your system's light and dark mode, or make your own. Every change shows up while you adjust it, and themes can be shared as a bit of JSON.</p>
+  <figure>
+    <img src="assets/themes.png" alt="The Appearance settings with five themes to choose from" width="900" height="640" loading="lazy">
+  </figure>
+
   <h2>AI agents</h2>
   <p>Fjord includes an MCP server, so an agent like Claude can read your boards and notes, add and move tasks, write notes and open pull requests. It can't delete anything, and every change it makes is marked with who made it.</p>
+  <p>For example, new work items from Azure Boards can land in Fjord, and an agent can go through them on a schedule, write a short summary and split the bigger ones into subtasks.</p>
 <pre>$ claude mcp add fjord -- fjord mcp</pre>
   <p>There's also a plain command line tool, <code>fjord</code>, if you'd rather script it yourself.</p>
 
@@ -131,7 +147,7 @@
     <dt>Where is my data?</dt>
     <dd>In one folder: <code>~/.local/share/fjord</code> on Linux, <code>%APPDATA%\fjord</code> on Windows and <code>~/Library/Application Support/fjord</code> on macOS. Copy it to back up.</dd>
     <dt>Does it send anything anywhere?</dt>
-    <dd>No accounts and no telemetry. It only goes online to check for updates (you can turn that off) and, if you link a repo, to talk to GitHub.</dd>
+    <dd>No accounts and no telemetry. It only goes online to check for updates (you can turn that off) and, if you link a repo or turn on the Azure Boards import, to talk to GitHub or Azure DevOps.</dd>
     <dt>What's it built with?</dt>
     <dd>Rust, Tauri, SQLite and React. Licensed MIT or Apache-2.0.</dd>
     <dt>Found a bug?</dt>
