@@ -241,6 +241,32 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
   )
 }
 
+const BRANCH_TYPES = ['feat', 'fix', 'chore', 'docs', 'refactor', 'test', 'perf', 'ci', 'hotfix']
+
+/** Start a conventional branch: pick the type, see the name, go. */
+function StartBranch({ task, kind, onKind }: { task: Task; kind: string | null; onKind: (k: string) => void }) {
+  const { run, t, toast } = useApp()
+  const [suggestion] = useLive(() => api.suggestBranch(task.id, kind), [task.id, task.title, kind])
+  const current = kind ?? suggestion?.[0] ?? 'feat'
+  return (
+    <div className="start-branch">
+      <select className="input mono" value={current} onChange={(e) => onKind(e.target.value)} aria-label={t('git.branchType')} title={t('git.branchType')}>
+        {BRANCH_TYPES.map((k) => (
+          <option key={k} value={k}>
+            {k}
+          </option>
+        ))}
+      </select>
+      <span className="mono dim branch-preview" title={suggestion?.[1]}>
+        {suggestion?.[1] ?? ''}
+      </span>
+      <button className="btn" onClick={() => run(api.startBranch(task.id, current)).then((r) => r && toast(t('git.branchStarted', { branch: r.branch }), 'success'))}>
+        <GitBranch size={14} /> {t('git.startBranch')} <kbd>B</kbd>
+      </button>
+    </div>
+  )
+}
+
 /** Pick an existing branch (local or on origin) to link to the task. */
 function LinkBranch({ task, onDone }: { task: Task; onDone: () => void }) {
   const { run, t, toast } = useApp()
@@ -301,6 +327,7 @@ function GitSection({ task }: { task: Task }) {
   const prs = usePullRequests(task.project_id)
   const [busy, setBusy] = useState(false)
   const [picking, setPicking] = useState(false)
+  const [kind, setKind] = useState<string | null>(null)
   const pr = prs?.find((p) => p.task_id === task.id)
   const hasGithub = !!remoteOf(repo)
   // Fetch PRs once if nothing has synced this project yet (e.g. Git tab never opened).
@@ -322,7 +349,7 @@ function GitSection({ task }: { task: Task }) {
     repo
       ? {
           'panel.branch': () =>
-            run(api.startBranch(task.id)).then((r) => r && toast(t('git.branchStarted', { branch: r.branch }), 'success')),
+            run(api.startBranch(task.id, kind)).then((r) => r && toast(t('git.branchStarted', { branch: r.branch }), 'success')),
           'panel.linkBranch': () => !task.branch && setPicking(true),
           'panel.openPr': () => task.branch && hasGithub && !pr && !busy && openPr(false),
         }
@@ -354,10 +381,8 @@ function GitSection({ task }: { task: Task }) {
           ) : picking ? (
             <LinkBranch task={task} onDone={() => setPicking(false)} />
           ) : (
-            <div className="row-inline">
-              <button className="btn" onClick={() => run(api.startBranch(task.id)).then((r) => r && toast(t('git.branchStarted', { branch: r.branch }), 'success'))}>
-                <GitBranch size={14} /> {t('git.startBranch')} <kbd>B</kbd>
-              </button>
+            <div className="branch-actions">
+              <StartBranch task={task} kind={kind} onKind={setKind} />
               <button className="btn ghost" onClick={() => setPicking(true)}>
                 <Link2 size={14} /> {t('git.linkBranch')}
               </button>

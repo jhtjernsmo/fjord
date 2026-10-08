@@ -183,6 +183,12 @@ kbd {
 .panel-head .spacer { flex: 1; }
 .panel-body { padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
 
+/* starting a conventional branch */
+.branch-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.start-branch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: 100%; }
+.start-branch select { padding: 5px 8px; font-size: 12.5px; }
+.branch-preview { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+
 /* linking a task to an existing branch */
 .branch-picker { display: flex; flex-direction: column; gap: 6px; }
 .branch-list { display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; padding: 3px; }

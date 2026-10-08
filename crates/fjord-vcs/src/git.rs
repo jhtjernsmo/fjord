@@ -195,19 +195,54 @@ pub fn validate_branch_name(name: &str) -> Result<()> {
 }
 
 /// "fjord/12-fix-push-notifications" for task 12 "Fix push notifications!".
-pub fn branch_name_for_task(task_id: i64, title: &str) -> String {
+/// Conventional branch types, offered when starting a branch (`feat/12-add-login`).
+pub const BRANCH_TYPES: &[&str] = &[
+    "feat", "fix", "chore", "docs", "refactor", "test", "perf", "ci", "hotfix",
+];
+
+/// Words in a task that suggest a bug fix rather than a feature.
+const FIX_WORDS: &[&str] = &[
+    "fix", "bug", "crash", "error", "broken", "feil", "krasj", "fiks",
+];
+
+/// `<type>/<id>-<slug>`, e.g. "feat/12-add-login".
+pub fn branch_name_for_task(kind: &str, task_id: i64, title: &str) -> String {
     let slug = fjord_core::slugify(title);
     let mut slug: String = slug.chars().take(MAX_BRANCH_SLUG).collect();
     while slug.ends_with('-') {
         slug.pop();
     }
-    format!("fjord/{task_id}-{slug}")
+    format!("{kind}/{task_id}-{slug}")
 }
 
-/// Task id encoded in a Fjord branch name, e.g. 12 for "fjord/12-fix-push".
+/// "fix" for tasks that read like a bug (or are a Bug in Azure Boards), else "feat".
+pub fn guess_branch_type(title: &str, body: &str) -> &'static str {
+    let words = title.to_lowercase();
+    let is_fix = FIX_WORDS.iter().any(|w| {
+        words
+            .split(|c: char| !c.is_alphanumeric())
+            .any(|word| word.starts_with(w))
+    }) || body.contains("Azure DevOps: [Bug ");
+    if is_fix { "fix" } else { "feat" }
+}
+
+/// The conventional type a branch starts with ("feat" for "feat/12-x").
+pub fn branch_type(branch: &str) -> Option<&'static str> {
+    let prefix = branch.split_once('/')?.0;
+    BRANCH_TYPES.iter().copied().find(|t| *t == prefix)
+}
+
+/// Task id encoded in a branch Fjord created, e.g. 12 for "feat/12-add-login"
+/// (and the older "fjord/12-fix-push").
 pub fn task_id_from_branch(branch: &str) -> Option<i64> {
-    let rest = branch.strip_prefix("fjord/")?;
+    let (prefix, rest) = branch.split_once('/')?;
+    if prefix != "fjord" && !BRANCH_TYPES.contains(&prefix) {
+        return None;
+    }
     let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    if digits.is_empty() || !rest[digits.len()..].starts_with('-') && rest.len() != digits.len() {
+        return None;
+    }
     digits.parse().ok()
 }
 
@@ -258,18 +293,40 @@ mod tests {
     #[test]
     fn branch_names_from_tasks() {
         assert_eq!(
-            branch_name_for_task(12, "Fix push notifications!"),
-            "fjord/12-fix-push-notifications"
+            branch_name_for_task("fix", 12, "Fix push notifications!"),
+            "fix/12-fix-push-notifications"
         );
         assert_eq!(
-            branch_name_for_task(3, "Ærlig talt: å/ø"),
-            "fjord/3-erlig-talt-a-o"
+            branch_name_for_task("feat", 3, "Ærlig talt: å/ø"),
+            "feat/3-erlig-talt-a-o"
         );
-        let long = branch_name_for_task(1, &"word ".repeat(30));
-        assert!(long.len() <= "fjord/1-".len() + MAX_BRANCH_SLUG && !long.ends_with('-'));
+        let long = branch_name_for_task("feat", 1, &"word ".repeat(30));
+        assert!(long.len() <= "feat/1-".len() + MAX_BRANCH_SLUG && !long.ends_with('-'));
+        // New conventional names and the older fjord/ ones both map back to the task.
+        assert_eq!(task_id_from_branch("feat/12-add-login"), Some(12));
         assert_eq!(task_id_from_branch("fjord/12-fix-push"), Some(12));
         assert_eq!(task_id_from_branch("feature/12-x"), None);
-        assert_eq!(task_id_from_branch("fjord/abc"), None);
+        assert_eq!(task_id_from_branch("fix/abc"), None);
+        assert_eq!(task_id_from_branch("feat/2024-roadmap"), Some(2024));
+        assert_eq!(branch_type("hotfix/3-x"), Some("hotfix"));
+        assert_eq!(branch_type("jonas/x"), None);
+    }
+
+    #[test]
+    fn guesses_the_branch_type_from_the_task() {
+        assert_eq!(guess_branch_type("Fix duplicate push", ""), "fix");
+        assert_eq!(guess_branch_type("App crashes on login", ""), "fix");
+        assert_eq!(guess_branch_type("Feil i budsjettet", ""), "fix");
+        assert_eq!(guess_branch_type("Home screen widget", ""), "feat");
+        assert_eq!(
+            guess_branch_type("Prefix routes", ""),
+            "feat",
+            "only whole words count"
+        );
+        assert_eq!(
+            guess_branch_type("Login", "…\n---\nAzure DevOps: [Bug 297](…)"),
+            "fix"
+        );
     }
 
     #[test]

@@ -332,7 +332,9 @@ export const api = {
   unlinkRepo: (projectId: number) => invoke<void>('unlink_repo', { projectId }),
   setRepoAutoMove: (projectId: number, autoMove: boolean) => invoke<void>('set_repo_auto_move', { projectId, autoMove }),
   gitOverview: (projectId: number) => invoke<GitOverview>('git_overview', { projectId }),
-  startBranch: (taskId: number) => invoke<StartedBranch>('start_branch', { taskId }),
+  startBranch: (taskId: number, kind: string | null = null) => invoke<StartedBranch>('start_branch', { taskId, kind }),
+  /** [type, name] the task's branch would get; the type is guessed when not given. */
+  suggestBranch: (taskId: number, kind: string | null = null) => invoke<[string, string]>('suggest_branch', { taskId, kind }),
   syncPullRequests: (projectId: number) => invoke<SyncReport>('sync_pull_requests', { projectId }),
   openPullRequest: (taskId: number, draft: boolean) => invoke<PullRequest>('open_pull_request', { taskId, draft }),
   openUrl: (url: string) => invoke<void>('open_url', { url }),

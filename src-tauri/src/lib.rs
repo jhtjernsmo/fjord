@@ -95,6 +95,7 @@ pub fn run() {
             git_commands::azure_discussion,
             git_commands::task_external_link,
             git_commands::list_branches,
+            git_commands::suggest_branch,
             git_commands::link_task_branch,
             git_commands::start_github_login,
             git_commands::poll_github_login,
