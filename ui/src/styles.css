@@ -519,6 +519,7 @@ kbd {
 .path-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12.5px; }
 .toggle-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
 .git-status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.git-status .btn { padding: 3px 9px; font-size: 12px; margin-left: 4px; }
 .warn-chip { color: var(--warn); }
 .git-section { display: flex; flex-direction: column; gap: 6px; }
 .git-section .section-title button { display: inline-flex; align-items: center; gap: 5px; }

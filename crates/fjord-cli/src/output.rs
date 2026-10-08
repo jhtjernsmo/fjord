@@ -143,6 +143,14 @@ impl Printer {
         Ok(())
     }
 
+    pub fn switched_to(&self, branch: &str) -> Result<()> {
+        if self.json {
+            return print_json(&serde_json::json!({ "branch": branch }));
+        }
+        println!("Switched to {branch}");
+        Ok(())
+    }
+
     pub fn pull_request(&self, pr: &fjord_vcs::PullRequest) -> Result<()> {
         if self.json {
             return print_json(pr);

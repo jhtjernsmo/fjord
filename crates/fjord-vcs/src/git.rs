@@ -98,8 +98,6 @@ impl Git {
         .is_ok()
     }
 
-    /// Checks out `name`, creating it from the current HEAD if it doesn't exist.
-    /// Uncommitted changes come along, as with `git switch`.
     /// Branch names on `origin` (without the `origin/` prefix).
     pub fn remote_branches(&self) -> Result<Vec<String>> {
         let out = self.git(&[
@@ -127,6 +125,31 @@ impl Git {
         Ok(names)
     }
 
+    /// The repository's main branch: what `origin/HEAD` points at, else `main`, else `master`.
+    pub fn default_branch(&self) -> Result<String> {
+        if let Ok(head) = self.git(&[
+            "symbolic-ref",
+            "--quiet",
+            "--short",
+            "refs/remotes/origin/HEAD",
+        ]) && let Some(name) = head.trim().strip_prefix("origin/")
+        {
+            return Ok(name.to_string());
+        }
+        let remotes = self.remote_branches().unwrap_or_default();
+        ["main", "master"]
+            .into_iter()
+            .find(|name| self.branch_exists(name) || remotes.iter().any(|r| r == name))
+            .map(str::to_string)
+            .ok_or_else(|| {
+                VcsError::Git(
+                    "couldn't find the main branch (no origin/HEAD, main or master)".into(),
+                )
+            })
+    }
+
+    /// Checks out `name`, creating it from the current HEAD if it doesn't exist.
+    /// Uncommitted changes come along, as with `git switch`.
     pub fn switch_or_create(&self, name: &str) -> Result<bool> {
         validate_branch_name(name)?;
         if self.branch_exists(name) {

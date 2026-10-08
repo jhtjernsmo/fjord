@@ -201,6 +201,8 @@ enum GitCmd {
         #[arg(long = "type", short = 't')]
         kind: Option<String>,
     },
+    /// Switch the project's repository back to its main branch
+    Main { project: String },
     /// Pull requests with CI state; moves tasks of merged PRs to done
     Prs { project: String },
     /// Push the task's branch and open a pull request
@@ -500,6 +502,10 @@ fn git(store: &mut Store, out: &output::Printer, cmd: GitCmd) -> Result<()> {
         }
         GitCmd::Branch { task, kind } => {
             out.started_branch(&fjord_vcs::start_branch(store, task, kind.as_deref())?)
+        }
+        GitCmd::Main { project } => {
+            let p = store.find_project(&project)?;
+            out.switched_to(&fjord_vcs::checkout_default(store, p.id)?)
         }
         GitCmd::Prs { project } => {
             let p = store.find_project(&project)?;

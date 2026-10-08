@@ -198,6 +198,7 @@ how to schedule it: [docs/azure-boards-triage.md](docs/azure-boards-triage.md).
 ```sh
 fjord git link bokost ~/code/bokost
 fjord git branch 12          # check out (or create) the task's branch
+fjord git main bokost        # back to the main branch
 fjord git status bokost      # branches and recent commits
 fjord git prs bokost         # pull requests + CI; moves merged tasks to done
 fjord git pr 12 --draft      # push the branch and open a pull request
