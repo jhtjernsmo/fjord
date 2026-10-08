@@ -23,3 +23,16 @@ describe('remoteOf', () => {
     expect(remoteOf(null)).toBeNull()
   })
 })
+
+import { bugReportUrl, osName } from '../src/reportBug'
+
+describe('report a bug', () => {
+  it('opens a new GitHub issue with the version and OS filled in', () => {
+    const url = new URL(bugReportUrl('0.2.7', 'Windows'))
+    expect(url.origin + url.pathname).toBe('https://github.com/jhtjernsmo/fjord/issues/new')
+    expect(url.searchParams.get('labels')).toBe('bug')
+    expect(url.searchParams.get('body')).toContain('Fjord 0.2.7 on Windows')
+    expect(osName('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')).toBe('Windows')
+    expect(osName('Mozilla/5.0 (X11; Linux x86_64)')).toBe('Linux')
+  })
+})
