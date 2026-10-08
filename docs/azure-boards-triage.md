@@ -30,6 +30,12 @@ Story → Task) all go under the topmost item assigned to you. Parents assigned 
 others are looked through but not imported. Tasks already imported move to the
 right place on the next import.
 
+**Open states.** When a work item's state changes in Azure, its task follows on the
+next import: to a column with the same name as the state if you have one; otherwise
+*Active*, *Committed* and *In Progress* go to your *In progress* (or *Pågår*) column,
+and *New* goes to the first column. Fjord only moves a task when the state actually
+changed in Azure, so moving it by hand sticks.
+
 **Closed in Azure.** When a work item you imported is closed, done, resolved or
 removed in Azure, its Fjord task moves on the next import: to a column with the same
 name as the Azure state if you have one (e.g. *Resolved* → your *Resolved* column,
