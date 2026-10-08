@@ -9,7 +9,9 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::github::{Checks, PullRequest, TokenSource, agent, combine_checks};
+use crate::github::{
+    Checks, HttpError, PullRequest, TokenSource, agent, checked, combine_checks, with_message,
+};
 use crate::{Result, VcsError, credentials};
 
 const HOST: &str = "https://dev.azure.com";
@@ -300,6 +302,8 @@ impl AzureDevOps {
             .header("Accept", "application/json")
             .header("Authorization", &self.auth()?.header())
             .call()
+            .map_err(HttpError::from)
+            .and_then(checked)
             .map_err(|e| api_error(e, &self.org))?;
         read_json(&mut res, &self.org)
     }
@@ -352,6 +356,8 @@ impl AzureDevOps {
             .header("Accept", "application/json")
             .header("Authorization", &self.auth()?.header())
             .send_json(&payload)
+            .map_err(HttpError::from)
+            .and_then(checked)
             .map_err(|e| api_error(e, &self.org))?;
         let pr: ApiPull = read_json(&mut res, &self.org)?;
         Ok(self.to_pr(pr))
@@ -403,20 +409,30 @@ fn read_json<T: serde::de::DeserializeOwned>(
         .map_err(|e| VcsError::Azure(e.to_string()))
 }
 
-fn api_error(e: ureq::Error, org: &str) -> VcsError {
+fn api_error(e: HttpError, org: &str) -> VcsError {
     match e {
-        ureq::Error::StatusCode(401) => VcsError::NoAzureToken(org.to_string()),
-        ureq::Error::StatusCode(403) => VcsError::Azure(
-            "access denied (403): the token needs Code (Read & Write) and Build (Read)".into(),
-        ),
-        ureq::Error::StatusCode(404) => {
-            VcsError::Azure("organization, project or repository not found (404)".into())
+        HttpError::Status(401, _) => VcsError::NoAzureToken(org.to_string()),
+        HttpError::Status(403, message) => VcsError::Azure(with_message(
+            "access denied (403)",
+            &message.or_else(|| {
+                Some(
+                    "the token needs Code (Read & Write), Build (Read) and Work Items (Read)"
+                        .into(),
+                )
+            }),
+        )),
+        HttpError::Status(404, message) => VcsError::Azure(with_message(
+            "organization, project or repository not found (404)",
+            &message,
+        )),
+        HttpError::Status(409, message) => VcsError::Azure(with_message(
+            "Azure DevOps rejected the request (409): is the branch pushed, or does a PR already exist?",
+            &message,
+        )),
+        HttpError::Status(code, message) => {
+            VcsError::Azure(with_message(&format!("HTTP {code}"), &message))
         }
-        ureq::Error::StatusCode(409) => VcsError::Azure(
-            "Azure DevOps rejected the request (409): is the branch pushed, or does a PR already exist?"
-                .into(),
-        ),
-        other => VcsError::Azure(other.to_string()),
+        HttpError::Transport(e) => VcsError::Azure(e),
     }
 }
 
@@ -436,8 +452,10 @@ fn whoami(org: &str, auth: &Auth, source: TokenSource) -> Result<AzureAccount> {
         .header("Accept", "application/json")
         .header("Authorization", &auth.header())
         .call()
+        .map_err(HttpError::from)
+        .and_then(checked)
         .map_err(|e| match e {
-            ureq::Error::StatusCode(401) => VcsError::Azure(format!(
+            HttpError::Status(401, _) => VcsError::Azure(format!(
                 "Azure DevOps did not accept this token for «{org}» (401)"
             )),
             other => api_error(other, org),
@@ -666,6 +684,8 @@ pub fn assigned_work_items(org: &str, closed_days: u32) -> Result<Vec<WorkItem>>
         .header("Accept", "application/json")
         .header("Authorization", &auth.header())
         .send_json(json!({ "query": assigned_query(closed_days) }))
+        .map_err(HttpError::from)
+        .and_then(checked)
         .map_err(|e| api_error(e, org))?;
     let wiql: WiqlResult = read_json(&mut res, org)?;
     let ids: Vec<String> = wiql
@@ -686,7 +706,9 @@ pub fn assigned_work_items(org: &str, closed_days: u32) -> Result<Vec<WorkItem>>
         .header("Accept", "application/json")
         .header("Authorization", &auth.header())
         .call()
-        .map_err(|e| api_error(e, org))?;
+        .map_err(HttpError::from)
+            .and_then(checked)
+            .map_err(|e| api_error(e, org))?;
     let items: List<ApiWorkItem> = read_json(&mut res, org)?;
     Ok(items
         .value
@@ -726,6 +748,8 @@ pub fn work_item_info(
             .header("Accept", "application/json")
             .header("Authorization", &auth.header())
             .call()
+            .map_err(HttpError::from)
+            .and_then(checked)
             .map_err(|e| api_error(e, org))?;
         let items: List<Option<ApiWorkItem>> = read_json(&mut res, org)?;
         for item in items.value.into_iter().flatten() {
@@ -795,7 +819,9 @@ pub fn work_item_comments(org: &str, project: &str, id: u64) -> Result<Vec<WorkI
         .header("Accept", "application/json")
         .header("Authorization", &auth.header())
         .call()
-        .map_err(|e| api_error(e, org))?;
+        .map_err(HttpError::from)
+            .and_then(checked)
+            .map_err(|e| api_error(e, org))?;
     Ok(comments_from(read_json(&mut res, org)?))
 }
 

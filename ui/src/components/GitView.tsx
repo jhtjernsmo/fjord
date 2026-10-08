@@ -109,7 +109,7 @@ export function GitView({ projectId, onOpenTask }: { projectId: number; onOpenTa
         if (report.completed.length > 0) toast(t('git.completed', { n: report.completed.length }), 'success')
         else if (!quiet) toast(t('git.synced', { n: report.pull_requests.length }), 'success')
       } catch (err) {
-        setSyncError(errorMessage(err))
+        setSyncError(`${t('git.syncFailed')}: ${errorMessage(err)}`)
       } finally {
         setSyncing(false)
       }
