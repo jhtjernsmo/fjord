@@ -4,6 +4,10 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## Unreleased
+
+- **Due this week** on the Overview: open tasks from every project that are due by Sunday, overdue ones first, then by day and priority. Click one to open it.
+
 ## 0.2.14 — 2026-10-09
 
 - The Microsoft Store package builds again (the manifest asked for a tile logo that wasn't there). ([#73](https://github.com/jhtjernsmo/fjord/pull/73))

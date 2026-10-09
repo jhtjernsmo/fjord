@@ -8,6 +8,7 @@ import type { MessageKey } from '../i18n'
 import { AgentTag, ProjectGlyph } from './Icons'
 import { useContextMenus } from './actions'
 import { MentionsSection } from './Mentions'
+import { DueThisWeek } from './DueThisWeek'
 import { useState } from 'react'
 
 /** Overview shows a short activity preview; "Show all" loads more. */
@@ -90,6 +91,8 @@ export function Home({ actor, projects, onOpen, onNewProject }: Props) {
           <div className="l">{t('home.overdue')}</div>
         </div>
       </div>
+
+      <DueThisWeek projects={projects} />
 
       <MentionsSection projects={projects} />
 
