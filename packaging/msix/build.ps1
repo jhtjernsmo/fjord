@@ -16,7 +16,7 @@ if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "Version must look like 1.2.3,
 $stage = Join-Path ([System.IO.Path]::GetTempPath()) "fjord-msix-$([guid]::NewGuid())"
 New-Item -ItemType Directory -Path "$stage/Assets" | Out-Null
 Copy-Item $Exe "$stage/Fjord.exe"
-foreach ($icon in 'StoreLogo.png', 'Square44x44Logo.png', 'Square150x150Logo.png', 'Square310x310Logo.png') {
+foreach ($icon in 'StoreLogo.png', 'Square44x44Logo.png', 'Square150x150Logo.png') {
   Copy-Item "$root/src-tauri/icons/$icon" "$stage/Assets/$icon"
 }
 # The Store wants a four-part version whose last part is 0.
