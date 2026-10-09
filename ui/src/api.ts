@@ -363,6 +363,7 @@ export const api = {
   getProjectRepo: (projectId: number) => invoke<ProjectRepo | null>('get_project_repo', { projectId }),
   linkRepo: (projectId: number, path: string) => invoke<ProjectRepo>('link_repo', { projectId, path }),
   unlinkRepo: (projectId: number) => invoke<void>('unlink_repo', { projectId }),
+  installedFromStore: () => invoke<boolean>('installed_from_store'),
   azureMentions: () => invoke<Mention[]>('azure_mentions'),
   addWorkItemTask: (projectId: number, org: string, id: number) => invoke<Task>('add_work_item_task', { projectId, org, id }),
   githubRepoOwners: () => invoke<RepoOwner[]>('github_repo_owners'),

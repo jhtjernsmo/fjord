@@ -4,7 +4,7 @@ import { check } from '@tauri-apps/plugin-updater'
 import type { Update } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { Download, RefreshCw, X } from 'lucide-react'
-import { errorMessage } from '../api'
+import { api, errorMessage } from '../api'
 import { useApp } from '../data'
 
 const CHECK_KEY = 'fjord.updateCheck'
@@ -26,7 +26,6 @@ export function setUpdateCheckEnabled(on: boolean): void {
   }
 }
 
-/** Shared by the banner and Settings → "Check for updates". */
 /** The installed app version, e.g. "0.2.7" (null in the browser preview). */
 export async function appVersion(): Promise<string | null> {
   try {
@@ -37,6 +36,14 @@ export async function appVersion(): Promise<string | null> {
   }
 }
 
+let storeInstall: Promise<boolean> | null = null
+/** The Microsoft Store version is updated by the Store, never by Fjord itself. */
+export function installedFromStore(): Promise<boolean> {
+  storeInstall ??= api.installedFromStore().catch(() => false)
+  return storeInstall
+}
+
+/** Shared by the banner and Settings → "Check for updates". */
 export function useUpdater() {
   const { t, toast } = useApp()
   const [update, setUpdate] = useState<Update | null>(null)
@@ -92,7 +99,11 @@ export function UpdateBanner() {
 
   useEffect(() => {
     if (!updateCheckEnabled()) return
-    const id = window.setTimeout(() => runCheck(false), STARTUP_DELAY_MS)
+    const id = window.setTimeout(() => {
+      void installedFromStore().then((store) => {
+        if (!store) void runCheck(false)
+      })
+    }, STARTUP_DELAY_MS)
     return () => window.clearTimeout(id)
   }, [runCheck])
 
