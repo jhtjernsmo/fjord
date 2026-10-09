@@ -244,24 +244,57 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
 
 const BRANCH_TYPES = ['feat', 'fix', 'chore', 'docs', 'refactor', 'test', 'perf', 'ci', 'hotfix']
 
-/** Start a conventional branch: pick the type, see the name, go. */
-function StartBranch({ task, kind, onKind }: { task: Task; kind: string | null; onKind: (k: string) => void }) {
-  const { run, t, toast } = useApp()
+interface StartBranchProps {
+  task: Task
+  kind: string | null
+  onKind: (k: string) => void
+  /** What the user typed over the suggested name; null keeps the suggestion. */
+  name: string | null
+  onName: (name: string | null) => void
+  onStart: (kind: string, name: string | null) => void
+}
+
+/** Start a conventional branch: pick the type, adjust the suggested name if you like, go. */
+function StartBranch({ task, kind, onKind, name, onName, onStart }: StartBranchProps) {
+  const { t } = useApp()
   const [suggestion] = useLive(() => api.suggestBranch(task.id, kind), [task.id, task.title, kind])
   const current = kind ?? suggestion?.[0] ?? 'feat'
+  const value = name ?? suggestion?.[1] ?? ''
+  const start = () => onStart(current, name)
   return (
     <div className="start-branch">
-      <select className="input mono" value={current} onChange={(e) => onKind(e.target.value)} aria-label={t('git.branchType')} title={t('git.branchType')}>
+      <select
+        className="input mono"
+        value={current}
+        onChange={(e) => {
+          onKind(e.target.value)
+          onName(null) // a new type means a new suggestion
+        }}
+        aria-label={t('git.branchType')}
+        title={t('git.branchType')}
+      >
         {BRANCH_TYPES.map((k) => (
           <option key={k} value={k}>
             {k}
           </option>
         ))}
       </select>
-      <span className="mono dim branch-preview" title={suggestion?.[1]}>
-        {suggestion?.[1] ?? ''}
-      </span>
-      <button className="btn" onClick={() => run(api.startBranch(task.id, current)).then((r) => r && toast(t('git.branchStarted', { branch: r.branch }), 'success'))}>
+      <input
+        className="input mono branch-name"
+        value={value}
+        onChange={(e) => onName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && value.trim()) start()
+          else if (e.key === 'Escape' && name !== null) {
+            e.stopPropagation()
+            onName(null)
+          }
+        }}
+        aria-label={t('git.branchName')}
+        title={t('git.branchNameHint')}
+        spellCheck={false}
+      />
+      <button className="btn" disabled={!value.trim()} onClick={start}>
         <GitBranch size={14} /> {t('git.startBranch')} <kbd>B</kbd>
       </button>
     </div>
@@ -329,6 +362,9 @@ function GitSection({ task }: { task: Task }) {
   const [busy, setBusy] = useState(false)
   const [picking, setPicking] = useState(false)
   const [kind, setKind] = useState<string | null>(null)
+  const [branchName, setBranchName] = useState<string | null>(null)
+  const startBranch = (k: string | null, name: string | null) =>
+    run(api.startBranch(task.id, k, name)).then((r) => r && toast(t('git.branchStarted', { branch: r.branch }), 'success'))
   const pr = prs?.find((p) => (p.task_ids ?? [p.task_id]).includes(task.id))
   const hasGithub = !!remoteOf(repo)
   // Fetch PRs once if nothing has synced this project yet (e.g. Git tab never opened).
@@ -349,8 +385,7 @@ function GitSection({ task }: { task: Task }) {
   useActions(
     repo
       ? {
-          'panel.branch': () =>
-            run(api.startBranch(task.id, kind)).then((r) => r && toast(t('git.branchStarted', { branch: r.branch }), 'success')),
+          'panel.branch': () => void startBranch(kind, branchName),
           'panel.linkBranch': () => !task.branch && setPicking(true),
           'panel.openPr': () => task.branch && hasGithub && !pr && !busy && openPr(false),
         }
@@ -391,7 +426,7 @@ function GitSection({ task }: { task: Task }) {
             <LinkBranch task={task} onDone={() => setPicking(false)} />
           ) : (
             <div className="branch-actions">
-              <StartBranch task={task} kind={kind} onKind={setKind} />
+              <StartBranch task={task} kind={kind} onKind={setKind} name={branchName} onName={setBranchName} onStart={startBranch} />
               <button className="btn ghost" onClick={() => setPicking(true)}>
                 <Link2 size={14} /> {t('git.linkBranch')}
               </button>

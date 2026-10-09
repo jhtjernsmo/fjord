@@ -124,9 +124,10 @@ pub async fn start_branch(
     state: State<'_, AppState>,
     task_id: i64,
     kind: Option<String>,
+    name: Option<String>,
 ) -> CmdResult<StartedBranch> {
     with_store_bg(&state, move |s| {
-        fjord_vcs::start_branch(s, task_id, kind.as_deref())
+        fjord_vcs::start_branch_named(s, task_id, kind.as_deref(), name.as_deref())
     })
     .await
 }
