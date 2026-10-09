@@ -40,7 +40,7 @@ const TABS: Tab[] = ['board', 'notes', 'files', 'git', 'activity', 'archive']
 
 const GLOBAL_ACTIONS = [
   'palette.open', 'help.toggle', 'panel.close', 'go.home', 'go.notes', 'project.pick', 'project.new', 'project.archive',
-  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'theme.cycle', 'app.reportBug', 'git.sync', 'azure.import', 'view.archive', 'view.git', 'editor.open',
+  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'theme.cycle', 'app.reportBug', 'git.sync', 'git.createRepo', 'azure.import', 'view.archive', 'view.git', 'editor.open',
 ]
 
 export default function App() {
@@ -57,6 +57,8 @@ export default function App() {
   const themes = useThemes()
   const [dropping, setDropping] = useState(false)
   const [quickAddSignal, setQuickAddSignal] = useState(0)
+  const [openCreateRepo, setOpenCreateRepo] = useState(false)
+  const closeCreateRepo = useCallback(() => setOpenCreateRepo(false), [])
 
   const [actor] = useLive(() => api.actor(), [])
   const [projects] = useLive(() => api.listProjects(false), [])
@@ -151,6 +153,15 @@ export default function App() {
           .then((r) => toast(t('git.synced', { n: r.pull_requests.length }), 'success'))
           .catch((err) => toast(errorMessage(err), 'error'))
       },
+      'git.createRepo': () => {
+        if (!projectId) return toast(t('toast.pickProject'), 'info')
+        setTaskId(null)
+        setView({ kind: 'project', id: projectId, tab: 'git' })
+        api
+          .getProjectRepo(projectId)
+          .then((repo) => (repo ? toast(t('newRepo.alreadyLinked'), 'info') : setOpenCreateRepo(true)))
+          .catch((err) => toast(errorMessage(err), 'error'))
+      },
       'azure.import': () =>
         api
           .runAzureImport()
@@ -232,7 +243,7 @@ export default function App() {
         )}
 
         {view.kind === 'home' && (
-          <Home actor={actor ?? ''} projects={sortedProjects} onOpen={openProject} onNewProject={() => setNewProject(true)} />
+          <Home actor={actor ?? ''} projects={sortedProjects} onOpen={openProject} onNewProject={() => setNewProject(true)} keysEnabled={!overlayOpen} />
         )}
 
         {view.kind === 'project' && activeBoard && (
@@ -274,7 +285,7 @@ export default function App() {
             {view.tab === 'files' && <FilesView projectId={activeBoard.project.id} />}
             {view.tab === 'activity' && <ActivityView projectId={activeBoard.project.id} />}
             {view.tab === 'archive' && <ArchiveView projectId={activeBoard.project.id} />}
-            {view.tab === 'git' && <GitView projectId={activeBoard.project.id} onOpenTask={setTaskId} />}
+            {view.tab === 'git' && <GitView projectId={activeBoard.project.id} onOpenTask={setTaskId} openCreateRepo={openCreateRepo} onCreateRepoDone={closeCreateRepo} />}
             {taskId !== null && (
               <TaskPanel key={taskId} taskId={taskId} statuses={activeBoard.statuses} onClose={() => setTaskId(null)} />
             )}

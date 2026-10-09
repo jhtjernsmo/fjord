@@ -76,7 +76,7 @@ function CreateRepo({ projectId, mode, onDone }: { projectId: number; mode: 'cre
   return (
     <div className="create-repo">
       <strong className="create-repo-title">{mode === 'create' ? t('newRepo.createOnGithub') : t('newRepo.publishFolder')}</strong>
-      <NewRepoFields mode={mode} projectName={project.name} description={project.description ?? ''} onChange={setDraft} />
+      <NewRepoFields mode={mode} projectName={project.name} description={project.description ?? ''} onChange={setDraft} autoFocus />
       <div className="row-inline">
         <button className="btn primary" disabled={!draft || busy} onClick={() => void submit()}>
           {busy ? <RefreshCw size={13} className="spin" /> : <CloudUpload size={14} />} {mode === 'create' ? t('newRepo.create') : t('newRepo.publish')}
@@ -89,11 +89,15 @@ function CreateRepo({ projectId, mode, onDone }: { projectId: number; mode: 'cre
   )
 }
 
-function LinkRepo({ projectId }: { projectId: number }) {
+function LinkRepo({ projectId, openCreate, onCreateDone }: { projectId: number; openCreate: boolean; onCreateDone: () => void }) {
   const { run, t } = useApp()
   const [path, setPath] = useState('')
   const [linking, setLinking] = useState(false)
   const [creating, setCreating] = useState<'create' | 'publish' | null>(null)
+  // Space G (or the palette) asks for the create form; the request ends when the
+  // form closes or this view goes away.
+  const shown = creating ?? (openCreate ? 'create' : null)
+  useEffect(() => onCreateDone, [onCreateDone])
   const choose = async () => {
     const picked = await openDialog({ directory: true, multiple: false })
     if (typeof picked === 'string') setPath(picked)
@@ -127,8 +131,15 @@ function LinkRepo({ projectId }: { projectId: number }) {
             )}
           </button>
         </form>
-        {creating ? (
-          <CreateRepo projectId={projectId} mode={creating} onDone={() => setCreating(null)} />
+        {shown ? (
+          <CreateRepo
+            projectId={projectId}
+            mode={shown}
+            onDone={() => {
+              setCreating(null)
+              onCreateDone()
+            }}
+          />
         ) : (
           <div className="row-inline create-repo-choices">
             <span className="hint">{t('newRepo.noRepoYet')}</span>
@@ -145,7 +156,16 @@ function LinkRepo({ projectId }: { projectId: number }) {
   )
 }
 
-export function GitView({ projectId, onOpenTask }: { projectId: number; onOpenTask: (id: number) => void }) {
+interface GitViewProps {
+  projectId: number
+  onOpenTask: (id: number) => void
+  /** Set by the "Create GitHub repository" command until the form closes. */
+  openCreateRepo: boolean
+  /** Must be stable (useCallback); it also runs when the view unmounts. */
+  onCreateRepoDone: () => void
+}
+
+export function GitView({ projectId, onOpenTask, openCreateRepo, onCreateRepoDone }: GitViewProps) {
   const { run, t, locale, toast } = useApp()
   const [repo] = useLive(() => api.getProjectRepo(projectId), [projectId])
   const [overview] = useLive(() => (repo ? api.gitOverview(projectId) : Promise.resolve(null)), [projectId, repo?.path])
@@ -176,7 +196,7 @@ export function GitView({ projectId, onOpenTask }: { projectId: number; onOpenTa
   }, [hasGithub, projectId, sync])
 
   if (repo === undefined) return null
-  if (repo === null) return <LinkRepo projectId={projectId} />
+  if (repo === null) return <LinkRepo projectId={projectId} openCreate={openCreateRepo} onCreateDone={onCreateRepoDone} />
 
   return (
     <div className="page git-page">

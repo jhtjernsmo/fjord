@@ -2,12 +2,12 @@
 // and user overrides from ~/.config/fjord/keymap.json. The mouse always works
 // too — the keyboard is an option, never a requirement.
 
-export type Scope = 'global' | 'board' | 'panel' | 'notes'
+export type Scope = 'global' | 'board' | 'panel' | 'notes' | 'home'
 
 export interface ActionDef {
   id: string
   /** i18n group key suffix, e.g. 'board' -> 'group.board' */
-  group: 'general' | 'go' | 'project' | 'search' | 'view' | 'task' | 'board' | 'panel' | 'notes'
+  group: 'general' | 'go' | 'project' | 'search' | 'view' | 'task' | 'board' | 'panel' | 'notes' | 'home'
   scope: Scope
   keys: string
 }
@@ -37,6 +37,7 @@ export const DEFAULT_ACTIONS: ActionDef[] = [
   { id: 'git.sync', group: 'project', scope: 'global', keys: '<leader>r' },
   { id: 'editor.open', group: 'project', scope: 'global', keys: '<leader>e' },
   { id: 'azure.import', group: 'project', scope: 'global', keys: '<leader>i' },
+  { id: 'git.createRepo', group: 'project', scope: 'global', keys: '<leader>G' },
   { id: 'board.left', group: 'board', scope: 'board', keys: 'h' },
   { id: 'board.right', group: 'board', scope: 'board', keys: 'l' },
   { id: 'board.down', group: 'board', scope: 'board', keys: 'j' },
@@ -75,6 +76,11 @@ export const DEFAULT_ACTIONS: ActionDef[] = [
   { id: 'notes.edit', group: 'notes', scope: 'notes', keys: 'e' },
   { id: 'notes.mode', group: 'notes', scope: 'notes', keys: 'v' },
   { id: 'notes.pin', group: 'notes', scope: 'notes', keys: 'P' },
+  { id: 'home.next', group: 'home', scope: 'home', keys: 'j' },
+  { id: 'home.prev', group: 'home', scope: 'home', keys: 'k' },
+  { id: 'home.open', group: 'home', scope: 'home', keys: 'enter' },
+  { id: 'home.addTask', group: 'home', scope: 'home', keys: 'a' },
+  { id: 'home.dismiss', group: 'home', scope: 'home', keys: 'x' },
 ]
 
 export interface KeymapConfig {

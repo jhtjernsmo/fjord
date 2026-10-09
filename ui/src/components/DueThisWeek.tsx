@@ -13,11 +13,11 @@ import { ProjectGlyph } from './Icons'
 const SHOWN = 5
 const PRIORITY_ICON = ['', '↓', '→', '↑']
 
-function DueRow({ task, project }: { task: Task; project?: ProjectSummary }) {
+function DueRow({ task, project, today }: { task: Task; project?: ProjectSummary; today: Date }) {
   const { t, locale } = useApp()
   const nav = useNav()
   const due = task.due_at ?? ''
-  const when = dueWhen(due, new Date())
+  const when = dueWhen(due, today)
   const date = parseDue(due)
   const label =
     when === 'overdue'
@@ -28,7 +28,7 @@ function DueRow({ task, project }: { task: Task; project?: ProjectSummary }) {
           ? t('due.tomorrow')
           : date.toLocaleDateString(dateLocale(locale), { weekday: 'long' })
   return (
-    <button className={`due-row due-${when}`} onClick={() => nav.openTask(task.project_id, task.id)}>
+    <button className={`due-row due-${when}`} data-home-item data-home-action="open" onClick={() => nav.openTask(task.project_id, task.id)}>
       <span className="due-when">{label}</span>
       <span className="due-title">{task.title}</span>
       {/* Every column is always rendered so rows line up in the grid. */}
@@ -55,7 +55,9 @@ function DueRow({ task, project }: { task: Task; project?: ProjectSummary }) {
 export function DueThisWeek({ projects }: { projects: ProjectSummary[] }) {
   const { t } = useApp()
   const [showAll, setShowAll] = useState(false)
-  const [tasks] = useLive(() => api.listDueTasks(endOfWeek(new Date())), [])
+  // Read once per visit to the Overview; the labels are relative to it.
+  const [today] = useState(() => new Date())
+  const [tasks] = useLive(() => api.listDueTasks(endOfWeek(today)), [today])
   if (!tasks || tasks.length === 0) return null
   return (
     <div>
@@ -66,7 +68,7 @@ export function DueThisWeek({ projects }: { projects: ProjectSummary[] }) {
       </div>
       <div className="due-list">
         {(showAll ? tasks : tasks.slice(0, SHOWN)).map((task) => (
-          <DueRow key={task.id} task={task} project={projects.find((p) => p.id === task.project_id)} />
+          <DueRow key={task.id} task={task} today={today} project={projects.find((p) => p.id === task.project_id)} />
         ))}
       </div>
       {tasks.length > SHOWN && (

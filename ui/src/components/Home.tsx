@@ -3,13 +3,13 @@ import { motion } from 'motion/react'
 import { ArchiveRestore, Plus } from 'lucide-react'
 import { api, describeActivity, relativeTime } from '../api'
 import type { Activity, ProjectSummary } from '../api'
-import { useApp, useLive } from '../data'
+import { useActions, useApp, useLive } from '../data'
 import type { MessageKey } from '../i18n'
 import { AgentTag, ProjectGlyph } from './Icons'
 import { useContextMenus } from './actions'
 import { MentionsSection } from './Mentions'
 import { DueThisWeek } from './DueThisWeek'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 /** Overview shows a short activity preview; "Show all" loads more. */
 const ACTIVITY_PREVIEW = 8
@@ -50,10 +50,58 @@ interface Props {
   projects: ProjectSummary[]
   onOpen: (id: number) => void
   onNewProject: () => void
+  /** Off while a dialog or the palette is open. */
+  keysEnabled: boolean
 }
 
-export function Home({ actor, projects, onOpen, onNewProject }: Props) {
+/**
+ * Keyboard navigation over the Overview's rows (due tasks, mentions, project cards).
+ * Rows mark themselves with `data-home-item`, and their buttons with
+ * `data-home-action`, so each section keeps its own data and layout.
+ */
+function useHomeKeys(enabled: boolean) {
+  const ref = useRef<HTMLDivElement>(null)
+  const items = () => [...(ref.current?.querySelectorAll<HTMLElement>('[data-home-item]') ?? [])]
+  const current = () => (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-home-item]') ?? null
+  const focusAt = (index: number) => {
+    const list = items()
+    const el = list[Math.min(Math.max(index, 0), list.length - 1)]
+    el?.focus()
+    el?.scrollIntoView({ block: 'nearest' })
+  }
+  const step = (delta: number) => {
+    const i = items().indexOf(current() as HTMLElement)
+    focusAt(i < 0 ? (delta > 0 ? 0 : items().length - 1) : i + delta)
+  }
+  const act = (action: string) => {
+    const row = current()
+    if (!row) return
+    const selector = `[data-home-action="${action}"]`
+    const target = row.matches(selector) ? row : row.querySelector<HTMLElement>(selector)
+    if (!target) return
+    const index = items().indexOf(row)
+    target.click()
+    // Dismissing removes the row; keep the cursor on the row that took its place.
+    if (action === 'dismiss') window.setTimeout(() => focusAt(index))
+  }
+  useActions(
+    enabled
+      ? {
+          'home.next': () => step(1),
+          'home.prev': () => step(-1),
+          'home.open': () => act('open'),
+          'home.addTask': () => act('add'),
+          'home.dismiss': () => act('dismiss'),
+        }
+      : {},
+    'home',
+  )
+  return ref
+}
+
+export function Home({ actor, projects, onOpen, onNewProject, keysEnabled }: Props) {
   const { t, run } = useApp()
+  const homeRef = useHomeKeys(keysEnabled)
   const [showAll, setShowAll] = useState(false)
   const [activity] = useLive(() => api.recentActivity(null, showAll ? ACTIVITY_ALL : ACTIVITY_PREVIEW + 1), [showAll])
   const { projectMenu } = useContextMenus()
@@ -65,7 +113,7 @@ export function Home({ actor, projects, onOpen, onNewProject }: Props) {
   const name = actor ? actor.charAt(0).toUpperCase() + actor.slice(1) : ''
 
   return (
-    <div className="home">
+    <div className="home" ref={homeRef}>
       <div className="hello">
         <h2>
           {t(greetingKey())}, {name}
@@ -112,6 +160,8 @@ export function Home({ actor, projects, onOpen, onNewProject }: Props) {
               <motion.button
                 key={p.id}
                 className="pcard"
+                data-home-item
+                data-home-action="open"
                 style={{ ['--c' as string]: p.color }}
                 onClick={() => onOpen(p.id)}
                 onContextMenu={projectMenu(p, { onOpen: () => onOpen(p.id) })}

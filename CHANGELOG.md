@@ -7,6 +7,8 @@ Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 ## Unreleased
 
 - **Due this week** on the Overview: open tasks from every project that are due by Sunday, overdue ones first, then by day and priority. Click one to open it.
+- **Keyboard on the Overview:** `j` / `k` move through due tasks, mentions and project cards, `Enter` opens, `a` adds a mention as a task, `x` dismisses it.
+- **Create GitHub repository** (`Space G`, or from the command palette) opens the create form for the current project.
 
 ## 0.2.14 — 2026-10-09
 

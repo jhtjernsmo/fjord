@@ -136,6 +136,9 @@ what comes next.
 | `Space ?` | Report a bug | `g g` / `G` | First / last task |
 | `Esc` | Close | `Delete` | Delete task |
 
+On the Overview: `j` / `k` move through due tasks, mentions and projects, `Enter` opens, `a` adds a
+mention as a task and `x` dismisses it. `Space G` creates a GitHub repository for the current project.
+
 In an open task: `[` / `]` move it to the previous/next column, `e` edits, `A` adds a subtask, `B`
 starts a branch, `L` links an existing one and `P` opens a pull request.
 
