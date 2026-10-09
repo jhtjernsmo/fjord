@@ -7,6 +7,7 @@ import { useApp, useLive } from '../data'
 import type { MessageKey } from '../i18n'
 import { AgentTag, ProjectGlyph } from './Icons'
 import { useContextMenus } from './actions'
+import { MentionsSection } from './Mentions'
 import { useState } from 'react'
 
 /** Overview shows a short activity preview; "Show all" loads more. */
@@ -89,6 +90,8 @@ export function Home({ actor, projects, onOpen, onNewProject }: Props) {
           <div className="l">{t('home.overdue')}</div>
         </div>
       </div>
+
+      <MentionsSection projects={projects} />
 
       {projects.length === 0 ? (
         <div className="empty-state">

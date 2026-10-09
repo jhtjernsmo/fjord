@@ -33,7 +33,7 @@ the same projects, and you can always see who did what.
 - **Full-text search** across tasks, notes and file names (`Space f`).
 - **Keyboard-first** — a leader key with a which-key popup, vim motions on the board, a `Ctrl+K` command palette, and every binding configurable. The mouse works for everything too.
 - **Git, GitHub & Azure DevOps** — link a project to a repo, start a branch with a conventional name from any task (`B`, e.g. `feat/12-add-login`) or link an existing one, see pull requests with CI status, open PRs from a task, and let merged PRs move tasks to done.
-- **Azure Boards import** — work items assigned to you show up as tasks in the project you choose, with their state mapped to your columns, child items as subtasks, and the discussion readable in the task.
+- **Azure Boards import** — work items assigned to you show up as tasks in the project you choose, with their state mapped to your columns, child items as subtasks, and the discussion readable in the task. Work items where someone @mentions you show up in the Overview.
 - **AI-agent ready** — `fjord mcp` exposes 25 tools to MCP clients such as Claude. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
 - **Activity log** — what changed, when, and by whom (you or an agent).
 - **Live updates** — changes from the CLI or an agent appear in the open app within a second or two.
@@ -201,6 +201,11 @@ items finished in the last 30 days (configurable) are included, and a notificati
 was added or changed. The task panel shows the work item's discussion. An AI agent can analyze new ones through the MCP
 server (`import_azure`, `list_new_imports`, `mark_analyzed`). Setup, a ready-made triage prompt and
 how to schedule it: [docs/azure-boards-triage.md](docs/azure-boards-triage.md).
+
+**Mentions.** When someone @mentions you in a work item that isn't assigned to you, the Overview
+shows it under **Mentioned**: the item, who mentioned you and what they wrote. Open it in Azure, add
+it to a project as a task, or dismiss it. New mentions also get a notification. This uses Azure
+DevOps' own "recent mentions" (the last 30 days, Azure DevOps Services only).
 
 | | |
 |---|---|

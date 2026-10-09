@@ -36,7 +36,7 @@ export function listTitles(tasks: Task[], more: (n: number) => string): string {
 }
 
 /** A desktop notification, asking for permission the first time. Never throws. */
-async function notify(title: string, body: string): Promise<void> {
+export async function notify(title: string, body: string): Promise<void> {
   try {
     const n = await import('@tauri-apps/plugin-notification')
     let granted = await n.isPermissionGranted()

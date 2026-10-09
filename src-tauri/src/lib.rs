@@ -95,6 +95,8 @@ pub fn run() {
             git_commands::get_import_settings,
             git_commands::set_import_settings,
             git_commands::run_azure_import,
+            git_commands::azure_mentions,
+            git_commands::add_work_item_task,
             git_commands::azure_discussion,
             git_commands::task_external_link,
             git_commands::list_branches,
