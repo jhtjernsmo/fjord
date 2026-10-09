@@ -56,7 +56,7 @@ describe('match', () => {
   })
 
   it('has no conflicting default bindings within a scope set', () => {
-    const scopes = [['global'], ['global', 'board']] as const
+    const scopes = [['global'], ['global', 'board'], ['global', 'home']] as const
     for (const active of scopes) {
       const seen = new Map<string, string>()
       for (const a of DEFAULT_ACTIONS.filter((x) => (active as readonly string[]).includes(x.scope))) {

@@ -67,24 +67,27 @@ function MentionRow({ mention, projects }: { mention: Mention; projects: Project
     toast(t('mentions.added', { project: project.name }), 'success')
     dismissMention(mention)
   }
-  const chooseProject = (e: React.MouseEvent) =>
+  // Anchored under the button, so it also opens in the right place from the keyboard.
+  const chooseProject = (e: React.MouseEvent<HTMLElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
     openMenu(
-      e,
+      { clientX: rect.left, clientY: rect.bottom, preventDefault: () => e.preventDefault() },
       ordered.map((p) => ({
         label: p.name,
         icon: <ProjectGlyph glyph={p.icon} color={p.color} />,
         onSelect: () => void addTo(p),
       })),
     )
+  }
 
   return (
-    <div className="mention">
+    <div className="mention" data-home-item tabIndex={-1}>
       <div className="mention-main">
         <div className="mention-head">
           <span className={`mention-kind ${kindClass(mention.kind)}`}>
             {mention.kind} {mention.id}
           </span>
-          <button className="mention-title" onClick={() => run(api.openUrl(mention.url))} title={mention.url}>
+          <button className="mention-title" data-home-action="open" onClick={() => run(api.openUrl(mention.url))} title={mention.url}>
             {mention.title}
           </button>
         </div>
@@ -98,13 +101,13 @@ function MentionRow({ mention, projects }: { mention: Mention; projects: Project
           {mention.project} · {relativeTime(mention.at, t, locale)}
         </span>
         <div className="mention-actions">
-          <button className="icon-btn" onClick={chooseProject} title={t('mentions.addTask')} aria-label={t('mentions.addTask')}>
+          <button className="icon-btn" data-home-action="add" onClick={chooseProject} title={t('mentions.addTask')} aria-label={t('mentions.addTask')}>
             <ListPlus size={15} />
           </button>
           <button className="icon-btn" onClick={() => run(api.openUrl(mention.url))} title={t('mentions.open')} aria-label={t('mentions.open')}>
             <ExternalLink size={14} />
           </button>
-          <button className="icon-btn" onClick={() => dismissMention(mention)} title={t('mentions.dismiss')} aria-label={t('mentions.dismiss')}>
+          <button className="icon-btn" data-home-action="dismiss" onClick={() => dismissMention(mention)} title={t('mentions.dismiss')} aria-label={t('mentions.dismiss')}>
             <X size={15} />
           </button>
         </div>

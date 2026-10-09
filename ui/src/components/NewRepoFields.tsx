@@ -37,9 +37,11 @@ interface Props {
   projectName: string
   description: string
   onChange: (draft: RepoDraft | null) => void
+  /** Puts the cursor in the name field once it appears (not inside the New project dialog). */
+  autoFocus?: boolean
 }
 
-export function NewRepoFields({ mode, projectName, description, onChange }: Props) {
+export function NewRepoFields({ mode, projectName, description, onChange, autoFocus = false }: Props) {
   const { t } = useApp()
   const [account, setAccount] = useState<GitHubAccount | null | undefined>(undefined)
   const [owners, setOwners] = useState<RepoOwner[]>([])
@@ -135,6 +137,7 @@ export function NewRepoFields({ mode, projectName, description, onChange }: Prop
           onChange={(e) => setName(e.target.value)}
           aria-label={t('newRepo.name')}
           aria-invalid={!nameOk}
+          autoFocus={autoFocus}
           spellCheck={false}
         />
       </div>

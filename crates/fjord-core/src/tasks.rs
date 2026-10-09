@@ -227,6 +227,28 @@ impl Store {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// Open tasks due on or before `until` (YYYY-MM-DD) in active projects,
+    /// overdue ones included. Earliest due date first, then highest priority.
+    pub fn list_due_tasks(&self, until: &str) -> Result<Vec<Task>> {
+        let until = validate_due(Some(until.to_string()))?
+            .ok_or_else(|| Error::Invalid("a date is required".into()))?;
+        let cols = TASK_COLS
+            .split(',')
+            .map(|c| format!("t.{}", c.trim()))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {cols} FROM tasks t
+             JOIN statuses s ON s.id = t.status_id
+             JOIN projects p ON p.id = t.project_id
+             WHERE t.archived_at IS NULL AND p.archived_at IS NULL AND NOT s.is_done
+               AND t.due_at IS NOT NULL AND t.due_at <= ?1
+             ORDER BY t.due_at, t.priority DESC, t.id"
+        ))?;
+        let rows = stmt.query_map([until], task_from_row)?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
     pub fn update_task(&mut self, id: i64, patch: TaskPatch) -> Result<Task> {
         let current = self.get_task(id)?;
         let title = match &patch.title {
@@ -526,6 +548,44 @@ mod tests {
         })
         .unwrap();
         assert_eq!(s.list_projects(false).unwrap()[0].overdue_count, 1);
+    }
+
+    #[test]
+    fn due_tasks_skip_done_archived_and_later_ones() {
+        let (mut s, _dir) = store();
+        let p = project(&mut s);
+        let due = |s: &mut Store, title: &str, date: &str, priority: i64| {
+            s.create_task(NewTask {
+                project_id: p,
+                title: title.into(),
+                due_at: Some(date.into()),
+                priority,
+                ..Default::default()
+            })
+            .unwrap()
+        };
+        due(&mut s, "late", "2026-01-01", 0);
+        due(&mut s, "low", "2026-01-05", 1);
+        due(&mut s, "high", "2026-01-05", 3);
+        due(&mut s, "next week", "2026-01-12", 0);
+        let finished = due(&mut s, "finished", "2026-01-03", 0);
+        let done = s
+            .list_statuses(p)
+            .unwrap()
+            .into_iter()
+            .find(|st| st.is_done)
+            .unwrap();
+        s.move_task(finished.id, done.id, None).unwrap();
+        let shelved = due(&mut s, "shelved", "2026-01-03", 0);
+        s.set_task_archived(shelved.id, true).unwrap();
+        let titles: Vec<String> = s
+            .list_due_tasks("2026-01-11")
+            .unwrap()
+            .into_iter()
+            .map(|t| t.title)
+            .collect();
+        assert_eq!(titles, ["late", "high", "low"]);
+        assert!(s.list_due_tasks("soon").is_err());
     }
 
     #[test]

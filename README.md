@@ -25,7 +25,7 @@ the same projects, and you can always see who did what.
 ## Features
 
 - **Projects & kanban boards** — drag and drop, or move tasks with `H`/`L`. Rename, recolor, reorder and add columns, and mark one or more as done columns (e.g. Resolved and Done). Right-click a project to change its icon and colour.
-- **Tasks** — markdown descriptions, priority, due dates, overdue warnings, archive & restore.
+- **Tasks** — markdown descriptions, priority, due dates, overdue warnings, archive & restore. The Overview lists everything due this week across your projects, overdue first.
 - **Files** — drop files onto the window to attach them to a project or task. Stored content-addressed (deduplicated) with image previews.
 - **Themes** — five built-in themes (Fjord Dark/Light, Nord, Solarized Light, High Contrast), follow the OS with separate light/dark picks, or build your own with live preview: colours, text size, rounding and density; share themes as JSON. `Space T` cycles themes.
 - **Subtasks** — break a task into subtasks (one level) with their own status, priority and branch; cards show progress (2/5), the task panel lists them with check-off, drag to reorder and `A` to add.
@@ -135,6 +135,9 @@ what comes next.
 | `Space T` | Cycle themes | `y` | Copy task reference (`[[#12]]`) |
 | `Space ?` | Report a bug | `g g` / `G` | First / last task |
 | `Esc` | Close | `Delete` | Delete task |
+
+On the Overview: `j` / `k` move through due tasks, mentions and projects, `Enter` opens, `a` adds a
+mention as a task and `x` dismisses it. `Space G` creates a GitHub repository for the current project.
 
 In an open task: `[` / `]` move it to the previous/next column, `e` edits, `A` adds a subtask, `B`
 starts a branch, `L` links an existing one and `P` opens a pull request.

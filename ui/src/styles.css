@@ -291,6 +291,7 @@ kbd {
 }
 .pcard::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--c); }
 .pcard:hover { transform: translateY(-2px); border-color: var(--line-2); box-shadow: var(--shadow); }
+.pcard:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent); }
 .pcard .top { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; }
 .pcard .icon { font-size: 22px; }
 .pcard .d { color: var(--muted); font-size: 12.5px; min-height: 19px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -524,6 +525,20 @@ kbd {
 .mention-when { font-size: 12px; color: var(--dim); white-space: nowrap; }
 .mention-actions { display: flex; gap: 2px; opacity: .55; transition: opacity .15s; }
 .mention:hover .mention-actions, .mention:focus-within .mention-actions { opacity: 1; }
+.mention:focus-visible { outline: none; background: var(--panel-2); box-shadow: inset 2px 0 0 var(--accent); }
+.due-list { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.due-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) 16px 160px 52px; align-items: center; gap: 14px; padding: 9px 14px; text-align: left; font-size: 13.5px; }
+.due-row + .due-row { border-top: 1px solid var(--line); }
+.due-row:hover { background: var(--panel-2); }
+.due-row:focus-visible { background: var(--panel-2); outline: none; box-shadow: inset 2px 0 0 var(--accent); }
+.due-when { font-size: 12.5px; color: var(--muted); text-transform: capitalize; }
+.due-today .due-when { color: var(--accent); font-weight: 600; }
+.due-overdue .due-when { color: var(--danger); font-weight: 600; }
+.due-title { min-width: 0; color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.due-prio { font-size: 13px; text-align: center; }
+.due-project { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.due-date { text-align: right; font-size: 12px; color: var(--dim); }
+.due-project-name { overflow: hidden; text-overflow: ellipsis; }
 .archive-list { display: flex; flex-direction: column; gap: 6px; }
 .archive-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
 .archive-title { flex: 1; }

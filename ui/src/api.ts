@@ -325,6 +325,7 @@ export const api = {
   deleteNote: (id: number) => invoke<void>('delete_note', { id }),
   renameUser: (name: string, rewriteHistory: boolean) => invoke<string>('rename_user', { name, rewriteHistory }),
   listArchivedTasks: (projectId: number) => invoke<Task[]>('list_archived_tasks', { projectId }),
+  listDueTasks: (until: string) => invoke<Task[]>('list_due_tasks', { until }),
   listSubtasks: (taskId: number) => invoke<Task[]>('list_subtasks', { taskId }),
   listBranches: (projectId: number) => invoke<string[]>('list_branches', { projectId }),
   linkTaskBranch: (taskId: number, branch: string | null) => invoke<Task>('link_task_branch', { taskId, branch }),
