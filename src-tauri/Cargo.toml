@@ -1,6 +1,6 @@
 [package]
 name = "fjord-app"
-version = "0.2.12"
+version = "0.2.13"
 description = "Fjord — local-first project management, Linux first, also Windows and macOS"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/jhtjernsmo/fjord"
@@ -21,7 +21,7 @@ serde = { version = "1.0", features = ["derive"] }
 tauri = { version = "2.12.1", features = [] }
 tauri-plugin-opener = "2"
 base64 = "0.23"
-fjord-vcs = { version = "0.2.12", path = "../crates/fjord-vcs" }
+fjord-vcs = { version = "0.2.13", path = "../crates/fjord-vcs" }
 tauri-plugin-dialog = "2.8.1"
 tauri-plugin-updater = "2.13.1"
 tauri-plugin-process = "2.4.0"

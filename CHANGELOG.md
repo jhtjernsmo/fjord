@@ -4,6 +4,10 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## 0.2.13 — 2026-10-09
+
+- Groundwork for the Microsoft Store ("Fjord Projects"): releases also build an MSIX package, and the Store version leaves updates to the Store. Nothing changes for other installs. ([#70](https://github.com/jhtjernsmo/fjord/pull/70))
+
 ## 0.2.12 — 2026-10-09
 
 - **Azure mentions in the Overview**: work items where someone @mentioned you but that aren't assigned to you, with who mentioned you and what they wrote. Open one, add it to a project as a task, or dismiss it; new mentions get a notification. ([#66](https://github.com/jhtjernsmo/fjord/pull/66))
