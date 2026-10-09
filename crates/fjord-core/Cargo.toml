@@ -1,6 +1,6 @@
 [package]
 name = "fjord-core"
-version = "0.2.14"
+version = "0.2.15"
 edition = "2024"
 description = "Core library for Fjord: local-first project management on SQLite"
 license = "MIT OR Apache-2.0"
