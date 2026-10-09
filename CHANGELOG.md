@@ -4,9 +4,12 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
-## Unreleased
+## 0.2.11 — 2026-10-09
 
 - **Create a GitHub repository** when you make a project, or from the Git tab: private or public, under you or an organization, with an optional README, `.gitignore` and license. Fjord clones it and links it to the project. A local repository without a remote can be published the same way. ([#57](https://github.com/jhtjernsmo/fjord/pull/57))
+- The Git buttons on a task are now small icons next to the branch name, which stays on one line. ([#53](https://github.com/jhtjernsmo/fjord/pull/53))
+- Weekly dependency updates with Dependabot; TypeScript 7. ([#56](https://github.com/jhtjernsmo/fjord/pull/56), [#59](https://github.com/jhtjernsmo/fjord/pull/59), [#60](https://github.com/jhtjernsmo/fjord/pull/60))
+- The project has the OpenSSF Best Practices badge, a `LICENSE` file, a privacy policy and a code signing policy. ([#51](https://github.com/jhtjernsmo/fjord/pull/51), [#54](https://github.com/jhtjernsmo/fjord/pull/54))
 
 ## 0.2.10 — 2026-10-08
 
