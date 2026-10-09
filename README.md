@@ -7,6 +7,7 @@
 **Local-first project management — Linux first, also on Windows & macOS. Built for the keyboard, friendly to the mouse, and open to AI agents.**
 
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15314/badge)](https://www.bestpractices.dev/projects/15314)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/jhtjernsmo/fjord/badge)](https://scorecard.dev/viewer/?uri=github.com/jhtjernsmo/fjord)
 [![CI](https://github.com/jhtjernsmo/fjord/actions/workflows/ci.yml/badge.svg)](https://github.com/jhtjernsmo/fjord/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-informational)
