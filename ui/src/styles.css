@@ -541,6 +541,10 @@ kbd {
 .commit-row { border-bottom: 1px solid var(--line); border-radius: 0; }
 .error-box { color: var(--danger); background: color-mix(in oklab, var(--danger) 10%, transparent); border: 1px solid color-mix(in oklab, var(--danger) 35%, transparent); border-radius: 8px; padding: 8px 12px; font-size: 12.5px; }
 .task-git { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.linked-branch { display: flex; align-items: center; gap: 2px; min-width: 0; font-size: 12.5px; }
+.linked-branch > svg { flex: none; color: var(--dim); margin-right: 6px; }
+.linked-branch .branch-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 4px; }
+.linked-branch .icon-btn { flex: none; width: 28px; height: 28px; }
 .card-branch { color: var(--accent); display: inline-flex; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
