@@ -4,9 +4,11 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
-## Unreleased
+## 0.2.12 — 2026-10-09
 
-- **Azure mentions in the Overview**: work items where someone @mentioned you but that aren't assigned to you, with who mentioned you and what they wrote. Open one, add it to a project as a task, or dismiss it; new mentions get a notification.
+- **Azure mentions in the Overview**: work items where someone @mentioned you but that aren't assigned to you, with who mentioned you and what they wrote. Open one, add it to a project as a task, or dismiss it; new mentions get a notification. ([#66](https://github.com/jhtjernsmo/fjord/pull/66))
+- The window fits the screen it opens on, also with a second monitor attached. ([#68](https://github.com/jhtjernsmo/fjord/pull/68), fixes [#65](https://github.com/jhtjernsmo/fjord/issues/65))
+- Install with Homebrew: `brew install --cask jhtjernsmo/fjord/fjord` (and `fjord-cli`). ([#67](https://github.com/jhtjernsmo/fjord/pull/67))
 
 ## 0.2.11 — 2026-10-09
 
