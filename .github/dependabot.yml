@@ -18,6 +18,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # v1 renames inputs the release workflow uses (includeUpdaterJson) and changes
+      # latest.json; upgrade it by hand and test it with a release.
+      - dependency-name: tauri-apps/tauri-action
+        update-types: ["version-update:semver-major"]
     groups:
       actions:
         patterns: ["*"]
