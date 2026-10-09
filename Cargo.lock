@@ -1261,7 +1261,7 @@ checksum = "aedcfb3409746eddb02b9e19ebda1c3394f759a152e48ee875a0844d1b955484"
 name = "fjord-app"
 version = "0.2.10"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "fjord-core",
  "fjord-vcs",
  "serde",
@@ -1306,7 +1306,7 @@ dependencies = [
 name = "fjord-vcs"
 version = "0.2.10"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "fjord-core",
  "keyring",
  "serde",
