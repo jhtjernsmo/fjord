@@ -524,7 +524,6 @@ kbd {
 .mention-when { font-size: 12px; color: var(--dim); white-space: nowrap; }
 .mention-actions { display: flex; gap: 2px; opacity: .55; transition: opacity .15s; }
 .mention:hover .mention-actions, .mention:focus-within .mention-actions { opacity: 1; }
-.mentions-more { margin-top: 6px; }
 .archive-list { display: flex; flex-direction: column; gap: 6px; }
 .archive-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
 .archive-title { flex: 1; }

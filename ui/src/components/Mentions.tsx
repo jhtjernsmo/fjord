@@ -1,6 +1,6 @@
 // Azure Boards mentions in the Overview: work items where someone @mentioned you
 // but that aren't assigned to you. Open them, add one as a task, or dismiss it.
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { AtSign, ExternalLink, ListPlus, X } from 'lucide-react'
 import { api, relativeTime } from '../api'
 import type { Mention, ProjectSummary } from '../api'
@@ -12,7 +12,8 @@ import { ProjectGlyph } from './Icons'
 
 const CHECK_EVERY_MS = 10 * 60 * 1000
 const FIRST_CHECK_DELAY_MS = 5000
-const SHOWN = 5
+/** The Overview shows the newest few; "Show all" expands the list. */
+const SHOWN = 3
 
 /** Checks for mentions on startup and every 10 minutes when Azure Boards is set up. */
 export function MentionsRunner() {
@@ -116,7 +117,10 @@ function MentionRow({ mention, projects }: { mention: Mention; projects: Project
 export function MentionsSection({ projects }: { projects: ProjectSummary[] }) {
   const { t } = useApp()
   const mentions = useMentions()
+  const [showAll, setShowAll] = useState(false)
   if (mentions.length === 0) return null
+  // Newest first, whichever organization it came from.
+  const sorted = [...mentions].sort((a, b) => b.at.localeCompare(a.at))
   return (
     <div>
       <div className="section-title" style={{ marginBottom: 8 }}>
@@ -125,11 +129,15 @@ export function MentionsSection({ projects }: { projects: ProjectSummary[] }) {
         </span>
       </div>
       <div className="mentions">
-        {mentions.slice(0, SHOWN).map((m) => (
+        {(showAll ? sorted : sorted.slice(0, SHOWN)).map((m) => (
           <MentionRow key={`${m.org}/${m.id}`} mention={m} projects={projects} />
         ))}
       </div>
-      {mentions.length > SHOWN && <div className="hint mentions-more">{t('mentions.more', { n: mentions.length - SHOWN })}</div>}
+      {mentions.length > SHOWN && (
+        <button className="show-more" onClick={() => setShowAll((v) => !v)}>
+          {showAll ? t('home.showLess') : t('mentions.showAll', { n: mentions.length })}
+        </button>
+      )}
     </div>
   )
 }
