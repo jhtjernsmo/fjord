@@ -82,6 +82,28 @@ jobs:
           releaseDraft: true
           prerelease: false # the updater only sees the latest non-prerelease
 
+      # Microsoft Store: wrap the Windows build in an unsigned MSIX (the Store signs it).
+      # It's a workflow artifact for uploading to Partner Center, not a release asset.
+      # continue-on-error so a packaging problem never blocks a release.
+      - name: Microsoft Store package (MSIX)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          $exe = Get-ChildItem target/release -Filter *.exe | Where-Object Name -in 'Fjord.exe', 'fjord-app.exe' | Select-Object -First 1
+          if (-not $exe) { throw 'Built Fjord exe not found in target/release' }
+          ./packaging/msix/build.ps1 -Exe $exe.FullName -Version $version -Out "Fjord_${version}_x64.msix"
+
+      - name: Upload the MSIX for the Store
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: msix
+          path: Fjord_*_x64.msix
+          if-no-files-found: error
+
   cli:
     name: CLI (${{ matrix.name }})
     needs: app
