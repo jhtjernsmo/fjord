@@ -70,9 +70,16 @@ Grab the installer for your system from [Releases](https://github.com/jhtjernsmo
 | Windows 10/11 | `.msi` or `-setup.exe` |
 | macOS | `.dmg` (Apple Silicon or Intel) |
 
+On macOS (and for the CLI on Linux) you can also use Homebrew:
+
+```sh
+brew install --cask jhtjernsmo/fjord/fjord   # the app
+brew install jhtjernsmo/fjord/fjord-cli      # the `fjord` command-line tool
+```
+
 The CLI is attached separately as `fjord-cli-<platform>`. From 0.2.9 the macOS app is signed with
 an Apple Developer ID and notarized, so it opens normally. Windows builds aren't code-signed yet and
-may show a SmartScreen warning (More info → Run anyway); signing through SignPath is in progress.
+may show a SmartScreen warning (More info → Run anyway).
 
 ### Build from source
 
