@@ -34,7 +34,7 @@
   .btn { display:inline-block; background:var(--ink); color:var(--bg); padding:9px 16px; border-radius:6px; text-decoration:none; font-weight:600; }
   figure { margin:36px -20px 0; }
   figure.wide { margin-left:calc(50% - min(48vw, 560px)); margin-right:calc(50% - min(48vw, 560px)); }
-  figure img { display:block; width:100%; height:auto; border-radius:8px; border:1px solid var(--line); }
+  figure img, figure video { display:block; width:100%; height:auto; border-radius:8px; border:1px solid var(--line); }
   figcaption { font-size:14px; color:var(--muted); margin-top:8px; padding:0 20px; }
   ul { padding-left:20px; margin:0 0 14px; }
   li { margin:4px 0; }
@@ -53,7 +53,7 @@
   footer { padding-top:30px; padding-bottom:48px; margin-top:64px; border-top:1px solid var(--line); font-size:15px; color:var(--muted); }
   #wk { position:fixed; right:16px; bottom:16px; background:var(--ink); color:var(--bg); font:13px/1.7 var(--mono); padding:10px 14px; border-radius:8px; display:none; }
   #wk.on { display:block; }
-  @media (max-width:600px) { h1 { font-size:26px; margin-top:40px; } figure, figure.wide { margin-left:-20px; margin-right:-20px; } figure img { border-radius:0; border-left:0; border-right:0; } }
+  @media (max-width:600px) { h1 { font-size:26px; margin-top:40px; } figure, figure.wide { margin-left:-20px; margin-right:-20px; } figure img, figure video { border-radius:0; border-left:0; border-right:0; } }
 </style>
 </head>
 <body>
@@ -113,6 +113,10 @@
     <tr><td><kbd>?</kbd></td><td>All shortcuts</td></tr>
   </table>
   <p class="muted">Every binding can be changed in <code>keymap.json</code>.</p>
+
+  <figure class="wide">
+    <video src="assets/keyboard.mp4" poster="assets/keyboard-poster.jpg" width="1280" height="800" autoplay muted loop playsinline preload="metadata" aria-label="Fjord used with the keyboard only: jump to a project, move and add tasks, search, open the Git tab and notes"></video>
+  </figure>
 
   <h2>Git, GitHub and Azure DevOps</h2>
   <p>Link a project to a local repository and each task can get its own branch, named the usual way: <code>feat/12-add-login</code>, <code>fix/7-crash-on-start</code>. You pick the type, or Fjord guesses it from the task. A task can also be linked to a branch you already have, and several tasks can share one.</p>
