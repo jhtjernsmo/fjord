@@ -3,6 +3,6 @@ resolver = "2"
 members = ["crates/fjord-core", "crates/fjord-cli", "src-tauri", "crates/fjord-vcs"]
 
 [workspace.package]
-version = "0.2.13"
+version = "0.2.14"
 edition = "2024"
 license = "MIT OR Apache-2.0"
