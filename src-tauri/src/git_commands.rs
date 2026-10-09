@@ -6,7 +6,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use fjord_core::{ProjectRepo, Task};
-use fjord_vcs::{AzureAccount, GitHubAccount, GitOverview, PullRequest, StartedBranch, SyncReport};
+use fjord_vcs::{
+    AzureAccount, GitHubAccount, GitOverview, NewRepo, PullRequest, RepoOwner, StartedBranch,
+    SyncReport,
+};
 use tauri::State;
 
 use crate::AppState;
@@ -61,6 +64,37 @@ pub async fn link_repo(
     path: PathBuf,
 ) -> CmdResult<ProjectRepo> {
     with_store_bg(&state, move |s| fjord_vcs::link_repo(s, project_id, &path)).await
+}
+
+/// Accounts a new GitHub repository can be created under (the user and their orgs).
+#[tauri::command]
+pub async fn github_repo_owners() -> CmdResult<Vec<RepoOwner>> {
+    off_thread(fjord_vcs::new_repo::repo_owners).await
+}
+
+/// Creates a repository on GitHub, clones it into `parent` and links it to the project.
+/// The network and clone run without holding the store; only the link takes it.
+#[tauri::command]
+pub async fn create_github_repo(
+    state: State<'_, AppState>,
+    project_id: i64,
+    repo: NewRepo,
+    parent: PathBuf,
+) -> CmdResult<ProjectRepo> {
+    let path = off_thread(move || fjord_vcs::new_repo::create_and_clone(&repo, &parent)).await?;
+    with_store_bg(&state, move |s| fjord_vcs::link_repo(s, project_id, &path)).await
+}
+
+/// Creates an empty GitHub repository for a local one, pushes it and links it.
+#[tauri::command]
+pub async fn publish_to_github(
+    state: State<'_, AppState>,
+    project_id: i64,
+    repo: NewRepo,
+    path: PathBuf,
+) -> CmdResult<ProjectRepo> {
+    let root = off_thread(move || fjord_vcs::new_repo::publish(&repo, &path)).await?;
+    with_store_bg(&state, move |s| fjord_vcs::link_repo(s, project_id, &root)).await
 }
 
 #[tauri::command]

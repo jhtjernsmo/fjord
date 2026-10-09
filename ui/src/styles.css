@@ -516,6 +516,15 @@ kbd {
 .git-page { display: flex; flex-direction: column; gap: 18px; }
 .git-link-card { max-width: 640px; margin: 40px auto; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
 .git-link-card form { width: 100%; }
+.create-repo-choices { flex-wrap: wrap; padding-top: 4px; border-top: 1px solid var(--line); width: 100%; }
+.create-repo-title { font-size: 13.5px; font-weight: 600; }
+.create-repo { display: flex; flex-direction: column; gap: 12px; width: 100%; padding-top: 12px; border-top: 1px solid var(--line); }
+.new-repo { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; width: 100%; margin-top: 4px; }
+.new-repo-name, .new-repo-folder { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+.new-repo-name select { flex: none; max-width: 45%; }
+.new-repo-files { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.new-repo-files select { width: auto; padding: 5px 8px; font-size: 12.5px; }
+.new-repo-folder .path-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
 .repo-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
 .path-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12.5px; }
 .toggle-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); cursor: pointer; }

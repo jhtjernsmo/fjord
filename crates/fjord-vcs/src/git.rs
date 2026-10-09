@@ -170,6 +170,17 @@ impl Git {
         }
     }
 
+    /// False for a freshly initialised repository with no commits yet.
+    pub fn has_commits(&self) -> bool {
+        self.git(&["rev-parse", "--verify", "--quiet", "HEAD"])
+            .is_ok()
+    }
+
+    pub fn add_remote(&self, name: &str, url: &str) -> Result<()> {
+        self.git(&["remote", "add", "--", name, url])?;
+        Ok(())
+    }
+
     pub fn push_upstream(&self, name: &str) -> Result<()> {
         validate_branch_name(name)?;
         self.git(&["push", "--set-upstream", "origin", name])?;
@@ -181,12 +192,37 @@ impl Git {
     }
 }
 
-fn run(dir: &Path, args: &[&str]) -> Result<String> {
-    let output = crate::process::tool("git")
-        .arg("-C")
+fn command(dir: &Path, args: &[&str]) -> std::process::Command {
+    let mut cmd = crate::process::tool("git");
+    cmd.arg("-C")
         .arg(dir)
         .args(args)
-        .env("GIT_TERMINAL_PROMPT", "0") // never hang waiting for a password
+        .env("GIT_TERMINAL_PROMPT", "0"); // never hang waiting for a password
+    cmd
+}
+
+fn run(dir: &Path, args: &[&str]) -> Result<String> {
+    finish(command(dir, args))
+}
+
+/// Like `run`, but lets git sign in to github.com with `token`. It goes in the
+/// environment as a one-off config value, so it never shows up in the process
+/// list or gets written to the repository's config.
+pub(crate) fn run_with_github_token(dir: &Path, args: &[&str], token: &str) -> Result<String> {
+    use base64::Engine;
+    let basic = base64::engine::general_purpose::STANDARD.encode(format!("x-access-token:{token}"));
+    let mut cmd = command(dir, args);
+    cmd.env("GIT_CONFIG_COUNT", "1")
+        .env("GIT_CONFIG_KEY_0", "http.https://github.com/.extraheader")
+        .env(
+            "GIT_CONFIG_VALUE_0",
+            format!("Authorization: Basic {basic}"),
+        );
+    finish(cmd)
+}
+
+fn finish(mut cmd: std::process::Command) -> Result<String> {
+    let output = cmd
         .output()
         .map_err(|e| VcsError::GitMissing(e.to_string()))?;
     if output.status.success() {

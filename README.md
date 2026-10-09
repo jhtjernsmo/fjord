@@ -162,7 +162,13 @@ Run `fjord --help` for everything. Changes are recorded with an actor: `--actor`
 
 ## Git & GitHub
 
-Link a project to a repository in the **Git** tab (or `fjord git link <project> <path>`). Fjord then:
+Link a project to a repository in the **Git** tab (or `fjord git link <project> <path>`). No
+repository yet? Tick **Also create a repository on GitHub** when you make a project, or use the Git
+tab: Fjord creates it (private or public, under you or an organization, with an optional README,
+`.gitignore` and license), clones it and links it in one step. A local repository without a remote
+can be published the same way. If you aren't signed in to GitHub, you can sign in right there.
+
+Once a project is linked, Fjord:
 
 - starts a branch for a task with a conventional name — `fix/12-fix-push-notifications`. Pick the type (feat, fix, chore, docs, refactor, test, perf, ci, hotfix) in the task, or let Fjord guess: `fix` for bug-like tasks and Azure Bugs, `feat` otherwise. The task moves to the second column,
 - or links a task to a branch that already exists. Several tasks can share one branch, and its pull request shows on all of them,

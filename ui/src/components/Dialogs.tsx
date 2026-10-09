@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react'
+import { FolderGit2, RefreshCw } from 'lucide-react'
 import type { NewProject, Project } from '../api'
 import { useApp } from '../data'
 import { PROJECT_GLYPHS, ProjectGlyph } from './Icons'
+import { NewRepoFields } from './NewRepoFields'
+import type { RepoDraft } from './NewRepoFields'
 import { appVersion, setUpdateCheckEnabled, updateCheckEnabled, useUpdater } from './Updater'
 
 const COLORS = ['#7c9cff', '#00d4b0', '#3fb950', '#f5a524', '#ff7a1a', '#ff6b6b', '#e86bff', '#a78bfa']
 
 interface Props {
   onCancel: () => void
-  onCreate: (input: NewProject) => void
+  /** Gets the GitHub repository to create too, when the user asked for one. */
+  onCreate: (input: NewProject, repo: RepoDraft | null) => void | Promise<void>
   /** Editing an existing project instead of creating one. */
   project?: Project
 }
@@ -21,8 +25,20 @@ export function NewProjectDialog({ onCancel, onCreate, project }: Props) {
   const [color, setColor] = useState(project?.color ?? COLORS[0])
   const [icon, setIcon] = useState(project?.icon ?? PROJECT_GLYPHS[0])
   const colors = COLORS.includes(color) ? COLORS : [...COLORS, color]
+  const [withRepo, setWithRepo] = useState(false)
+  const [repo, setRepo] = useState<RepoDraft | null>(null)
+  const [busy, setBusy] = useState(false)
+  const canSubmit = !!name.trim() && !busy && (!withRepo || !!repo)
 
-  const submit = () => name.trim() && onCreate({ name: name.trim(), description, color, icon, locale })
+  const submit = async () => {
+    if (!canSubmit) return
+    setBusy(true)
+    try {
+      await onCreate({ name: name.trim(), description, color, icon, locale }, withRepo ? repo : null)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="overlay" onMouseDown={onCancel}>
@@ -31,7 +47,7 @@ export function NewProjectDialog({ onCancel, onCreate, project }: Props) {
         onMouseDown={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault()
-          submit()
+          void submit()
         }}
         onKeyDown={(e) => e.key === 'Escape' && onCancel()}
         role="dialog"
@@ -81,12 +97,29 @@ export function NewProjectDialog({ onCancel, onCreate, project }: Props) {
             ))}
           </div>
         </div>
+        {!project && (
+          <div className="row">
+            <label className="toggle-label">
+              <input type="checkbox" checked={withRepo} onChange={(e) => setWithRepo(e.target.checked)} />
+              <FolderGit2 size={14} /> {t('newRepo.toggle')}
+            </label>
+            {withRepo && <NewRepoFields mode="create" projectName={name} description={description} onChange={setRepo} />}
+          </div>
+        )}
         <div className="actions">
           <button type="button" className="btn ghost" onClick={onCancel}>
             {t('dialog.cancel')}
           </button>
-          <button type="submit" className="btn primary" disabled={!name.trim()}>
-            {project ? t('settings.save') : t('dialog.create')} <kbd>⏎</kbd>
+          <button type="submit" className="btn primary" disabled={!canSubmit}>
+            {busy ? (
+              <>
+                <RefreshCw size={13} className="spin" /> {withRepo ? t('newRepo.creating') : t('dialog.create')}
+              </>
+            ) : (
+              <>
+                {project ? t('settings.save') : t('dialog.create')} <kbd>⏎</kbd>
+              </>
+            )}
           </button>
         </div>
       </form>

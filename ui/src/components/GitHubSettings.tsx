@@ -9,12 +9,9 @@ import type { MessageKey } from '../i18n'
 
 const NEW_TOKEN_URL = 'https://github.com/settings/tokens/new?scopes=repo&description=Fjord'
 
-export function GitHubSettings() {
+/** Sign in with GitHub in the browser (device flow); calls `onDone` with the account. */
+export function useDeviceLogin(onDone: (account: GitHubAccount) => void) {
   const { t, toast } = useApp()
-  const [account, setAccount] = useState<GitHubAccount | null | undefined>(undefined)
-  const [error, setError] = useState<string | null>(null)
-  const [token, setToken] = useState('')
-  const [busy, setBusy] = useState(false)
   const [device, setDevice] = useState<DeviceLogin | null>(null)
 
   // While a browser sign-in is open, poll GitHub at the interval it asked for.
@@ -27,9 +24,9 @@ export function GitHubSettings() {
       try {
         const poll = await api.pollGithubLogin()
         if (poll.status === 'done') {
-          setAccount(poll.account)
           setDevice(null)
           toast(t('github.connected', { login: poll.account.login }), 'success')
+          onDone(poll.account)
           return
         }
         if (poll.status === 'expired' || poll.status === 'denied' || Date.now() > deadline) {
@@ -47,7 +44,7 @@ export function GitHubSettings() {
     }
     timer = window.setTimeout(tick, interval * 1000)
     return () => window.clearTimeout(timer)
-  }, [device, t, toast])
+  }, [device, t, toast, onDone])
 
   const signIn = async () => {
     try {
@@ -59,6 +56,42 @@ export function GitHubSettings() {
       toast(errorMessage(e), 'error')
     }
   }
+
+  return { device, signIn, cancel: () => setDevice(null) }
+}
+
+/** The code to type on github.com while a device sign-in is waiting. */
+export function DeviceCode({ device, onCancel }: { device: DeviceLogin; onCancel: () => void }) {
+  const { t } = useApp()
+  return (
+    <div className="device-login">
+      <span className="hint">{t('github.enterCode')}</span>
+      <div className="device-code">
+        <span className="mono">{device.user_code}</span>
+        <button type="button" className="icon-btn" onClick={() => navigator.clipboard?.writeText(device.user_code)} aria-label={t('github.copyCode')} title={t('github.copyCode')}>
+          <Copy size={14} />
+        </button>
+      </div>
+      <span className="hint">
+        <a href={device.verification_uri} onClick={(e) => (e.preventDefault(), api.openUrl(device.verification_uri))}>
+          {device.verification_uri}
+        </a>{' '}
+        · {t('github.waiting')}
+      </span>
+      <button type="button" className="btn ghost" onClick={onCancel}>
+        {t('dialog.cancel')}
+      </button>
+    </div>
+  )
+}
+
+export function GitHubSettings() {
+  const { t, toast } = useApp()
+  const [account, setAccount] = useState<GitHubAccount | null | undefined>(undefined)
+  const [error, setError] = useState<string | null>(null)
+  const [token, setToken] = useState('')
+  const [busy, setBusy] = useState(false)
+  const { device, signIn, cancel } = useDeviceLogin(setAccount)
 
   const load = () => {
     setError(null)
@@ -122,26 +155,7 @@ export function GitHubSettings() {
         </span>
       )}
       {error && <span className="hint warn">{error}</span>}
-      {device && (
-        <div className="device-login">
-          <span className="hint">{t('github.enterCode')}</span>
-          <div className="device-code">
-            <span className="mono">{device.user_code}</span>
-            <button className="icon-btn" onClick={() => navigator.clipboard?.writeText(device.user_code)} aria-label={t('github.copyCode')} title={t('github.copyCode')}>
-              <Copy size={14} />
-            </button>
-          </div>
-          <span className="hint">
-            <a href={device.verification_uri} onClick={(e) => (e.preventDefault(), api.openUrl(device.verification_uri))}>
-              {device.verification_uri}
-            </a>{' '}
-            · {t('github.waiting')}
-          </span>
-          <button className="btn ghost" onClick={() => setDevice(null)}>
-            {t('dialog.cancel')}
-          </button>
-        </div>
-      )}
+      {device && <DeviceCode device={device} onCancel={cancel} />}
       {account?.source !== 'env' && !device && (
         <button className="btn primary github-signin" onClick={signIn}>
           <LogIn size={14} /> {account ? t('github.signInAgain') : t('github.signIn')}
