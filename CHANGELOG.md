@@ -4,6 +4,10 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## Unreleased
+
+- **Create a GitHub repository** when you make a project, or from the Git tab: private or public, under you or an organization, with an optional README, `.gitignore` and license. Fjord clones it and links it to the project. A local repository without a remote can be published the same way.
+
 ## 0.2.10 — 2026-10-08
 
 - **Open in editor**: open a project's repository in your editor or IDE (VS Code, Cursor, JetBrains IDEs, Visual Studio, Zed, Sublime, or your own command), on a task's branch. `Space e`. ([#48](https://github.com/jhtjernsmo/fjord/pull/48))

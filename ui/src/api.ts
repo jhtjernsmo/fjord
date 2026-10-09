@@ -89,6 +89,22 @@ export interface GitHubAccount {
   private_repos: boolean
 }
 
+export interface RepoOwner {
+  login: string
+  org: boolean
+}
+
+/** A repository to create on GitHub (starter files are ignored when publishing). */
+export interface NewRepo {
+  owner: string
+  name: string
+  description: string
+  private: boolean
+  readme: boolean
+  gitignore: string | null
+  license: string | null
+}
+
 export interface ImportMapping {
   org: string
   project: string
@@ -333,6 +349,11 @@ export const api = {
   getProjectRepo: (projectId: number) => invoke<ProjectRepo | null>('get_project_repo', { projectId }),
   linkRepo: (projectId: number, path: string) => invoke<ProjectRepo>('link_repo', { projectId, path }),
   unlinkRepo: (projectId: number) => invoke<void>('unlink_repo', { projectId }),
+  githubRepoOwners: () => invoke<RepoOwner[]>('github_repo_owners'),
+  createGithubRepo: (projectId: number, repo: NewRepo, parent: string) =>
+    invoke<ProjectRepo>('create_github_repo', { projectId, repo, parent }),
+  publishToGithub: (projectId: number, repo: NewRepo, path: string) =>
+    invoke<ProjectRepo>('publish_to_github', { projectId, repo, path }),
   setRepoAutoMove: (projectId: number, autoMove: boolean) => invoke<void>('set_repo_auto_move', { projectId, autoMove }),
   gitOverview: (projectId: number) => invoke<GitOverview>('git_overview', { projectId }),
   /** Opens the repo in an editor (command template); with a task, checks out its branch first. */

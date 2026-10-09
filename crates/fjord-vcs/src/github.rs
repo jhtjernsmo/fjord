@@ -251,7 +251,7 @@ pub(crate) fn with_message(text: &str, message: &Option<String>) -> String {
     }
 }
 
-fn whoami(token: &str, source: TokenSource) -> Result<GitHubAccount> {
+pub(crate) fn whoami(token: &str, source: TokenSource) -> Result<GitHubAccount> {
     let mut res = agent()
         .get(&format!("{API}/user"))
         .header("Accept", "application/vnd.github+json")
@@ -538,7 +538,7 @@ fn device_poll_from(res: ApiDeviceToken) -> Result<DevicePoll> {
     })
 }
 
-fn api_error(e: HttpError) -> VcsError {
+pub(crate) fn api_error(e: HttpError) -> VcsError {
     match e {
         HttpError::Status(401, _) => VcsError::NoToken,
         HttpError::Status(403, message) => VcsError::GitHub(with_message(

@@ -22,6 +22,7 @@ import { Board } from './components/Board'
 import { CommandPalette } from './components/CommandPalette'
 import type { PaletteMode } from './components/CommandPalette'
 import { NewProjectDialog } from './components/Dialogs'
+import { rememberParent } from './repoName'
 import { SettingsWindow } from './components/Settings'
 import { useThemes } from './themes'
 import { Home } from './components/Home'
@@ -298,8 +299,13 @@ export default function App() {
       {newProject && (
         <NewProjectDialog
           onCancel={() => setNewProject(false)}
-          onCreate={async (input) => {
-            const p = await run(api.createProject(input), t('toast.created', { name: input.name }))
+          onCreate={async (input, repo) => {
+            const p = await run(api.createProject(input), repo ? undefined : t('toast.created', { name: input.name }))
+            if (p && repo) {
+              rememberParent(repo.folder)
+              const linked = await run(api.createGithubRepo(p.id, repo.repo, repo.folder))
+              if (linked) toast(t('newRepo.created', { name: input.name, repo: `${repo.repo.owner}/${repo.repo.name}` }), 'success')
+            }
             setNewProject(false)
             if (p) openProject(p.id)
           }}

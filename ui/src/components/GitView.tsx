@@ -2,11 +2,14 @@
 import { editorLabel, openInEditor } from '../editor'
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
-import { CircleCheck, CircleDashed, Code2, CircleX, ExternalLink, FolderGit2, GitBranch, GitMerge, GitPullRequest, RefreshCw, Unlink, CornerUpLeft } from 'lucide-react'
+import { CircleCheck, CircleDashed, Code2, CircleX, ExternalLink, FolderGit2, GitBranch, GitMerge, GitPullRequest, RefreshCw, Unlink, CornerUpLeft, CloudUpload, FolderPlus } from 'lucide-react'
 import { api, errorMessage, relativeTime, remoteOf } from '../api'
 import type { Checks, LinkedPullRequest, ProjectRepo } from '../api'
 import { useApp, useLive } from '../data'
 import type { MessageKey } from '../i18n'
+import { NewRepoFields } from './NewRepoFields'
+import { rememberParent } from '../repoName'
+import type { RepoDraft } from './NewRepoFields'
 
 // ---- tiny shared cache of the last PR sync per project (used by the task panel) ----
 const prCache = new Map<number, LinkedPullRequest[]>()
@@ -50,10 +53,47 @@ export function PrStateBadge({ pr }: { pr: LinkedPullRequest }) {
   )
 }
 
+/** Make a GitHub repository for a project that has none yet: new and cloned, or a local one published. */
+function CreateRepo({ projectId, mode, onDone }: { projectId: number; mode: 'create' | 'publish'; onDone: () => void }) {
+  const { run, t, toast } = useApp()
+  const [projects] = useLive(() => api.listProjects(), [])
+  const project = projects?.find((p) => p.id === projectId)
+  const [draft, setDraft] = useState<RepoDraft | null>(null)
+  const [busy, setBusy] = useState(false)
+  const submit = async () => {
+    if (!draft || busy) return
+    setBusy(true)
+    const action =
+      mode === 'create' ? api.createGithubRepo(projectId, draft.repo, draft.folder) : api.publishToGithub(projectId, draft.repo, draft.folder)
+    const linked = await run(action)
+    setBusy(false)
+    if (!linked) return
+    if (mode === 'create') rememberParent(draft.folder)
+    toast(t('newRepo.done', { repo: `${draft.repo.owner}/${draft.repo.name}` }), 'success')
+    onDone()
+  }
+  if (!project) return null
+  return (
+    <div className="create-repo">
+      <strong className="create-repo-title">{mode === 'create' ? t('newRepo.createOnGithub') : t('newRepo.publishFolder')}</strong>
+      <NewRepoFields mode={mode} projectName={project.name} description={project.description ?? ''} onChange={setDraft} />
+      <div className="row-inline">
+        <button className="btn primary" disabled={!draft || busy} onClick={() => void submit()}>
+          {busy ? <RefreshCw size={13} className="spin" /> : <CloudUpload size={14} />} {mode === 'create' ? t('newRepo.create') : t('newRepo.publish')}
+        </button>
+        <button className="btn ghost" disabled={busy} onClick={onDone}>
+          {t('dialog.cancel')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function LinkRepo({ projectId }: { projectId: number }) {
   const { run, t } = useApp()
   const [path, setPath] = useState('')
   const [linking, setLinking] = useState(false)
+  const [creating, setCreating] = useState<'create' | 'publish' | null>(null)
   const choose = async () => {
     const picked = await openDialog({ directory: true, multiple: false })
     if (typeof picked === 'string') setPath(picked)
@@ -87,6 +127,19 @@ function LinkRepo({ projectId }: { projectId: number }) {
             )}
           </button>
         </form>
+        {creating ? (
+          <CreateRepo projectId={projectId} mode={creating} onDone={() => setCreating(null)} />
+        ) : (
+          <div className="row-inline create-repo-choices">
+            <span className="hint">{t('newRepo.noRepoYet')}</span>
+            <button className="btn ghost" onClick={() => setCreating('create')}>
+              <FolderPlus size={14} /> {t('newRepo.createOnGithub')}
+            </button>
+            <button className="btn ghost" onClick={() => setCreating('publish')}>
+              <CloudUpload size={14} /> {t('newRepo.publishFolder')}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

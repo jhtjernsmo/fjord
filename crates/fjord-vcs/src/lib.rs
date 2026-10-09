@@ -7,6 +7,7 @@ pub mod credentials;
 pub mod editor;
 pub mod git;
 pub mod github;
+pub mod new_repo;
 mod process;
 
 use std::collections::HashMap;
@@ -30,6 +31,7 @@ pub use github::{
     connect_github, disconnect_github, find_token, github_account, parse_github_remote,
     poll_github_login, start_github_login,
 };
+pub use new_repo::{GITIGNORE_TEMPLATES, LICENSES, NewRepo, RepoOwner};
 
 const RECENT_COMMITS: usize = 15;
 
