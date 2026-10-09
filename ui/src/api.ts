@@ -379,7 +379,9 @@ export const api = {
     invoke<string>('open_in_editor', { projectId, taskId, command }),
   /** Switches the repository back to its main branch; returns the branch name. */
   checkoutDefault: (projectId: number) => invoke<string>('checkout_default', { projectId }),
-  startBranch: (taskId: number, kind: string | null = null) => invoke<StartedBranch>('start_branch', { taskId, kind }),
+  /** `name` replaces the suggested branch name; null uses the suggestion. */
+  startBranch: (taskId: number, kind: string | null = null, name: string | null = null) =>
+    invoke<StartedBranch>('start_branch', { taskId, kind, name }),
   /** [type, name] the task's branch would get; the type is guessed when not given. */
   suggestBranch: (taskId: number, kind: string | null = null) => invoke<[string, string]>('suggest_branch', { taskId, kind }),
   syncPullRequests: (projectId: number) => invoke<SyncReport>('sync_pull_requests', { projectId }),
