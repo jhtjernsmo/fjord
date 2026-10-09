@@ -253,11 +253,24 @@ pub fn branch_for(task: &Task, kind: Option<&str>) -> Result<String> {
 /// Checks out the task's branch (creating `<type>/<id>-<slug>` the first time)
 /// and, with auto-move on, moves a task from the first column to the second.
 pub fn start_branch(store: &mut Store, task_id: i64, kind: Option<&str>) -> Result<StartedBranch> {
+    start_branch_named(store, task_id, kind, None)
+}
+
+/// Like [`start_branch`], but with a name the user typed instead of the
+/// suggested one. Ignored when the task already has a branch.
+pub fn start_branch_named(
+    store: &mut Store,
+    task_id: i64,
+    kind: Option<&str>,
+    name: Option<&str>,
+) -> Result<StartedBranch> {
     let task = store.get_task(task_id)?;
     let (repo, git) = linked(store, task.project_id)?;
-    let branch = match task.branch.clone() {
-        Some(existing) => existing,
-        None => branch_for(&task, kind)?,
+    let custom = name.map(str::trim).filter(|n| !n.is_empty());
+    let branch = match (task.branch.clone(), custom) {
+        (Some(existing), _) => existing,
+        (None, Some(name)) => name.to_string(),
+        (None, None) => branch_for(&task, kind)?,
     };
     let created = git.switch_or_create(&branch)?;
     let mut task = store.set_task_branch(task.id, Some(&branch))?;
@@ -816,6 +829,30 @@ mod tests {
 
         let again = start_branch(&mut s, t.id, None).unwrap();
         assert!(!again.created);
+
+        let other = s
+            .create_task(NewTask {
+                project_id: p,
+                title: "Login page".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(matches!(
+            start_branch_named(&mut s, other.id, None, Some("bad name")),
+            Err(VcsError::InvalidBranch(_))
+        ));
+        assert_eq!(
+            s.get_task(other.id).unwrap().branch,
+            None,
+            "nothing linked on error"
+        );
+        let named =
+            start_branch_named(&mut s, other.id, Some("feat"), Some(" jonas/login ")).unwrap();
+        assert_eq!(named.branch, "jonas/login");
+        assert_eq!(named.task.branch.as_deref(), Some("jonas/login"));
+        assert!(named.created);
+        // Back on the first task's branch for the overview checks below.
+        start_branch(&mut s, t.id, None).unwrap();
 
         let ov = overview(&s, p).unwrap();
         assert_eq!(ov.current_branch, started.branch);
