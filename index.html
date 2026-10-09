@@ -141,19 +141,40 @@
     <tr data-os="mac"><td>macOS</td><td><a data-asset="aarch64.dmg" href="https://github.com/jhtjernsmo/fjord/releases/latest">Apple Silicon</a> or <a data-asset="x64.dmg" href="https://github.com/jhtjernsmo/fjord/releases/latest">Intel</a></td></tr>
     <tr data-os="linux"><td>Linux</td><td><a data-asset=".AppImage" href="https://github.com/jhtjernsmo/fjord/releases/latest">AppImage</a>, <a data-asset=".deb" href="https://github.com/jhtjernsmo/fjord/releases/latest">.deb</a> or <a data-asset=".rpm" href="https://github.com/jhtjernsmo/fjord/releases/latest">.rpm</a></td></tr>
   </table>
-  <p class="muted">The macOS app is signed and notarized by Apple, so it opens like any other app. The Windows builds aren't code-signed yet: if SmartScreen warns you, click "More info" and then "Run anyway". Older versions are on the <a href="https://github.com/jhtjernsmo/fjord/releases">releases page</a>.</p>
+  <p class="muted">The macOS app is signed and notarized by Apple, so it opens like any other app. The Windows builds aren't code-signed yet: if SmartScreen warns you, click "More info" and then "Run anyway". Older versions are on the <a href="https://github.com/jhtjernsmo/fjord/releases">releases page</a>. See the <a href="#code-signing">code signing policy</a>.</p>
 
   <h2>Questions</h2>
   <dl>
     <dt>Where is my data?</dt>
     <dd>In one folder: <code>~/.local/share/fjord</code> on Linux, <code>%APPDATA%\fjord</code> on Windows and <code>~/Library/Application Support/fjord</code> on macOS. Copy it to back up.</dd>
     <dt>Does it send anything anywhere?</dt>
-    <dd>No accounts and no telemetry. It only goes online to check for updates (you can turn that off) and, if you link a repo or turn on the Azure Boards import, to talk to GitHub or Azure DevOps.</dd>
+    <dd>No accounts and no telemetry. It only goes online to check for updates (you can turn that off) and, if you link a repo or turn on the Azure Boards import, to talk to GitHub or Azure DevOps. Details under <a href="#privacy">Privacy</a>.</dd>
     <dt>What's it built with?</dt>
     <dd>Rust, Tauri, SQLite and React. Licensed MIT or Apache-2.0.</dd>
     <dt>Found a bug?</dt>
     <dd>Please <a href="https://github.com/jhtjernsmo/fjord/issues">open an issue</a>.</dd>
   </dl>
+
+  <h2 id="privacy">Privacy</h2>
+  <p>Fjord has no accounts, no telemetry and no analytics, and I don't collect any data about you. Everything you write stays in the data folder on your own machine.</p>
+  <p>The app only connects to other systems in these cases:</p>
+  <ul>
+    <li>Checking for updates: it asks GitHub Releases whether there's a newer version. This is on by default and can be turned off in Settings &rarr; Updates.</li>
+    <li>Git, GitHub and Azure DevOps: only for repositories and organizations you link yourself, using the token you give it. Tokens are kept in your operating system's credential store.</li>
+    <li>Links open in your browser when you click them. "Report a bug" opens a new GitHub issue with the app version and operating system filled in, and nothing is sent until you submit it.</li>
+  </ul>
+  <p>The command line tool and the MCP server for AI agents run locally. They only talk to GitHub or Azure DevOps when you or your agent run a command that needs it, such as syncing pull requests.</p>
+
+  <h2 id="code-signing">Code signing policy</h2>
+  <p>Free code signing provided by <a href="https://about.signpath.io">SignPath.io</a>, certificate by <a href="https://signpath.org">SignPath Foundation</a>.</p>
+  <p>The Windows installers and the command line tool are built by GitHub Actions from the tagged commit in the <a href="https://github.com/jhtjernsmo/fjord">public repository</a>, and each release is approved by hand before it's signed. The macOS app is signed with an Apple Developer ID and notarized by Apple.</p>
+  <dl>
+    <dt>Committers and reviewers</dt>
+    <dd><a href="https://github.com/jhtjernsmo">Jonas Hollund Tjernsmo</a></dd>
+    <dt>Approvers</dt>
+    <dd><a href="https://github.com/jhtjernsmo">Jonas Hollund Tjernsmo</a></dd>
+  </dl>
+  <p>Changes reach the main branch only through pull requests that pass the required checks. See the <a href="#privacy">privacy policy</a> above for what the app sends over the network.</p>
 </main>
 
 <footer>
