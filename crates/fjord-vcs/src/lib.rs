@@ -3,6 +3,7 @@
 //! tasks along the board as their PRs get merged.
 
 pub mod azure;
+pub mod azure_mentions;
 pub mod credentials;
 pub mod editor;
 pub mod git;
@@ -22,6 +23,7 @@ pub use azure::{
     azure_account, connect_azure, connect_azure_cli, disconnect_azure, parse_azure_remote,
     parse_work_item_url, work_item_comments, work_item_info,
 };
+pub use azure_mentions::Mention;
 pub use git::{
     BRANCH_TYPES, Branch, Commit, Git, branch_name_for_task, branch_type, guess_branch_type,
     task_id_from_branch,
@@ -432,13 +434,7 @@ fn split_external_id(id: &str) -> Option<(String, u64)> {
 /// mappings, plus what's needed to nest them and to notice closed ones.
 /// `known` are external ids already imported (`org/id`).
 pub fn fetch_import(settings: &ImportSettings, known: &[String]) -> Result<ImportFetch> {
-    let mut orgs: Vec<String> = settings
-        .mappings
-        .iter()
-        .map(|m| m.org.to_lowercase())
-        .collect();
-    orgs.sort();
-    orgs.dedup();
+    let orgs = import_orgs(settings);
     let mut fetch = ImportFetch::default();
     for org in orgs {
         let items = assigned_work_items(&org, settings.closed_days)?;
@@ -482,6 +478,39 @@ pub fn fetch_import(settings: &ImportSettings, known: &[String]) -> Result<Impor
         fetch.items.extend(items);
     }
     Ok(fetch)
+}
+
+/// The organizations the Azure Boards import is set up for.
+fn import_orgs(settings: &ImportSettings) -> Vec<String> {
+    let mut orgs: Vec<String> = settings
+        .mappings
+        .iter()
+        .map(|m| m.org.to_lowercase())
+        .collect();
+    orgs.sort();
+    orgs.dedup();
+    orgs
+}
+
+/// Network only: work items you were mentioned in (and don't own) in the
+/// organizations the import is set up for.
+pub fn fetch_mentions(settings: &ImportSettings) -> Result<Vec<Mention>> {
+    azure_mentions::recent_mentions(&import_orgs(settings))
+}
+
+/// Network only: the work item to turn into a task (see [`add_work_item_task`]).
+pub fn fetch_work_item(org: &str, id: u64) -> Result<WorkItem> {
+    azure::work_items(org, &[id])?
+        .into_iter()
+        .next()
+        .ok_or_else(|| VcsError::Azure(format!("work item {id} not found in «{org}»")))
+}
+
+/// Adds a work item to a project as an imported task (or returns the task it
+/// already became), so later imports keep its title and state up to date.
+pub fn add_work_item_task(store: &mut Store, project_id: i64, item: &WorkItem) -> Result<Task> {
+    let (task, _) = store.upsert_imported_task(project_id, &item.to_external_item())?;
+    Ok(task)
 }
 
 /// Network only, without hierarchy: open work items assigned to you.

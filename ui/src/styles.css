@@ -502,6 +502,28 @@ kbd {
 .toggle { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
 .toggle.on { border-color: var(--accent); color: var(--text); background: var(--panel-2); }
 .filter-count { color: var(--dim); font-size: 12.5px; }
+.mentions-heading { display: inline-flex; align-items: center; gap: 6px; }
+.mentions-heading .count { background: var(--panel-2); color: var(--text); border-radius: 999px; padding: 0 7px; font-size: 11px; letter-spacing: 0; line-height: 18px; }
+.mentions { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.mention { display: flex; gap: 16px; padding: 11px 14px; align-items: flex-start; }
+.mention + .mention { border-top: 1px solid var(--line); }
+.mention-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.mention-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mention-kind { flex: none; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 5px; color: var(--c); background: color-mix(in oklab, var(--c) 14%, transparent); }
+.kind-bug { --c: var(--danger); }
+.kind-story { --c: #5ea4ff; }
+.kind-feature { --c: #b48cff; }
+.kind-task { --c: #e3b341; }
+.mention-title { font-size: 13.5px; font-weight: 500; color: var(--text); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.mention-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+.mention-meta { display: flex; gap: 6px; font-size: 12.5px; min-width: 0; color: var(--muted); }
+.mention-by { flex: none; color: var(--text); opacity: .85; }
+.mention-by.said::after { content: ':'; }
+.mention-snippet { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.mention-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.mention-when { font-size: 12px; color: var(--dim); white-space: nowrap; }
+.mention-actions { display: flex; gap: 2px; opacity: .55; transition: opacity .15s; }
+.mention:hover .mention-actions, .mention:focus-within .mention-actions { opacity: 1; }
 .archive-list { display: flex; flex-direction: column; gap: 6px; }
 .archive-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
 .archive-title { flex: 1; }

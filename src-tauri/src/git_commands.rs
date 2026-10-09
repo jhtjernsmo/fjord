@@ -235,6 +235,27 @@ pub async fn run_azure_import(state: State<'_, AppState>) -> CmdResult<fjord_vcs
     with_store(&state, |s| fjord_vcs::apply_import(s, &settings, &fetch))
 }
 
+/// Azure Boards work items you were mentioned in but don't own (Overview).
+#[tauri::command]
+pub async fn azure_mentions(state: State<'_, AppState>) -> CmdResult<Vec<fjord_vcs::Mention>> {
+    let settings = with_store(&state, |s| Ok(s.import_settings()?))?;
+    off_thread(move || fjord_vcs::fetch_mentions(&settings)).await
+}
+
+/// Adds a work item you were mentioned in to a project as a task.
+#[tauri::command]
+pub async fn add_work_item_task(
+    state: State<'_, AppState>,
+    project_id: i64,
+    org: String,
+    id: u64,
+) -> CmdResult<Task> {
+    let item = off_thread(move || fjord_vcs::fetch_work_item(&org, id)).await?;
+    with_store(&state, |s| {
+        fjord_vcs::add_work_item_task(s, project_id, &item)
+    })
+}
+
 /// Starts "Sign in with GitHub": returns the code the user types on github.com.
 #[tauri::command]
 pub async fn start_github_login() -> CmdResult<fjord_vcs::DeviceLogin> {

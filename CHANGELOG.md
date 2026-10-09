@@ -4,6 +4,10 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## Unreleased
+
+- **Azure mentions in the Overview**: work items where someone @mentioned you but that aren't assigned to you, with who mentioned you and what they wrote. Open one, add it to a project as a task, or dismiss it; new mentions get a notification.
+
 ## 0.2.11 — 2026-10-09
 
 - **Create a GitHub repository** when you make a project, or from the Git tab: private or public, under you or an organization, with an optional README, `.gitignore` and license. Fjord clones it and links it to the project. A local repository without a remote can be published the same way. ([#57](https://github.com/jhtjernsmo/fjord/pull/57))

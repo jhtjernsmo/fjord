@@ -89,6 +89,20 @@ export interface GitHubAccount {
   private_repos: boolean
 }
 
+/** An Azure Boards work item you were @mentioned in but don't own. */
+export interface Mention {
+  org: string
+  id: number
+  project: string
+  kind: string
+  state: string
+  title: string
+  url: string
+  by: string
+  at: string
+  snippet: string
+}
+
 export interface RepoOwner {
   login: string
   org: boolean
@@ -349,6 +363,8 @@ export const api = {
   getProjectRepo: (projectId: number) => invoke<ProjectRepo | null>('get_project_repo', { projectId }),
   linkRepo: (projectId: number, path: string) => invoke<ProjectRepo>('link_repo', { projectId, path }),
   unlinkRepo: (projectId: number) => invoke<void>('unlink_repo', { projectId }),
+  azureMentions: () => invoke<Mention[]>('azure_mentions'),
+  addWorkItemTask: (projectId: number, org: string, id: number) => invoke<Task>('add_work_item_task', { projectId, org, id }),
   githubRepoOwners: () => invoke<RepoOwner[]>('github_repo_owners'),
   createGithubRepo: (projectId: number, repo: NewRepo, parent: string) =>
     invoke<ProjectRepo>('create_github_repo', { projectId, repo, parent }),

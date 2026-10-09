@@ -15,6 +15,7 @@ import { TitleBar } from './components/TitleBar'
 import { reportBug } from './reportBug'
 import { refreshPullRequests } from './components/GitView'
 import { AzureImportRunner } from './components/AzureImport'
+import { MentionsRunner } from './components/Mentions'
 import { LOCALES } from './i18n'
 import type { MessageKey } from './i18n'
 import { ProjectGlyph } from './components/Icons'
@@ -201,6 +202,7 @@ export default function App() {
     <div className="app">
       <TitleBar title={windowTitle} />
       <AzureImportRunner />
+      <MentionsRunner />
       <Sidebar
         projects={sortedProjects}
         sort={projectSort}

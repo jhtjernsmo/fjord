@@ -14,7 +14,7 @@ use crate::github::{
 };
 use crate::{Result, VcsError, credentials};
 
-const HOST: &str = "https://dev.azure.com";
+pub(crate) const HOST: &str = "https://dev.azure.com";
 const API_VERSION: &str = "7.1";
 const TOP: u32 = 30;
 /// The Azure DevOps resource id, for `az account get-access-token`.
@@ -85,7 +85,7 @@ fn decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-fn encode(s: &str) -> String {
+pub(crate) fn encode(s: &str) -> String {
     s.bytes()
         .map(|b| match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
@@ -102,7 +102,7 @@ fn account_for(org: &str) -> String {
 }
 
 #[derive(Clone)]
-enum Auth {
+pub(crate) enum Auth {
     /// Personal access token (HTTP Basic with an empty user name).
     Pat(String),
     /// Microsoft Entra token from the Azure CLI.
@@ -110,7 +110,7 @@ enum Auth {
 }
 
 impl Auth {
-    fn header(&self) -> String {
+    pub(crate) fn header(&self) -> String {
         match self {
             Auth::Pat(pat) => format!(
                 "Basic {}",
@@ -121,7 +121,7 @@ impl Auth {
     }
 }
 
-fn find_auth(org: &str) -> Option<(Auth, TokenSource)> {
+pub(crate) fn find_auth(org: &str) -> Option<(Auth, TokenSource)> {
     if let Some(t) = std::env::var("AZURE_DEVOPS_EXT_PAT")
         .ok()
         .filter(|t| !t.trim().is_empty())
@@ -156,14 +156,14 @@ fn az_cli_token() -> Option<(Auth, TokenSource)> {
 // ---------- API shapes ----------
 
 #[derive(Deserialize)]
-struct List<T> {
-    value: Vec<T>,
+pub(crate) struct List<T> {
+    pub(crate) value: Vec<T>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ApiIdentity {
-    display_name: String,
+pub(crate) struct ApiIdentity {
+    pub(crate) display_name: String,
 }
 
 #[derive(Deserialize)]
@@ -213,6 +213,7 @@ struct ApiConnection {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ApiConnectionUser {
+    id: Option<String>,
     provider_display_name: Option<String>,
     custom_display_name: Option<String>,
 }
@@ -390,7 +391,7 @@ impl AzureDevOps {
 
 /// Azure DevOps answers a bad or expired PAT with a 203 sign-in page instead of
 /// a 401, so anything that isn't JSON is treated as an authentication problem.
-fn read_json<T: serde::de::DeserializeOwned>(
+pub(crate) fn read_json<T: serde::de::DeserializeOwned>(
     res: &mut ureq::http::Response<ureq::Body>,
     org: &str,
 ) -> Result<T> {
@@ -409,7 +410,7 @@ fn read_json<T: serde::de::DeserializeOwned>(
         .map_err(|e| VcsError::Azure(e.to_string()))
 }
 
-fn api_error(e: HttpError, org: &str) -> VcsError {
+pub(crate) fn api_error(e: HttpError, org: &str) -> VcsError {
     match e {
         HttpError::Status(401, _) => VcsError::NoAzureToken(org.to_string()),
         HttpError::Status(403, message) => VcsError::Azure(with_message(
@@ -472,7 +473,21 @@ fn whoami(org: &str, auth: &Auth, source: TokenSource) -> Result<AzureAccount> {
     })
 }
 
-fn check_org(org: &str) -> Result<&str> {
+/// The signed-in user's identity id in an organization (mentions point at it).
+pub(crate) fn my_identity_id(org: &str, auth: &Auth) -> Result<Option<String>> {
+    let mut res = agent()
+        .get(&format!("{HOST}/{}/_apis/connectionData", encode(org)))
+        .header("Accept", "application/json")
+        .header("Authorization", &auth.header())
+        .call()
+        .map_err(HttpError::from)
+        .and_then(checked)
+        .map_err(|e| api_error(e, org))?;
+    let data: ApiConnection = read_json(&mut res, org)?;
+    Ok(data.authenticated_user.id)
+}
+
+pub(crate) fn check_org(org: &str) -> Result<&str> {
     let org = org.trim();
     if org.is_empty()
         || !org
@@ -561,10 +576,10 @@ struct WiqlRef {
 }
 
 #[derive(Deserialize)]
-struct ApiWorkItem {
-    id: u64,
+pub(crate) struct ApiWorkItem {
+    pub(crate) id: u64,
     rev: i64,
-    fields: serde_json::Map<String, serde_json::Value>,
+    pub(crate) fields: serde_json::Map<String, serde_json::Value>,
 }
 
 /// An Azure Boards work item, with HTML fields already turned into markdown.
@@ -631,7 +646,7 @@ impl WorkItem {
     }
 }
 
-fn field_str(fields: &serde_json::Map<String, serde_json::Value>, key: &str) -> String {
+pub(crate) fn field_str(fields: &serde_json::Map<String, serde_json::Value>, key: &str) -> String {
     fields
         .get(key)
         .and_then(|v| v.as_str())
@@ -639,7 +654,7 @@ fn field_str(fields: &serde_json::Map<String, serde_json::Value>, key: &str) -> 
         .to_string()
 }
 
-fn work_item_from(org: &str, item: ApiWorkItem) -> WorkItem {
+pub(crate) fn work_item_from(org: &str, item: ApiWorkItem) -> WorkItem {
     let f = &item.fields;
     let description = match field_str(f, "System.Description") {
         d if d.trim().is_empty() => field_str(f, "Microsoft.VSTS.TCM.ReproSteps"),
@@ -671,35 +686,41 @@ fn work_item_from(org: &str, item: ApiWorkItem) -> WorkItem {
     }
 }
 
-/// Open work items assigned to you in one organization.
-pub fn assigned_work_items(org: &str, closed_days: u32) -> Result<Vec<WorkItem>> {
-    let org = check_org(org)?;
-    let (auth, _) = find_auth(org).ok_or_else(|| VcsError::NoAzureToken(org.to_string()))?;
-    let agent = agent();
-    let mut res = agent
+/// Runs a WIQL query and returns the ids it matched, in the query's order.
+pub(crate) fn wiql_ids(org: &str, auth: &Auth, query: &str) -> Result<Vec<u64>> {
+    let mut res = agent()
         .post(&format!(
             "{HOST}/{}/_apis/wit/wiql?api-version={API_VERSION}",
             encode(org)
         ))
         .header("Accept", "application/json")
         .header("Authorization", &auth.header())
-        .send_json(json!({ "query": assigned_query(closed_days) }))
+        .send_json(json!({ "query": query }))
         .map_err(HttpError::from)
         .and_then(checked)
         .map_err(|e| api_error(e, org))?;
     let wiql: WiqlResult = read_json(&mut res, org)?;
-    let ids: Vec<String> = wiql
-        .work_items
-        .iter()
-        .take(MAX_WORK_ITEMS)
-        .map(|w| w.id.to_string())
-        .collect();
+    Ok(wiql.work_items.iter().map(|w| w.id).collect())
+}
+
+/// Raw work items with the given fields (at most [`MAX_WORK_ITEMS`] ids).
+pub(crate) fn fetch_work_items(
+    org: &str,
+    auth: &Auth,
+    ids: &[u64],
+    fields: &str,
+) -> Result<Vec<ApiWorkItem>> {
     if ids.is_empty() {
         return Ok(Vec::new());
     }
-    let mut res = agent
+    let ids: Vec<String> = ids
+        .iter()
+        .take(MAX_WORK_ITEMS)
+        .map(u64::to_string)
+        .collect();
+    let mut res = agent()
         .get(&format!(
-            "{HOST}/{}/_apis/wit/workitems?ids={}&fields={WORK_ITEM_FIELDS}&api-version={API_VERSION}",
+            "{HOST}/{}/_apis/wit/workitems?ids={}&fields={fields}&errorPolicy=omit&api-version={API_VERSION}",
             encode(org),
             ids.join(",")
         ))
@@ -707,11 +728,29 @@ pub fn assigned_work_items(org: &str, closed_days: u32) -> Result<Vec<WorkItem>>
         .header("Authorization", &auth.header())
         .call()
         .map_err(HttpError::from)
-            .and_then(checked)
-            .map_err(|e| api_error(e, org))?;
-    let items: List<ApiWorkItem> = read_json(&mut res, org)?;
-    Ok(items
-        .value
+        .and_then(checked)
+        .map_err(|e| api_error(e, org))?;
+    let items: List<Option<ApiWorkItem>> = read_json(&mut res, org)?;
+    Ok(items.value.into_iter().flatten().collect())
+}
+
+/// Open work items assigned to you in one organization.
+pub fn assigned_work_items(org: &str, closed_days: u32) -> Result<Vec<WorkItem>> {
+    let org = check_org(org)?;
+    let (auth, _) = find_auth(org).ok_or_else(|| VcsError::NoAzureToken(org.to_string()))?;
+    let ids = wiql_ids(org, &auth, &assigned_query(closed_days))?;
+    work_items_with_auth(org, &auth, &ids)
+}
+
+/// Work items by id, with everything an import needs.
+pub fn work_items(org: &str, ids: &[u64]) -> Result<Vec<WorkItem>> {
+    let org = check_org(org)?;
+    let (auth, _) = find_auth(org).ok_or_else(|| VcsError::NoAzureToken(org.to_string()))?;
+    work_items_with_auth(org, &auth, ids)
+}
+
+fn work_items_with_auth(org: &str, auth: &Auth, ids: &[u64]) -> Result<Vec<WorkItem>> {
+    Ok(fetch_work_items(org, auth, ids, WORK_ITEM_FIELDS)?
         .into_iter()
         .map(|i| work_item_from(org, i))
         .collect())
@@ -774,15 +813,15 @@ pub struct WorkItemComment {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ApiComment {
-    text: String,
-    created_by: ApiIdentity,
-    created_date: String,
+pub(crate) struct ApiComment {
+    pub(crate) text: String,
+    pub(crate) created_by: ApiIdentity,
+    pub(crate) created_date: String,
 }
 
 #[derive(Deserialize)]
-struct ApiComments {
-    comments: Vec<ApiComment>,
+pub(crate) struct ApiComments {
+    pub(crate) comments: Vec<ApiComment>,
 }
 
 /// (org, project, id) from a work item's web URL, as stored for imported tasks.
