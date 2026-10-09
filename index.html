@@ -170,8 +170,7 @@
   <p>The command line tool and the MCP server for AI agents run locally. They only talk to GitHub or Azure DevOps when you or your agent run a command that needs it, such as syncing pull requests.</p>
 
   <h2 id="code-signing">Code signing policy</h2>
-  <p>Free code signing provided by <a href="https://about.signpath.io">SignPath.io</a>, certificate by <a href="https://signpath.org">SignPath Foundation</a>.</p>
-  <p>The Windows installers and the command line tool are built by GitHub Actions from the tagged commit in the <a href="https://github.com/jhtjernsmo/fjord">public repository</a>, and each release is approved by hand before it's signed. The macOS app is signed with an Apple Developer ID and notarized by Apple.</p>
+  <p>Every release is built by GitHub Actions from the tagged commit in the <a href="https://github.com/jhtjernsmo/fjord">public repository</a>, and approved by hand before it's published. The macOS app is signed with an Apple Developer ID and notarized by Apple. The Windows builds aren't code-signed yet; the updater still checks a signature on every update before installing it.</p>
   <dl>
     <dt>Committers and reviewers</dt>
     <dd><a href="https://github.com/jhtjernsmo">Jonas Hollund Tjernsmo</a></dd>
