@@ -6,7 +6,7 @@ Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 
 ## Unreleased
 
-- **Create a GitHub repository** when you make a project, or from the Git tab: private or public, under you or an organization, with an optional README, `.gitignore` and license. Fjord clones it and links it to the project. A local repository without a remote can be published the same way.
+- **Create a GitHub repository** when you make a project, or from the Git tab: private or public, under you or an organization, with an optional README, `.gitignore` and license. Fjord clones it and links it to the project. A local repository without a remote can be published the same way. ([#57](https://github.com/jhtjernsmo/fjord/pull/57))
 
 ## 0.2.10 — 2026-10-08
 
