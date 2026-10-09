@@ -12,7 +12,7 @@
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-informational)
 ![Status](https://img.shields.io/badge/status-early%20preview-orange)
 
-![Fjord board](docs/screenshots/board.png)
+![Fjord used with the keyboard only: jump to a project, move and add tasks, search, open the Git tab and notes](docs/screenshots/keyboard.gif)
 
 </div>
 
@@ -104,6 +104,8 @@ For development with hot reload: `npx --prefix ui tauri dev`.
 From 0.2.1 on, Fjord checks GitHub Releases on startup and offers **Update & restart** (Windows, macOS and the Linux AppImage; `.deb`/`.rpm` update via your package manager). Updates are signed and verified before installing; the check can be turned off in Settings. **Settings → Updates** shows the installed version and has a *Check now* button. Versions before 0.2.1 have no updater, so install the latest release once by hand.
 
 ## Keyboard
+
+![Fjord board](docs/screenshots/board.png)
 
 Press `?` in the app to see every shortcut. Press the leader key (`Space`) and wait a moment to see
 what comes next.
