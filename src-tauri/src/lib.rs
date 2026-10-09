@@ -1,6 +1,7 @@
 //! Tauri shell: exposes fjord-core to the React UI as commands.
 
 mod commands;
+mod distribution;
 mod git_commands;
 mod window_fit;
 
@@ -33,6 +34,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            distribution::installed_from_store,
             commands::actor,
             commands::change_counter,
             commands::list_projects,
