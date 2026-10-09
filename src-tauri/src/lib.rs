@@ -2,6 +2,7 @@
 
 mod commands;
 mod git_commands;
+mod window_fit;
 
 use std::sync::{Arc, Mutex};
 
@@ -28,6 +29,7 @@ pub fn run() {
                 store.set_actor(&name)?;
             }
             app.manage(AppState(Arc::new(Mutex::new(store))));
+            window_fit::fit_main_window(app);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
