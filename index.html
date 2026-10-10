@@ -74,6 +74,14 @@
   },
   {
    "@type": "Question",
+   "name": "Is it trying to replace my other tools?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "No. Git stays Git, and your code stays in your editor. Fjord links tasks to branches and pull requests, and uses git, gh and az if you have them. Your data is a plain SQLite file, and the fjord command line tool prints JSON with --json, so you can script it or pipe it into other tools. The MCP server lets AI agents use it the same way."
+   }
+  },
+  {
+   "@type": "Question",
    "name": "Can an AI agent use it?",
    "acceptedAnswer": {
     "@type": "Answer",
@@ -184,7 +192,7 @@
 
   <h2>Why I made it</h2>
   <p>I have a handful of side projects going at any time, and I wanted one place for their tasks, notes and files that opens instantly and doesn't live in a browser tab. Most tools I tried were either online-only or did far more than I needed.</p>
-  <p>So Fjord is small on purpose. It runs locally, works fine without the mouse, knows about my Git repos, and lets my AI agent help out on the same board. If that sounds like what you want too, give it a try.</p>
+  <p>So Fjord is small on purpose. It runs locally, works fine without the mouse, knows about my Git repos, and lets my AI agent help out on the same board. It doesn't try to replace Git, GitHub or my editor; it links to them and uses the tools I already have. If that sounds like what you want too, give it a try.</p>
   <p class="muted">Jonas</p>
 
   <h2>What it does</h2>
@@ -277,6 +285,8 @@
     <dd>Yes. Boards, notes and files are on your own disk, so everything works without a connection. Only the GitHub and Azure DevOps features need the internet.</dd>
     <dt>How is it different from Trello, Jira or Linear?</dt>
     <dd>Those are online services built for teams. Fjord is a desktop app for one person: your data stays in a file on your computer, it opens instantly, and it's made to be used from the keyboard. There's no sharing or sync between machines.</dd>
+    <dt>Is it trying to replace my other tools?</dt>
+    <dd>No. Git stays Git, and your code stays in your editor. Fjord links tasks to branches and pull requests, and uses <code>git</code>, <code>gh</code> and <code>az</code> if you have them. Your data is a plain SQLite file, and the <code>fjord</code> command line tool prints JSON with <code>--json</code>, so you can script it or pipe it into other tools. The MCP server lets AI agents use it the same way.</dd>
     <dt>Can an AI agent use it?</dt>
     <dd>Yes. Fjord comes with an MCP server, so Claude and other MCP clients can read and update your boards and notes. It can't delete anything. See <a href="#ai-agents">AI agents</a>.</dd>
     <dt>Where is my data?</dt>

@@ -21,6 +21,8 @@ Made by Jonas Hollund Tjernsmo in Oslo. Licensed MIT or Apache-2.0. Built with R
 
 One person who wants a fast, local place for the tasks, notes and files of several projects, especially developers who live in Git and the keyboard. It is not a team tool: there is no sharing or sync between machines.
 
+Fjord doesn't try to replace Git, GitHub or your editor. It links tasks to branches and pull requests and uses the git, gh and az tools you already have. Data is a plain SQLite file, and the `fjord` CLI prints JSON with `--json`, so it can be scripted and piped into other tools.
+
 ## Install
 
 - Windows: .exe installer or .msi from GitHub Releases.
