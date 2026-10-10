@@ -1,0 +1,42 @@
+# Fjord
+
+> Fjord is a free, open-source desktop app for keeping track of projects: kanban boards, markdown notes and files, stored in one SQLite file on your own computer. No account, no server, no telemetry. It runs on Linux, Windows and macOS, is made to be used from the keyboard, has Git, GitHub and Azure DevOps built in, and includes an MCP server so AI agents can work on the same boards.
+
+Made by Jonas Hollund Tjernsmo in Oslo. Licensed MIT or Apache-2.0. Built with Rust, Tauri, SQLite and React. Latest version: 0.2.15.
+
+## What it does
+
+- Boards with custom columns, priorities, due dates, subtasks, drag and drop, filters and an archive.
+- An Overview with what's due this week across all projects, mentions from Azure DevOps and project progress.
+- Markdown notes with [[wiki links]] to projects, tasks and other notes, backlinks, tables and Mermaid diagrams.
+- Files attached to projects or tasks, copied into Fjord's data folder.
+- Search across tasks, notes and file names.
+- Keyboard-first: Space is a leader key with a which-key menu, Ctrl+K opens a command palette, h/j/k/l move around the board. Every binding can be changed in keymap.json. Everything also works with the mouse.
+- Git: link a project to a local repository and start a branch from any task (feat/12-add-login); the name can be edited first. Shows pull requests and CI status, opens a PR from a task and moves the task to Done when the PR is merged. Works with GitHub and Azure DevOps. Can create a new GitHub repository for a project.
+- Azure Boards: imports work items assigned to you as tasks, child items as subtasks.
+- AI agents: `fjord mcp` is an MCP server (add it with `claude mcp add fjord -- fjord mcp`). Agents can read boards and notes, add and move tasks, write notes and open pull requests, but can't delete anything. There's also a command line tool, `fjord`.
+- Themes (five built in, or your own), English and Norwegian, built-in updater.
+
+## Who it's for
+
+One person who wants a fast, local place for the tasks, notes and files of several projects, especially developers who live in Git and the keyboard. It is not a team tool: there is no sharing or sync between machines.
+
+## Install
+
+- Windows: .exe installer or .msi from GitHub Releases.
+- macOS: .dmg for Apple Silicon or Intel (signed and notarized), or `brew install --cask jhtjernsmo/fjord/fjord`.
+- Linux: AppImage, .deb or .rpm.
+- Command line tool: `brew install jhtjernsmo/fjord/fjord-cli`, or the binaries on GitHub Releases.
+
+## Links
+
+- [Website](https://jhtjernsmo.github.io/fjord/)
+- [Downloads (latest release)](https://github.com/jhtjernsmo/fjord/releases/latest)
+- [Source code](https://github.com/jhtjernsmo/fjord)
+- [README with all shortcuts](https://github.com/jhtjernsmo/fjord/blob/main/README.md)
+- [Changelog](https://github.com/jhtjernsmo/fjord/blob/main/CHANGELOG.md)
+- [Issues](https://github.com/jhtjernsmo/fjord/issues)
+
+## Data and privacy
+
+Data lives in ~/.local/share/fjord (Linux), %APPDATA%\fjord (Windows) or ~/Library/Application Support/fjord (macOS). The app only goes online to check for updates (can be turned off) and to talk to GitHub or Azure DevOps for repositories you link yourself. Tokens are kept in the operating system's keychain.

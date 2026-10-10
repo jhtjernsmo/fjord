@@ -3,11 +3,118 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fjord</title>
+<title>Fjord – local kanban boards, notes and Git for your projects</title>
 <meta name="description" content="Fjord is a free, open-source desktop app for kanban boards with subtasks, notes and files, with GitHub and Azure DevOps built in. Everything stays in one SQLite file on your machine. Linux first, also on Windows and macOS.">
+<link rel="canonical" href="https://jhtjernsmo.github.io/fjord/">
+<link rel="alternate" type="text/markdown" href="https://jhtjernsmo.github.io/fjord/llms.txt" title="Fjord in plain text">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Fjord">
+<meta property="og:url" content="https://jhtjernsmo.github.io/fjord/">
 <meta property="og:title" content="Fjord">
 <meta property="og:description" content="A desktop app for kanban boards, notes and files. Local, keyboard-friendly, open source.">
 <meta property="og:image" content="https://jhtjernsmo.github.io/fjord/assets/board.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="788">
+<meta property="og:image:alt" content="A Fjord board with To do, In progress and Done columns">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Fjord",
+  "alternateName": "Fjord Projects",
+  "description": "A desktop app for keeping track of projects: kanban boards with subtasks and due dates, markdown notes with wiki links, and files, stored in one SQLite file on your own computer. GitHub and Azure DevOps built in, keyboard-first, with an MCP server for AI agents.",
+  "url": "https://jhtjernsmo.github.io/fjord/",
+  "image": "https://jhtjernsmo.github.io/fjord/assets/board.png",
+  "screenshot": ["https://jhtjernsmo.github.io/fjord/assets/board.png", "https://jhtjernsmo.github.io/fjord/assets/overview.png", "https://jhtjernsmo.github.io/fjord/assets/notes.png", "https://jhtjernsmo.github.io/fjord/assets/git.png"],
+  "applicationCategory": "BusinessApplication",
+  "applicationSubCategory": "Project management",
+  "operatingSystem": "Linux, Windows, macOS",
+  "softwareVersion": "0.2.15",
+  "downloadUrl": "https://github.com/jhtjernsmo/fjord/releases/latest",
+  "installUrl": "https://jhtjernsmo.github.io/fjord/#download",
+  "releaseNotes": "https://github.com/jhtjernsmo/fjord/blob/main/CHANGELOG.md",
+  "license": "https://github.com/jhtjernsmo/fjord/blob/main/LICENSE",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "inLanguage": ["en", "nb"],
+  "featureList": ["Kanban boards with custom columns, priorities, due dates and subtasks", "Due this week overview across all projects", "Markdown notes with [[wiki links]], backlinks, tables and Mermaid diagrams", "Files attached to projects and tasks", "Keyboard-first: leader key, which-key menu, command palette, remappable keys", "Git branches per task, pull requests and CI status for GitHub and Azure DevOps", "Azure Boards import and @mentions", "MCP server and command line tool for AI agents", "Local-first: one SQLite file, no account, no telemetry", "Themes, English and Norwegian"],
+  "author": { "@type": "Person", "name": "Jonas Hollund Tjernsmo", "url": "https://github.com/jhtjernsmo", "address": { "@type": "PostalAddress", "addressLocality": "Oslo", "addressCountry": "NO" } },
+  "sameAs": ["https://github.com/jhtjernsmo/fjord"]
+}
+</script>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "FAQPage",
+ "mainEntity": [
+  {
+   "@type": "Question",
+   "name": "Is Fjord free?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Yes. It's free and open source under MIT or Apache-2.0, with no paid tier and no account."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Does it work offline?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Yes. Boards, notes and files are on your own disk, so everything works without a connection. Only the GitHub and Azure DevOps features need the internet."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "How is it different from Trello, Jira or Linear?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Those are online services built for teams. Fjord is a desktop app for one person: your data stays in a file on your computer, it opens instantly, and it's made to be used from the keyboard. There's no sharing or sync between machines."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Can an AI agent use it?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Yes. Fjord comes with an MCP server, so Claude and other MCP clients can read and update your boards and notes. It can't delete anything. See AI agents."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Where is my data?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "In one folder: ~/.local/share/fjord on Linux, %APPDATA%\\fjord on Windows and ~/Library/Application Support/fjord on macOS. Copy it to back up."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Does it send anything anywhere?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "No accounts and no telemetry. It only goes online to check for updates (you can turn that off) and, if you link a repo or turn on the Azure Boards import, to talk to GitHub or Azure DevOps. Details under Privacy."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "What's it built with?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Rust, Tauri, SQLite and React. Licensed MIT or Apache-2.0."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Found a bug?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Please open an issue."
+   }
+  }
+ ]
+}
+</script>
 <meta name="theme-color" content="#f6f5f1">
 <link rel="icon" href="assets/icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -92,6 +199,20 @@
     <li>English and Norwegian.</li>
   </ul>
 
+  <h2 id="new">New in 0.2.15</h2>
+  <ul>
+    <li>The Overview lists what's due this week across all your projects: overdue tasks first, then by day and priority.</li>
+    <li>The Overview works with the keyboard too. <kbd>j</kbd> and <kbd>k</kbd> move between due tasks, mentions and projects, <kbd>Enter</kbd> opens, <kbd>a</kbd> turns a mention into a task and <kbd>x</kbd> dismisses it.</li>
+    <li><kbd>Space</kbd> <kbd>G</kbd> creates a GitHub repository for the current project.</li>
+    <li>The suggested branch name for a task can be edited before the branch is created.</li>
+  </ul>
+  <p class="muted">Everything else is in the <a href="https://github.com/jhtjernsmo/fjord/blob/main/CHANGELOG.md">changelog</a>.</p>
+
+  <figure class="wide">
+    <img src="assets/overview.png" alt="The Fjord Overview with a Due this week list of overdue and upcoming tasks, mentions from Azure DevOps and project cards" width="1400" height="1000" loading="lazy">
+    <figcaption>The Overview: due this week, mentions from Azure DevOps, and your projects.</figcaption>
+  </figure>
+
   <figure>
     <img src="assets/notes.png" alt="The notes view with a markdown editor and live preview showing links to a project, tasks and another note" width="1440" height="900" loading="lazy">
     <figcaption>Notes with links to a project, two tasks and another note. The dashed one doesn't exist yet; clicking it creates it.</figcaption>
@@ -133,7 +254,7 @@
     <img src="assets/themes.png" alt="The Appearance settings with five themes to choose from" width="900" height="640" loading="lazy">
   </figure>
 
-  <h2>AI agents</h2>
+  <h2 id="ai-agents">AI agents</h2>
   <p>Fjord includes an MCP server, so an agent like Claude can read your boards and notes, add and move tasks, write notes and open pull requests. It can't delete anything, and every change it makes is marked with who made it.</p>
   <p>For example, new work items from Azure Boards can land in Fjord, and an agent can go through them on a schedule, write a short summary and split the bigger ones into subtasks.</p>
 <pre>$ claude mcp add fjord -- fjord mcp</pre>
@@ -148,8 +269,16 @@
   <p>On a Mac you can also use Homebrew: <code>brew install --cask jhtjernsmo/fjord/fjord</code>. The command line tool is <code>brew install jhtjernsmo/fjord/fjord-cli</code>.</p>
   <p class="muted">The macOS app is signed and notarized by Apple, so it opens like any other app. The Windows builds aren't code-signed yet: if SmartScreen warns you, click "More info" and then "Run anyway". Older versions are on the <a href="https://github.com/jhtjernsmo/fjord/releases">releases page</a>. See the <a href="#code-signing">code signing policy</a>.</p>
 
-  <h2>Questions</h2>
+  <h2 id="faq">Questions</h2>
   <dl>
+    <dt>Is Fjord free?</dt>
+    <dd>Yes. It's free and open source under MIT or Apache-2.0, with no paid tier and no account.</dd>
+    <dt>Does it work offline?</dt>
+    <dd>Yes. Boards, notes and files are on your own disk, so everything works without a connection. Only the GitHub and Azure DevOps features need the internet.</dd>
+    <dt>How is it different from Trello, Jira or Linear?</dt>
+    <dd>Those are online services built for teams. Fjord is a desktop app for one person: your data stays in a file on your computer, it opens instantly, and it's made to be used from the keyboard. There's no sharing or sync between machines.</dd>
+    <dt>Can an AI agent use it?</dt>
+    <dd>Yes. Fjord comes with an MCP server, so Claude and other MCP clients can read and update your boards and notes. It can't delete anything. See <a href="#ai-agents">AI agents</a>.</dd>
     <dt>Where is my data?</dt>
     <dd>In one folder: <code>~/.local/share/fjord</code> on Linux, <code>%APPDATA%\fjord</code> on Windows and <code>~/Library/Application Support/fjord</code> on macOS. Copy it to back up.</dd>
     <dt>Does it send anything anywhere?</dt>
