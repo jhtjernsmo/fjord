@@ -7,6 +7,7 @@ Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 ## Unreleased
 
 - **Calmer Overview:** today's date and a one-line summary replace the greeting and the four number cards, section headings are plain, and projects are a compact list in the same style as Due this week.
+- **Quieter look:** task numbers on board cards, due dates and subtask counts as plain text instead of badges, a thin border instead of a glow on the selected card, and headings in normal case everywhere.
 
 ## 0.2.15 — 2026-10-09
 
