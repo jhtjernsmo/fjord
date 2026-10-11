@@ -134,7 +134,7 @@ export function Home({ projects, onOpen, onNewProject, keysEnabled }: Props) {
           <div className="section-title" style={{ marginBottom: 8 }}>
             {t('app.projects')}
           </div>
-          <div className="project-list">
+          <div className="overview-projects">
             {projects.map((p) => {
               const pct = p.task_count === 0 ? 0 : Math.round((p.done_count / p.task_count) * 100)
               return (
