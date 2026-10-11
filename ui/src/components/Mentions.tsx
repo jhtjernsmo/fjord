@@ -1,7 +1,7 @@
 // Azure Boards mentions in the Overview: work items where someone @mentioned you
 // but that aren't assigned to you. Open them, add one as a task, or dismiss it.
 import { useEffect, useState } from 'react'
-import { AtSign, ExternalLink, ListPlus, X } from 'lucide-react'
+import { ExternalLink, ListPlus, X } from 'lucide-react'
 import { api, relativeTime } from '../api'
 import type { Mention, ProjectSummary } from '../api'
 import { useApp, useLive } from '../data'
@@ -128,7 +128,7 @@ export function MentionsSection({ projects }: { projects: ProjectSummary[] }) {
     <div>
       <div className="section-title" style={{ marginBottom: 8 }}>
         <span className="mentions-heading">
-          <AtSign size={13} /> {t('mentions.title')} <span className="count">{mentions.length}</span>
+          {t('mentions.title')} <span className="count">{mentions.length}</span>
         </span>
       </div>
       <div className="mentions">

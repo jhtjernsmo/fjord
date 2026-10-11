@@ -10,7 +10,7 @@ const no = translator('no')
 
 describe('translator', () => {
   it('interpolates variables and falls back to English', () => {
-    expect(en('home.open', { open: 3, projects: 2 })).toBe('You have 3 open tasks across 2 projects.')
+    expect(en('home.open', { open: 3, projects: 2 })).toBe('3 open tasks across 2 projects')
     expect(no('home.open', { open: 3, projects: 2 })).toContain('3 åpne oppgaver')
     expect(en('tab.board')).toBe('Board')
     expect(no('tab.board')).toBe('Tavle')
