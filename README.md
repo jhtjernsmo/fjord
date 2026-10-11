@@ -138,6 +138,7 @@ what comes next.
 
 On the Overview: `j` / `k` move through due tasks, mentions and projects, `Enter` opens, `a` adds a
 mention as a task and `x` dismisses it. `Space G` creates a GitHub repository for the current project.
+`Ctrl+B` collapses the sidebar to icons, like in VS Code.
 
 In an open task: `[` / `]` move it to the previous/next column, `e` edits, `A` adds a subtask, `B`
 starts a branch, `L` links an existing one and `P` opens a pull request.

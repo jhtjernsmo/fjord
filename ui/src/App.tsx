@@ -1,5 +1,6 @@
 import { editorLabel, openInEditor } from './editor'
 import { useProjectSort } from './projectSort'
+import { useSidebarCollapsed } from './sidebarPref'
 import { useCallback, useEffect, useState } from 'react'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { Ellipsis, Paperclip } from 'lucide-react'
@@ -40,7 +41,7 @@ const TABS: Tab[] = ['board', 'notes', 'files', 'git', 'activity', 'archive']
 
 const GLOBAL_ACTIONS = [
   'palette.open', 'help.toggle', 'panel.close', 'go.home', 'go.notes', 'project.pick', 'project.new', 'project.archive',
-  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'theme.cycle', 'app.reportBug', 'git.sync', 'git.createRepo', 'azure.import', 'view.archive', 'view.git', 'editor.open',
+  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'theme.cycle', 'app.reportBug', 'git.sync', 'git.createRepo', 'azure.import', 'view.archive', 'view.git', 'editor.open', 'view.sidebar',
 ]
 
 export default function App() {
@@ -62,6 +63,7 @@ export default function App() {
 
   const [projects] = useLive(() => api.listProjects(false), [])
   const projectId = view.kind === 'project' ? view.id : null
+  const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed()
   const { sorted: sortedProjects, sort: projectSort, setSort: setProjectSort } = useProjectSort(projects ?? [], projectId)
   const [board] = useLive(() => (projectId ? api.getBoard(projectId) : Promise.resolve(null)), [projectId])
   const activeBoard = board && board.project.id === projectId ? board : null
@@ -139,6 +141,7 @@ export default function App() {
       'view.git': () => setTab('git'),
       'settings.open': () => setSettings(true),
       'theme.cycle': () => themes.cycle(),
+      'view.sidebar': toggleSidebar,
       'app.reportBug': () => void reportBug(),
       'editor.open': () => {
         if (!projectId) return toast(t('toast.pickProject'), 'info')
@@ -209,7 +212,7 @@ export default function App() {
 
   return (
     <NavContext.Provider value={nav}>
-    <div className="app">
+    <div className={`app ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <TitleBar title={windowTitle} />
       <AzureImportRunner />
       <MentionsRunner />
@@ -226,6 +229,8 @@ export default function App() {
         onPalette={() => setPalette('commands')}
         onHelp={() => setHelp(true)}
         onSettings={() => setSettings(true)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={toggleSidebar}
       />
 
       <main className="main">
