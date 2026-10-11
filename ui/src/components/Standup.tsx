@@ -99,7 +99,7 @@ function StandupList({ title, tasks, done = [], prs = [], mentions = [], githubM
                 {m.repo}#{m.number}
               </span>{' '}
               {m.title}
-              <span className="standup-state"> {t('standup.mentioned').toLowerCase()}</span>
+              <span className="standup-state"> {t('standup.mentionedBy', { name: m.by })}</span>
             </button>
           </li>
         ))}
