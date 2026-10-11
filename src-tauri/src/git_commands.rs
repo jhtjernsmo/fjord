@@ -243,6 +243,30 @@ pub async fn azure_mentions(state: State<'_, AppState>) -> CmdResult<Vec<fjord_v
     off_thread(move || fjord_vcs::fetch_mentions(&settings)).await
 }
 
+/// Pull requests waiting for you: reviews, changes requested on yours, and failed checks.
+#[tauri::command]
+pub async fn waiting_on_you(state: State<'_, AppState>) -> CmdResult<Vec<fjord_vcs::WaitingItem>> {
+    let (settings, repo_orgs) = with_store(&state, |s| {
+        let mut orgs = Vec::new();
+        for project in s.list_projects(false)? {
+            if let Some(org) = s
+                .get_project_repo(project.project.id)?
+                .and_then(|r| r.azure_org)
+            {
+                orgs.push(org);
+            }
+        }
+        Ok((s.import_settings()?, orgs))
+    })?;
+    off_thread(move || fjord_vcs::fetch_waiting(&settings, &repo_orgs)).await
+}
+
+/// GitHub issues and pull requests that @mention you since a date (YYYY-MM-DD), for the standup.
+#[tauri::command]
+pub async fn github_mentions(since: String) -> CmdResult<Vec<fjord_vcs::GitHubMention>> {
+    off_thread(move || fjord_vcs::fetch_github_mentions(&since)).await
+}
+
 /// Adds a work item you were mentioned in to a project as a task.
 #[tauri::command]
 pub async fn add_work_item_task(

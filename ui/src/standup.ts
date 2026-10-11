@@ -1,6 +1,6 @@
 // Standup drafts: which weekdays have a standup, and what happened since the last one.
 import { useCallback } from 'react'
-import type { Activity, Mention, PullRequest, Status, Task } from './api'
+import type { Activity, GitHubMention, Mention, PullRequest, Status, Task } from './api'
 import { useStoredPref } from './storedPref'
 
 /** Weekdays as Date.getDay() numbers: 0 is Sunday, 1 Monday … 6 Saturday. */
@@ -35,6 +35,8 @@ export interface StandupDraft {
   today: Task[]
   /** Azure DevOps work items where someone @mentioned you since the last standup. */
   mentions: Mention[]
+  /** GitHub issues and pull requests that @mention you, updated since the last standup. */
+  githubMentions: GitHubMention[]
   /** Your pull requests merged or closed since the last standup. */
   closedPrs: PullRequest[]
   /** Your pull requests that are still open. */
@@ -119,7 +121,8 @@ export function standupText(draft: StandupDraft, labels: StandupLabels): string 
   for (const t of draft.workedOn) lines.push(line(t))
   for (const p of draft.closedPrs) lines.push(pr(p, p.state === 'merged' ? labels.merged : labels.closed))
   for (const m of draft.mentions) lines.push(`- ${labels.mentioned} #${m.id} ${m.title} (${m.by})`)
-  if (draft.done.length + draft.workedOn.length + draft.closedPrs.length + draft.mentions.length === 0) lines.push(`- ${labels.none}`)
+  for (const m of draft.githubMentions) lines.push(`- ${labels.mentioned} ${m.repo}#${m.number} ${m.title} (${m.by})`)
+  if (draft.done.length + draft.workedOn.length + draft.closedPrs.length + draft.mentions.length + draft.githubMentions.length === 0) lines.push(`- ${labels.none}`)
   lines.push('', labels.today)
   for (const t of draft.today) lines.push(line(t))
   for (const p of draft.openPrs) lines.push(pr(p, labels.inReview))

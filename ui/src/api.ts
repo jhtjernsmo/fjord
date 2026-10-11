@@ -102,6 +102,17 @@ export interface WaitingItem {
   at: string
 }
 
+/** A GitHub issue or pull request that @mentions you. */
+export interface GitHubMention {
+  repo: string
+  number: number
+  title: string
+  url: string
+  by: string
+  at: string
+  pull_request: boolean
+}
+
 export interface Mention {
   org: string
   id: number
@@ -379,6 +390,7 @@ export const api = {
   installedFromStore: () => invoke<boolean>('installed_from_store'),
   azureMentions: () => invoke<Mention[]>('azure_mentions'),
   waitingOnYou: () => invoke<WaitingItem[]>('waiting_on_you'),
+  githubMentions: (since: string) => invoke<GitHubMention[]>('github_mentions', { since }),
   addWorkItemTask: (projectId: number, org: string, id: number) => invoke<Task>('add_work_item_task', { projectId, org, id }),
   githubRepoOwners: () => invoke<RepoOwner[]>('github_repo_owners'),
   createGithubRepo: (projectId: number, repo: NewRepo, parent: string) =>

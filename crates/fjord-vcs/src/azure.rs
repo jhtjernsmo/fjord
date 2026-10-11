@@ -15,7 +15,7 @@ use crate::github::{
 use crate::{Result, VcsError, credentials};
 
 pub(crate) const HOST: &str = "https://dev.azure.com";
-const API_VERSION: &str = "7.1";
+pub(crate) const API_VERSION: &str = "7.1";
 const TOP: u32 = 30;
 /// The Azure DevOps resource id, for `az account get-access-token`.
 const AZURE_DEVOPS_RESOURCE: &str = "499b84ac-1321-427f-aa17-267ca6975798";

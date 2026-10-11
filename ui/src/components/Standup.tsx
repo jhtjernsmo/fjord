@@ -2,10 +2,12 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, Copy } from 'lucide-react'
 import { api } from '../api'
-import type { Mention, PullRequest, ProjectSummary, Task } from '../api'
+import type { GitHubMention, Mention, PullRequest, ProjectSummary, Task } from '../api'
 import { useApp, useLive } from '../data'
 import { dateLocale } from '../i18n'
 import { useNav } from '../nav'
+import { localIso } from '../dueWeek'
+import { memo } from '../memo'
 import { buildStandup, mentionsSince, myPullRequests, previousStandup, standupText } from '../standup'
 import { useMentions } from '../mentions'
 import type { StandupDraft, Weekday } from '../standup'
@@ -21,12 +23,19 @@ async function myNames(orgs: string[]): Promise<string[]> {
 }
 
 /** Pull requests of the projects' linked repositories. A project without a repo has none. */
-async function pullRequests(projects: ProjectSummary[]): Promise<{ prs: PullRequest[]; orgs: string[] }> {
+async function pullRequests(projects: ProjectSummary[]): Promise<{ prs: PullRequest[]; orgs: string[]; githubRepos: string[] }> {
   const repos = await Promise.all(projects.map((p) => api.getProjectRepo(p.id).catch(() => null)))
   const linked = projects.filter((_, i) => repos[i])
   const reports = await Promise.all(linked.map((p) => api.syncPullRequests(p.id).catch(() => null)))
   const orgs = [...new Set(repos.map((r) => r?.azure_org).filter((o): o is string => !!o))]
-  return { prs: reports.flatMap((r) => r?.pull_requests ?? []), orgs }
+  const githubRepos = repos.flatMap((r) => (r?.github_owner && r.github_repo ? [`${r.github_owner}/${r.github_repo}`.toLowerCase()] : []))
+  return { prs: reports.flatMap((r) => r?.pull_requests ?? []), orgs, githubRepos }
+}
+
+/** GitHub mentions since the last standup; for one project, only those in its linked repository. */
+async function githubMentions(since: Date, repos: string[] | null): Promise<GitHubMention[]> {
+  const found = await api.githubMentions(localIso(since)).catch(() => [] as GitHubMention[])
+  return repos === null ? found : found.filter((m) => repos.includes(m.repo.toLowerCase()))
 }
 
 /** The Azure DevOps projects whose work items are imported into the chosen Fjord project. */
@@ -36,20 +45,21 @@ async function azureScope(projectId: number | null): Promise<{ org: string; proj
   return (settings?.mappings ?? []).filter((m) => m.fjord_project_id === projectId)
 }
 
-async function loadDraft(projects: ProjectSummary[], since: Date): Promise<Omit<StandupDraft, 'mentions'>> {
+async function loadDraft(projects: ProjectSummary[], since: Date, oneProject: boolean): Promise<Omit<StandupDraft, 'mentions'>> {
   const ids = new Set(projects.map((p) => p.id))
-  const [activity, actor, boards, { prs, orgs }] = await Promise.all([
+  const [activity, actor, boards, { prs, orgs, githubRepos }] = await Promise.all([
     api.recentActivity(null, ACTIVITY_LIMIT),
     api.actor(),
     Promise.all(projects.map((p) => api.getBoard(p.id))),
     pullRequests(projects),
   ])
+  const onGitHub = await githubMentions(since, oneProject ? githubRepos : null)
   const ownActivity = activity.filter((a) => a.project_id !== null && ids.has(a.project_id))
   const tasks = buildStandup(ownActivity, boards.flatMap((b) => b.tasks), boards.flatMap((b) => b.statuses), since, actor)
-  return { ...tasks, ...myPullRequests(prs, await myNames(orgs), since) }
+  return { ...tasks, ...myPullRequests(prs, await myNames(orgs), since), githubMentions: onGitHub }
 }
 
-function StandupList({ title, tasks, done = [], prs = [], mentions = [] }: { title: string; tasks: Task[]; done?: Task[]; prs?: PullRequest[]; mentions?: Mention[] }) {
+function StandupList({ title, tasks, done = [], prs = [], mentions = [], githubMentions = [] }: { title: string; tasks: Task[]; done?: Task[]; prs?: PullRequest[]; mentions?: Mention[]; githubMentions?: GitHubMention[] }) {
   const { t, run } = useApp()
   const nav = useNav()
   const item = (task: Task, isDone: boolean) => (
@@ -82,7 +92,18 @@ function StandupList({ title, tasks, done = [], prs = [], mentions = [] }: { tit
             </button>
           </li>
         ))}
-        {done.length + tasks.length + prs.length + mentions.length === 0 && <li className="dim">{t('standup.none')}</li>}
+        {githubMentions.map((m) => (
+          <li key={m.url}>
+            <button data-home-item data-home-action="open" onClick={() => run(api.openUrl(m.url))} title={m.url}>
+              <span className="mono dim">
+                {m.repo}#{m.number}
+              </span>{' '}
+              {m.title}
+              <span className="standup-state"> {t('standup.mentioned').toLowerCase()}</span>
+            </button>
+          </li>
+        ))}
+        {done.length + tasks.length + prs.length + mentions.length + githubMentions.length === 0 && <li className="dim">{t('standup.none')}</li>}
       </ul>
     </div>
   )
@@ -95,7 +116,7 @@ export function Standup({ projects, days, projectId }: { projects: ProjectSummar
   const since = previousStandup(today, days)
   const scope = projectId === null ? projects : projects.filter((p) => p.id === projectId)
   const scopeIds = scope.map((p) => p.id).join()
-  const [loaded] = useLive(() => loadDraft(scope, since), [scopeIds, days.join(), today])
+  const [loaded] = useLive(() => memo(`standup:${scopeIds}:${localIso(since)}`, () => loadDraft(scope, since, projectId !== null)), [scopeIds, days.join(), today])
   const [mentionScope] = useLive(() => azureScope(projectId), [projectId])
   const allMentions = useMentions()
   if (!loaded || mentionScope === undefined) return null
@@ -105,7 +126,7 @@ export function Standup({ projects, days, projectId }: { projects: ProjectSummar
     navigator.clipboard
       ?.writeText(standupText(draft, { since: sinceLabel, done: t('standup.done'), today: t('standup.today'), blockers: t('standup.blockers'), none: t('standup.none'), merged: t('standup.merged'), closed: t('standup.closed'), inReview: t('standup.inReview'), mentioned: t('standup.mentioned') }))
       .then(() => toast(t('standup.copied'), 'success'))
-  const summary = t('standup.summary', { done: draft.done.length, worked: draft.workedOn.length, prs: draft.closedPrs.length + draft.openPrs.length, mentions: draft.mentions.length, today: draft.today.length })
+  const summary = t('standup.summary', { done: draft.done.length, worked: draft.workedOn.length, prs: draft.closedPrs.length + draft.openPrs.length, mentions: draft.mentions.length + draft.githubMentions.length, today: draft.today.length })
   const projectName = projectId === null ? null : scope[0]?.name
   return (
     <div className="standup">
@@ -122,7 +143,7 @@ export function Standup({ projects, days, projectId }: { projects: ProjectSummar
       </div>
       {open && (
         <div className="standup-body">
-          <StandupList title={sinceLabel} done={draft.done} tasks={draft.workedOn} prs={draft.closedPrs} mentions={draft.mentions} />
+          <StandupList title={sinceLabel} done={draft.done} tasks={draft.workedOn} prs={draft.closedPrs} mentions={draft.mentions} githubMentions={draft.githubMentions} />
           <StandupList title={t('standup.today')} tasks={draft.today} prs={draft.openPrs} />
         </div>
       )}

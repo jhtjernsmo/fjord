@@ -2,6 +2,7 @@
 import { api, relativeTime } from '../api'
 import type { WaitingItem } from '../api'
 import { useApp, useLive } from '../data'
+import { memo } from '../memo'
 
 function WaitingRow({ item }: { item: WaitingItem }) {
   const { t, locale, run } = useApp()
@@ -22,7 +23,7 @@ function WaitingRow({ item }: { item: WaitingItem }) {
 export function WaitingOnYou() {
   const { t } = useApp()
   // Without a linked GitHub or Azure DevOps account the call fails; the section just stays hidden.
-  const [items] = useLive(() => api.waitingOnYou().catch(() => [] as WaitingItem[]), [])
+  const [items] = useLive(() => memo('waiting', () => api.waitingOnYou()).catch(() => [] as WaitingItem[]), [])
   if (!items || items.length === 0) return null
   return (
     <div>

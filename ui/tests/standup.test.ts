@@ -61,7 +61,7 @@ describe('buildStandup', () => {
   })
 
   test('formats as plain text with pull requests, mentions and an empty blockers line', () => {
-    const full = { ...draft, closedPrs: [pr(12, 'merged', 'jhtjernsmo', '2026-10-10T10:00:00Z')], openPrs: [pr(14, 'open', 'jhtjernsmo', '2026-10-11T10:00:00Z')], mentions: [mention(4211, '2026-10-10T08:00:00Z')] }
+    const full = { ...draft, closedPrs: [pr(12, 'merged', 'jhtjernsmo', '2026-10-10T10:00:00Z')], openPrs: [pr(14, 'open', 'jhtjernsmo', '2026-10-11T10:00:00Z')], mentions: [mention(4211, '2026-10-10T08:00:00Z')], githubMentions: [{ repo: 'acme/api', number: 7, title: 'Flaky login test', url: 'https://github.com/acme/api/issues/7', by: 'ola', at: '2026-10-10T09:00:00Z', pull_request: false }] }
     const labels = { since: 'Since Friday', done: 'done', today: 'Today', blockers: 'Blockers', none: 'None', merged: 'merged', closed: 'closed', inReview: 'in review', mentioned: 'Mentioned in' }
     expect(standupText(full, labels)).toBe(
       [
@@ -70,6 +70,7 @@ describe('buildStandup', () => {
         '- Task 2 (#2)',
         '- PR #12 PR 12 – merged',
         '- Mentioned in #4211 Item 4211 (Kari)',
+        '- Mentioned in acme/api#7 Flaky login test (ola)',
         '',
         'Today',
         '- Task 2 (#2)',
