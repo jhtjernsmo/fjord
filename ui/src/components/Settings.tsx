@@ -1,7 +1,7 @@
 // Settings window: a menu of sections on the left, the section on the right.
 import { EditorSettings } from './EditorSettings'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bot, Database, Keyboard, Palette, PlugZap, RefreshCw, Search, SlidersHorizontal, UserRound, X } from 'lucide-react'
+import { Bot, Database, Keyboard, LayoutDashboard, Palette, PlugZap, RefreshCw, Search, SlidersHorizontal, UserRound, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { api } from '../api'
 import { useApp } from '../data'
@@ -12,8 +12,9 @@ import { AzureSettings } from './AzureSettings'
 import { UpdateSettings } from './Dialogs'
 import { GitHubSettings } from './GitHubSettings'
 import { ThemeSettings } from './ThemeSettings'
+import { OverviewSettings } from './OverviewSettings'
 
-type SectionId = 'general' | 'appearance' | 'accounts' | 'integrations' | 'keyboard' | 'updates' | 'agents' | 'data'
+type SectionId = 'general' | 'overview' | 'appearance' | 'accounts' | 'integrations' | 'keyboard' | 'updates' | 'agents' | 'data'
 
 interface Section {
   id: SectionId
@@ -24,6 +25,7 @@ interface Section {
 
 const SECTIONS: Section[] = [
   { id: 'general', icon: SlidersHorizontal, keywords: 'name user language norsk english' },
+  { id: 'overview', icon: LayoutDashboard, keywords: 'overview standup due mentions review pull requests builds oversikt' },
   { id: 'appearance', icon: Palette, keywords: 'theme dark light color colour font size density accent tema farge' },
   { id: 'accounts', icon: UserRound, keywords: 'github azure devops token login sign in az' },
   { id: 'integrations', icon: PlugZap, keywords: 'azure boards import work items editor ide vs code jetbrains' },
@@ -131,6 +133,8 @@ function SectionBody({ id }: { id: SectionId }) {
   switch (id) {
     case 'general':
       return <GeneralSection />
+    case 'overview':
+      return <OverviewSettings />
     case 'appearance':
       return <ThemeSettings />
     case 'accounts':
