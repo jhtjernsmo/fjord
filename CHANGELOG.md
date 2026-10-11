@@ -8,6 +8,7 @@ Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 
 - **Calmer Overview:** today's date and a one-line summary replace the greeting and the four number cards, section headings are plain, and projects are a compact list in the same style as Due this week.
 - **Quieter look:** task numbers on board cards, due dates and subtask counts as plain text instead of badges, a thin border instead of a glow on the selected card, and headings in normal case everywhere.
+- **Collapsible sidebar:** `Ctrl+B` or the button next to the logo collapses the sidebar to icons, like in VS Code. Names show as tooltips, overdue projects get a red dot, and the choice is remembered.
 
 ## 0.2.15 — 2026-10-09
 

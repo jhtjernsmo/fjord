@@ -10,6 +10,8 @@ export const LOCALES: { id: Locale; label: string }[] = [
 
 const en = {
   'app.overview': 'Overview',
+  'app.collapseSidebar': 'Collapse sidebar',
+  'app.expandSidebar': 'Expand sidebar',
   'app.commands': 'Commands',
   'app.projects': 'Projects',
   'app.newProject': 'New project',
@@ -122,6 +124,7 @@ const en = {
   'appearance.color.warn': 'Warning',
   'appearance.color.danger': 'Danger',
   'action.theme.cycle': 'Next theme',
+  'action.view.sidebar': 'Collapse or expand the sidebar',
   'subtasks.title': 'Subtasks',
   'subtasks.add': 'Add a subtask…',
   'subtasks.of': 'Subtask of “{title}”',
@@ -507,6 +510,8 @@ export type MessageKey = keyof typeof en
 
 const no: Partial<Record<MessageKey, string>> = {
   'app.overview': 'Oversikt',
+  'app.collapseSidebar': 'Skjul sidemenyen',
+  'app.expandSidebar': 'Vis sidemenyen',
   'app.commands': 'Kommandoer',
   'app.projects': 'Prosjekter',
   'app.newProject': 'Nytt prosjekt',
@@ -618,6 +623,7 @@ const no: Partial<Record<MessageKey, string>> = {
   'appearance.color.warn': 'Advarsel',
   'appearance.color.danger': 'Fare',
   'action.theme.cycle': 'Neste tema',
+  'action.view.sidebar': 'Skjul eller vis sidemenyen',
   'subtasks.title': 'Deloppgaver',
   'subtasks.add': 'Legg til en deloppgave…',
   'subtasks.of': 'Deloppgave av «{title}»',

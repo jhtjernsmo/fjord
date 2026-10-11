@@ -67,7 +67,7 @@ kbd {
 
 /* ---------- layout ---------- */
 /* Rows are capped at the window height so panels scroll inside instead of growing the page. */
-.app { display: grid; grid-template-columns: 260px minmax(0, 1fr); grid-template-rows: var(--titlebar-h) minmax(0, 1fr); height: 100vh; overflow: hidden; --titlebar-h: 34px; }
+.app { --sidebar-w: 260px; display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); grid-template-rows: var(--titlebar-h) minmax(0, 1fr); height: 100vh; overflow: hidden; --titlebar-h: 34px; }
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; position: relative; }
 
 /* ---------- sidebar ---------- */
@@ -103,6 +103,19 @@ kbd {
 .project-list { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .sidebar-footer { border-top: 1px solid var(--line); padding: 10px 10px 2px; color: var(--dim); font-size: 12px; display: flex; flex-direction: column; gap: 6px; }
 .sidebar-footer span { display: flex; justify-content: space-between; }
+.sidebar-toggle { margin-left: auto; display: grid; place-items: center; padding: 4px; border-radius: 4px; color: var(--dim); }
+.sidebar-toggle:hover { color: var(--text); background: var(--panel); }
+/* Collapsed: icons only, names in tooltips. */
+.app.sidebar-collapsed { --sidebar-w: 58px; }
+.sidebar.collapsed { padding: 14px 8px; align-items: center; }
+.sidebar.collapsed .brand { flex-direction: column; gap: 10px; padding: 6px 0 12px; }
+.sidebar.collapsed .sidebar-toggle { margin-left: 0; }
+.sidebar.collapsed .nav-item { position: relative; justify-content: center; width: 40px; padding: 8px 0; }
+.sidebar.collapsed :is(.brand-name, .name, kbd, .ring, .nav-section-label, .sort-button) { display: none; }
+.sidebar.collapsed .nav-section { justify-content: center; padding: 12px 0 6px; }
+.sidebar.collapsed .project-list { align-items: center; }
+.sidebar.collapsed .sidebar-footer { align-items: center; padding: 10px 0 2px; }
+.sidebar.collapsed .chip.overdue { position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; padding: 0; border: 0; font-size: 0; background: var(--danger); }
 
 .ring { --p: 0; width: 18px; height: 18px; border-radius: 50%; flex: none;
   background: conic-gradient(var(--c, var(--accent)) calc(var(--p) * 1%), var(--line-2) 0);
@@ -648,7 +661,7 @@ kbd {
 .update-banner .btn { padding: 4px 12px; }
 
 /* ---------- title bar (window frame is drawn by Fjord) ---------- */
-.titlebar { grid-column: 1 / -1; display: grid; grid-template-columns: 260px minmax(0, 1fr); height: var(--titlebar-h); user-select: none; -webkit-user-select: none; }
+.titlebar { grid-column: 1 / -1; display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); height: var(--titlebar-h); user-select: none; -webkit-user-select: none; }
 .titlebar-side { background: var(--bg-2); border-right: 1px solid var(--line); }
 .titlebar-main { display: flex; align-items: center; min-width: 0; position: relative; }
 .titlebar-title { flex: 1; text-align: center; font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 150px; pointer-events: none; }
