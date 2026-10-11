@@ -60,7 +60,6 @@ export default function App() {
   const [openCreateRepo, setOpenCreateRepo] = useState(false)
   const closeCreateRepo = useCallback(() => setOpenCreateRepo(false), [])
 
-  const [actor] = useLive(() => api.actor(), [])
   const [projects] = useLive(() => api.listProjects(false), [])
   const projectId = view.kind === 'project' ? view.id : null
   const { sorted: sortedProjects, sort: projectSort, setSort: setProjectSort } = useProjectSort(projects ?? [], projectId)
@@ -243,7 +242,7 @@ export default function App() {
         )}
 
         {view.kind === 'home' && (
-          <Home actor={actor ?? ''} projects={sortedProjects} onOpen={openProject} onNewProject={() => setNewProject(true)} keysEnabled={!overlayOpen} />
+          <Home projects={sortedProjects} onOpen={openProject} onNewProject={() => setNewProject(true)} keysEnabled={!overlayOpen} />
         )}
 
         {view.kind === 'project' && activeBoard && (

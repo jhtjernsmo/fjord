@@ -1,10 +1,9 @@
-// Overview: greeting, stats, project cards and activity across all projects.
-import { motion } from 'motion/react'
+// Overview: today's date, what's due, mentions, projects and activity across all projects.
 import { ArchiveRestore, Plus } from 'lucide-react'
 import { api, describeActivity, relativeTime } from '../api'
 import type { Activity, ProjectSummary } from '../api'
 import { useActions, useApp, useLive } from '../data'
-import type { MessageKey } from '../i18n'
+import { dateLocale } from '../i18n'
 import { AgentTag, ProjectGlyph } from './Icons'
 import { useContextMenus } from './actions'
 import { MentionsSection } from './Mentions'
@@ -14,14 +13,6 @@ import { useRef, useState } from 'react'
 /** Overview shows a short activity preview; "Show all" loads more. */
 const ACTIVITY_PREVIEW = 8
 const ACTIVITY_ALL = 50
-
-function greetingKey(): MessageKey {
-  const h = new Date().getHours()
-  if (h < 5) return 'greeting.night'
-  if (h < 10) return 'greeting.morning'
-  if (h < 18) return 'greeting.day'
-  return 'greeting.evening'
-}
 
 export function ActivityList({ items, projects }: { items: Activity[]; projects?: ProjectSummary[] }) {
   const { t, locale } = useApp()
@@ -46,7 +37,6 @@ export function ActivityList({ items, projects }: { items: Activity[]; projects?
 }
 
 interface Props {
-  actor: string
   projects: ProjectSummary[]
   onOpen: (id: number) => void
   onNewProject: () => void
@@ -99,8 +89,8 @@ function useHomeKeys(enabled: boolean) {
   return ref
 }
 
-export function Home({ actor, projects, onOpen, onNewProject, keysEnabled }: Props) {
-  const { t, run } = useApp()
+export function Home({ projects, onOpen, onNewProject, keysEnabled }: Props) {
+  const { t, run, locale } = useApp()
   const homeRef = useHomeKeys(keysEnabled)
   const [showAll, setShowAll] = useState(false)
   const [activity] = useLive(() => api.recentActivity(null, showAll ? ACTIVITY_ALL : ACTIVITY_PREVIEW + 1), [showAll])
@@ -108,36 +98,23 @@ export function Home({ actor, projects, onOpen, onNewProject, keysEnabled }: Pro
   const [allProjects] = useLive(() => api.listProjects(true), [])
   const archived = (allProjects ?? []).filter((p) => p.archived_at)
   const open = projects.reduce((n, p) => n + p.task_count - p.done_count, 0)
-  const done = projects.reduce((n, p) => n + p.done_count, 0)
   const overdue = projects.reduce((n, p) => n + p.overdue_count, 0)
-  const name = actor ? actor.charAt(0).toUpperCase() + actor.slice(1) : ''
+  const [today] = useState(() => new Date())
+  const date = today.toLocaleDateString(dateLocale(locale), { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
     <div className="home" ref={homeRef}>
       <div className="hello">
-        <h2>
-          {t(greetingKey())}, {name}
-        </h2>
-        <p>{open === 0 ? t('home.noOpen') : t('home.open', { open, projects: projects.length })}</p>
-      </div>
-
-      <div className="stats">
-        <div className="stat">
-          <div className="n">{projects.length}</div>
-          <div className="l">{t('home.activeProjects')}</div>
-        </div>
-        <div className="stat">
-          <div className="n">{open}</div>
-          <div className="l">{t('home.openTasks')}</div>
-        </div>
-        <div className="stat">
-          <div className="n">{done}</div>
-          <div className="l">{t('home.completed')}</div>
-        </div>
-        <div className={`stat ${overdue > 0 ? 'alert' : ''}`}>
-          <div className="n">{overdue}</div>
-          <div className="l">{t('home.overdue')}</div>
-        </div>
+        <h2>{date.charAt(0).toUpperCase() + date.slice(1)}</h2>
+        <p>
+          {open === 0 ? t('home.noOpen') : t('home.open', { open, projects: projects.length })}
+          {overdue > 0 && (
+            <>
+              {', '}
+              <span className="overdue-text">{t('home.overdueCount', { n: overdue })}</span>
+            </>
+          )}
+        </p>
       </div>
 
       <DueThisWeek projects={projects} />
@@ -153,39 +130,39 @@ export function Home({ actor, projects, onOpen, onNewProject, keysEnabled }: Pro
           </button>
         </div>
       ) : (
-        <div className="cards">
-          {projects.map((p, i) => {
-            const pct = p.task_count === 0 ? 0 : Math.round((p.done_count / p.task_count) * 100)
-            return (
-              <motion.button
-                key={p.id}
-                className="pcard"
-                data-home-item
-                data-home-action="open"
-                style={{ ['--c' as string]: p.color }}
-                onClick={() => onOpen(p.id)}
-                onContextMenu={projectMenu(p, { onOpen: () => onOpen(p.id) })}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04 }}
-              >
-                <div className="top">
-                  <ProjectGlyph glyph={p.icon} color={p.color} size="lg" />
-                  {p.name}
-                </div>
-                <div className="d">{p.description}</div>
-                <div className="bar">
-                  <div style={{ width: `${pct}%` }} />
-                </div>
-                <div className="foot">
-                  <span>{t('home.done', { done: p.done_count, total: p.task_count })}</span>
-                  <span className={p.overdue_count > 0 ? 'overdue-text' : ''}>
-                    {p.overdue_count > 0 ? `! ${t('home.overdueCount', { n: p.overdue_count })}` : `${pct} %`}
+        <div>
+          <div className="section-title" style={{ marginBottom: 8 }}>
+            {t('app.projects')}
+          </div>
+          <div className="project-list">
+            {projects.map((p) => {
+              const pct = p.task_count === 0 ? 0 : Math.round((p.done_count / p.task_count) * 100)
+              return (
+                <button
+                  key={p.id}
+                  className="project-row"
+                  data-home-item
+                  data-home-action="open"
+                  style={{ ['--c' as string]: p.color }}
+                  onClick={() => onOpen(p.id)}
+                  onContextMenu={projectMenu(p, { onOpen: () => onOpen(p.id) })}
+                >
+                  <ProjectGlyph glyph={p.icon} color={p.color} />
+                  <span className="project-row-name">{p.name}</span>
+                  <span className="project-row-desc">{p.description}</span>
+                  <span className="bar">
+                    <div style={{ width: `${pct}%` }} />
                   </span>
-                </div>
-              </motion.button>
-            )
-          })}
+                  <span className="project-row-count">
+                    {p.done_count}/{p.task_count}
+                  </span>
+                  <span className={p.overdue_count > 0 ? 'overdue-text' : ''}>
+                    {p.overdue_count > 0 ? t('home.overdueCount', { n: p.overdue_count }) : ''}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
 

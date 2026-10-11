@@ -1,6 +1,5 @@
 // Overview: open tasks due by Sunday across all projects, overdue ones first.
 import { useState } from 'react'
-import { CalendarDays } from 'lucide-react'
 import { api } from '../api'
 import type { ProjectSummary, Task } from '../api'
 import { useApp, useLive } from '../data'
@@ -63,7 +62,7 @@ export function DueThisWeek({ projects }: { projects: ProjectSummary[] }) {
     <div>
       <div className="section-title" style={{ marginBottom: 8 }}>
         <span className="mentions-heading">
-          <CalendarDays size={13} /> {t('due.title')} <span className="count">{tasks.length}</span>
+          {t('due.title')} <span className="count">{tasks.length}</span>
         </span>
       </div>
       <div className="due-list">
