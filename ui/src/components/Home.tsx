@@ -12,7 +12,7 @@ import { DueThisWeek } from './DueThisWeek'
 import { Standup } from './Standup'
 import { WaitingOnYou } from './WaitingOnYou'
 import { useOverviewSections } from '../overviewSections'
-import { isStandupDay, useStandupDays } from '../standup'
+import { isStandupDay, useStandupDays, useStandupProject } from '../standup'
 import { useRef, useState } from 'react'
 
 /** Overview shows a short activity preview; "Show all" loads more. */
@@ -108,6 +108,7 @@ export function Home({ projects, onOpen, onNewProject, keysEnabled }: Props) {
   const flair = dayFlair(today)
   const [sections] = useOverviewSections()
   const [standupDays] = useStandupDays()
+  const [standupProject] = useStandupProject()
   const date = today.toLocaleDateString(dateLocale(locale), { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
@@ -126,7 +127,7 @@ export function Home({ projects, onOpen, onNewProject, keysEnabled }: Props) {
         {flair.line && <p>{flair.line}</p>}
       </div>
 
-      {sections.standup && isStandupDay(today, standupDays) && <Standup projects={projects} days={standupDays} />}
+      {sections.standup && isStandupDay(today, standupDays) && <Standup projects={projects} days={standupDays} projectId={standupProject} />}
 
       {sections.due && <DueThisWeek projects={projects} />}
 

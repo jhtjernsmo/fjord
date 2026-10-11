@@ -739,6 +739,11 @@ html[data-flair='p'] body::after { content: ''; position: fixed; inset: 0; z-ind
 .standup-col li button:hover { color: var(--accent); }
 .standup-col li button:focus-visible { outline: none; color: var(--accent); }
 .standup-done { color: var(--ok); font-size: 12px; }
+.standup-state { color: var(--muted); font-size: 12px; }
+.standup-project { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; }
+.standup-project-pick { display: flex; flex-direction: column; gap: 4px; padding-left: 22px; margin-top: 6px; color: var(--muted); font-size: 12.5px; }
+.standup-project-pick select { max-width: 260px; }
+.standup-project-pick .hint { padding-left: 0; }
 .waiting-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) 150px 120px 72px; align-items: center; gap: 14px; padding: 9px 14px; text-align: left; font-size: 13.5px; }
 .waiting-row + .waiting-row { border-top: 1px solid var(--line); }
 .waiting-row:hover { background: var(--panel-2); }
