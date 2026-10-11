@@ -4,6 +4,10 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## Unreleased
+
+- **Calmer Overview:** today's date and a one-line summary replace the greeting and the four number cards, section headings are plain, and projects are a compact list in the same style as Due this week.
+
 ## 0.2.15 — 2026-10-09
 
 - **Due this week** on the Overview: open tasks from every project that are due by Sunday, overdue ones first, then by day and priority. Click one to open it.
