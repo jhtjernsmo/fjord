@@ -14,7 +14,7 @@
 <meta property="og:description" content="A desktop app for kanban boards, notes and files. Local, keyboard-friendly, open source.">
 <meta property="og:image" content="https://jhtjernsmo.github.io/fjord/assets/board.png">
 <meta property="og:image:width" content="1280">
-<meta property="og:image:height" content="788">
+<meta property="og:image:height" content="800">
 <meta property="og:image:alt" content="A Fjord board with To do, In progress and Done columns">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">
@@ -30,7 +30,7 @@
   "applicationCategory": "BusinessApplication",
   "applicationSubCategory": "Project management",
   "operatingSystem": "Linux, Windows, macOS",
-  "softwareVersion": "0.2.15",
+  "softwareVersion": "0.2.16",
   "downloadUrl": "https://github.com/jhtjernsmo/fjord/releases/latest",
   "installUrl": "https://jhtjernsmo.github.io/fjord/#download",
   "releaseNotes": "https://github.com/jhtjernsmo/fjord/blob/main/CHANGELOG.md",
@@ -187,7 +187,7 @@
   </div>
 
   <figure class="wide">
-    <img src="assets/board.png" alt="A Fjord board with To do, In progress and Done columns" width="1280" height="788">
+    <img src="assets/board.png" alt="A Fjord board with To do, In progress and Done columns" width="1280" height="800">
   </figure>
 
   <h2>Why I made it</h2>
@@ -207,12 +207,12 @@
     <li>English and Norwegian.</li>
   </ul>
 
-  <h2 id="new">New in 0.2.15</h2>
+  <h2 id="new">New in 0.2.16</h2>
   <ul>
-    <li>The Overview lists what's due this week across all your projects: overdue tasks first, then by day and priority.</li>
-    <li>The Overview works with the keyboard too. <kbd>j</kbd> and <kbd>k</kbd> move between due tasks, mentions and projects, <kbd>Enter</kbd> opens, <kbd>a</kbd> turns a mention into a task and <kbd>x</kbd> dismisses it.</li>
-    <li><kbd>Space</kbd> <kbd>G</kbd> creates a GitHub repository for the current project.</li>
-    <li>The suggested branch name for a task can be edited before the branch is created.</li>
+    <li>A calmer Overview: today's date and one line with what's open and overdue, then what's due this week, your mentions and your projects as a short list.</li>
+    <li>Task numbers on the board cards, the same ones the branch names use.</li>
+    <li><kbd>Ctrl</kbd> <kbd>B</kbd> collapses the sidebar to icons, like in VS Code.</li>
+    <li>A quieter look overall: plain headings, and dates and counts as text instead of badges.</li>
   </ul>
   <p class="muted">Everything else is in the <a href="https://github.com/jhtjernsmo/fjord/blob/main/CHANGELOG.md">changelog</a>.</p>
 
@@ -228,7 +228,7 @@
 
   <figure>
     <img src="assets/subtasks.png" alt="A task with four subtasks, two of them checked off, and a progress bar" width="1180" height="835" loading="lazy">
-    <figcaption>Subtasks in the task panel. The card on the board shows 2/4.</figcaption>
+    <figcaption>Subtasks in the task panel, two of four done.</figcaption>
   </figure>
 
   <h2>Keyboard</h2>
@@ -239,6 +239,7 @@
     <tr><td><kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd></td><td>Move around the board</td></tr>
     <tr><td><kbd>H</kbd> <kbd>L</kbd></td><td>Move a task to the previous or next column</td></tr>
     <tr><td><kbd>/</kbd></td><td>Filter the board</td></tr>
+    <tr><td><kbd>Ctrl</kbd> <kbd>B</kbd></td><td>Collapse the sidebar to icons</td></tr>
     <tr><td><kbd>?</kbd></td><td>All shortcuts</td></tr>
   </table>
   <p class="muted">Every binding can be changed in <code>keymap.json</code>.</p>
