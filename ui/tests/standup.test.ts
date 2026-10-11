@@ -49,25 +49,21 @@ describe('buildStandup', () => {
     act_(6, 'task.move', '2026-10-08T10:00:00'),
     act_(2, 'file.attach', '2026-10-10T11:00:00'),
   ]
-  const draft = buildStandup(activity, tasks, statuses, new Date(2026, 9, 9), monday, 'jonas')
+  const draft = buildStandup(activity, tasks, statuses, new Date(2026, 9, 9), 'jonas')
 
   test('splits your own work since the last standup into done and worked on', () => {
     expect(draft.done.map((t) => t.id)).toEqual([1])
     expect(draft.workedOn.map((t) => t.id)).toEqual([2])
   })
 
-  test("today lists what's in progress and what's due", () => {
-    expect(draft.today.map((t) => [t.task.id, t.due])).toEqual([
-      [2, null],
-      [4, null],
-      [3, 'today'],
-    ])
+  test("today lists what's in progress, not the backlog", () => {
+    expect(draft.today.map((t) => t.id)).toEqual([2, 4])
   })
 
   test('formats as plain text with an empty blockers line', () => {
-    const text = standupText(draft, { since: 'Since Friday', done: 'done', today: 'Today', dueToday: 'due today', overdue: 'overdue', blockers: 'Blockers', none: 'None' })
+    const text = standupText(draft, { since: 'Since Friday', done: 'done', today: 'Today', blockers: 'Blockers', none: 'None' })
     expect(text).toBe(
-      ['Since Friday', '- Task 1 (#1) – done', '- Task 2 (#2)', '', 'Today', '- Task 2 (#2)', '- Task 4 (#4)', '- Task 3 (#3) – due today', '', 'Blockers', '- None'].join('\n'),
+      ['Since Friday', '- Task 1 (#1) – done', '- Task 2 (#2)', '', 'Today', '- Task 2 (#2)', '- Task 4 (#4)', '', 'Blockers', '- None'].join('\n'),
     )
   })
 })

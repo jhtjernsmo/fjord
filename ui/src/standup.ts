@@ -1,7 +1,6 @@
 // Standup drafts: which weekdays have a standup, and what happened since the last one.
 import { useCallback } from 'react'
 import type { Activity, Status, Task } from './api'
-import { localIso } from './dueWeek'
 import { useStoredPref } from './storedPref'
 
 /** Weekdays as Date.getDay() numbers: 0 is Sunday, 1 Monday … 6 Saturday. */
@@ -28,16 +27,11 @@ export function previousStandup(today: Date, days: Weekday[]): Date {
   return new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7)
 }
 
-export interface StandupTask {
-  task: Task
-  /** Set when it's due today or already overdue. */
-  due: 'overdue' | 'today' | null
-}
-
 export interface StandupDraft {
   done: Task[]
   workedOn: Task[]
-  today: StandupTask[]
+  /** In progress now. What's due is already in "Due this week". */
+  today: Task[]
 }
 
 /** Actions that count as working on a task. Edits to columns, notes and files don't. */
@@ -47,7 +41,7 @@ const WORK_ACTIONS = new Set(['task.create', 'task.move', 'task.update', 'task.b
  * Builds the draft from the activity log and the current boards.
  * Only `actor`'s own changes count, so tasks an agent moved don't end up in your standup.
  */
-export function buildStandup(activity: Activity[], tasks: Task[], statuses: Status[], since: Date, today: Date, actor: string): StandupDraft {
+export function buildStandup(activity: Activity[], tasks: Task[], statuses: Status[], since: Date, actor: string): StandupDraft {
   const doneStatus = new Set(statuses.filter((s) => s.is_done).map((s) => s.id))
   const firstStatus = new Set(firstColumns(statuses))
   const byId = new Map(tasks.filter((t) => !t.archived_at).map((t) => [t.id, t]))
@@ -60,19 +54,8 @@ export function buildStandup(activity: Activity[], tasks: Task[], statuses: Stat
   const done = recent.filter((t) => doneStatus.has(t.status_id))
   const workedOn = recent.filter((t) => !doneStatus.has(t.status_id))
 
-  const todayIso = localIso(today)
-  const open = [...byId.values()].filter((t) => !doneStatus.has(t.status_id) && !t.parent_id)
-  const inProgress = open.filter((t) => !firstStatus.has(t.status_id))
-  const dueNow = open.filter((t) => t.due_at !== null && t.due_at <= todayIso)
-  const seen = new Set<number>()
-  const todayList: StandupTask[] = []
-  for (const t of [...inProgress, ...dueNow]) {
-    if (seen.has(t.id)) continue
-    seen.add(t.id)
-    const due = t.due_at === null || t.due_at > todayIso ? null : t.due_at < todayIso ? 'overdue' : 'today'
-    todayList.push({ task: t, due })
-  }
-  return { done, workedOn, today: todayList }
+  const inProgress = [...byId.values()].filter((t) => !doneStatus.has(t.status_id) && !firstStatus.has(t.status_id) && !t.parent_id)
+  return { done, workedOn, today: inProgress }
 }
 
 /** Each project's first column is its backlog; tasks there aren't "in progress". */
@@ -89,8 +72,6 @@ export interface StandupLabels {
   since: string
   done: string
   today: string
-  dueToday: string
-  overdue: string
   blockers: string
   none: string
 }
@@ -103,7 +84,7 @@ export function standupText(draft: StandupDraft, labels: StandupLabels): string 
   for (const t of draft.workedOn) lines.push(line(t))
   if (draft.done.length + draft.workedOn.length === 0) lines.push(`- ${labels.none}`)
   lines.push('', labels.today)
-  for (const { task, due } of draft.today) lines.push(line(task, due === 'overdue' ? ` – ${labels.overdue}` : due === 'today' ? ` – ${labels.dueToday}` : ''))
+  for (const t of draft.today) lines.push(line(t))
   if (draft.today.length === 0) lines.push(`- ${labels.none}`)
   lines.push('', labels.blockers, `- ${labels.none}`)
   return lines.join('\n')
