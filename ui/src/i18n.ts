@@ -369,7 +369,7 @@ const en = {
   'action.board.filter': 'Filter tasks',
   'action.settings.open': 'Settings',
 
-  'home.noOpen': 'No open tasks. Enjoy it!',
+  'home.noOpen': 'No open tasks.',
   'home.open': '{open} open tasks across {projects} projects',
   'home.welcome': 'Welcome to Fjord. Create your first project to get started.',
   'home.recent': 'Recent activity',
@@ -864,7 +864,7 @@ const no: Partial<Record<MessageKey, string>> = {
   'act.status.delete': 'fjernet kolonnen «{s}»',
   'action.board.filter': 'Filtrer oppgaver',
   'action.settings.open': 'Innstillinger',
-  'home.noOpen': 'Ingen åpne oppgaver. Nyt det!',
+  'home.noOpen': 'Ingen åpne oppgaver.',
   'home.open': '{open} åpne oppgaver i {projects} prosjekter',
   'home.welcome': 'Velkommen til Fjord. Lag ditt første prosjekt for å komme i gang.',
   'home.recent': 'Siste aktivitet',

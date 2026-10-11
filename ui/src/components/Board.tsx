@@ -104,35 +104,34 @@ function CardBody({ task, statuses, className = '' }: { task: Task; statuses: St
         </span>
       )}
       <div className="card-title">{task.title}</div>
-      {(task.priority > 0 || task.due_at || task.body_md || task.branch || subs) && (
-        <div className="card-meta">
-          {subs && (
-            <span className={`chip subtask-chip ${subs.done === subs.total ? 'complete' : ''}`} title={t('subtasks.title')}>
-              <ListChecks size={11} strokeWidth={1.8} /> {subs.done}/{subs.total}
-            </span>
-          )}
-          {task.priority > 0 && (
-            <span className={`prio-${task.priority}`} title={`${t('task.priority')}: ${priority}`}>
-              {PRIORITY_ICON[task.priority]} {priority}
-            </span>
-          )}
-          {task.due_at && (
-            <span className={`chip ${isOverdue(task, statuses) ? 'overdue' : ''}`}>
-              <CalendarDays size={11} strokeWidth={1.8} /> {task.due_at.slice(5)}
-            </span>
-          )}
-          {task.body_md && (
-            <span title={t('board.hasDescription')}>
-              <AlignLeft size={12} strokeWidth={1.8} />
-            </span>
-          )}
-          {task.branch && (
-            <span className="card-branch" title={task.branch}>
-              <GitBranch size={12} strokeWidth={1.8} />
-            </span>
-          )}
-        </div>
-      )}
+      <div className="card-meta">
+        <span className="card-id">#{task.id}</span>
+        {subs && (
+          <span className={`chip subtask-chip ${subs.done === subs.total ? 'complete' : ''}`} title={t('subtasks.title')}>
+            <ListChecks size={11} strokeWidth={1.8} /> {subs.done}/{subs.total}
+          </span>
+        )}
+        {task.priority > 0 && (
+          <span className={`prio-${task.priority}`} title={`${t('task.priority')}: ${priority}`}>
+            {PRIORITY_ICON[task.priority]} {priority}
+          </span>
+        )}
+        {task.due_at && (
+          <span className={`chip ${isOverdue(task, statuses) ? 'overdue' : ''}`}>
+            <CalendarDays size={11} strokeWidth={1.8} /> {task.due_at.slice(5)}
+          </span>
+        )}
+        {task.body_md && (
+          <span title={t('board.hasDescription')}>
+            <AlignLeft size={12} strokeWidth={1.8} />
+          </span>
+        )}
+        {task.branch && (
+          <span className="card-branch" title={task.branch}>
+            <GitBranch size={12} strokeWidth={1.8} />
+          </span>
+        )}
+      </div>
     </div>
   )
 }
