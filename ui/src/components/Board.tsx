@@ -94,15 +94,15 @@ function CardBody({ task, statuses, className = '' }: { task: Task; statuses: St
   const parentTitle = parentId !== null ? titles.get(parentId) : undefined
   return (
     <div className={`card ${done ? 'done' : ''} ${className}`}>
-      {parentTitle && (
-        <div className="card-parent" title={parentTitle}>
-          <CornerLeftUp size={11} /> {parentTitle}
-        </div>
-      )}
       {task.created_by === 'claude' && (
         <span className="agent-badge">
           <AgentTag title={t('board.byAgent')} />
         </span>
+      )}
+      {parentTitle && (
+        <div className="card-parent" title={parentTitle}>
+          <CornerLeftUp size={11} /> {parentTitle}
+        </div>
       )}
       <div className="card-title">{task.title}</div>
       <div className="card-meta">
