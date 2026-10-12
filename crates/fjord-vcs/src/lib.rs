@@ -14,7 +14,7 @@ mod process;
 use std::collections::HashMap;
 use std::path::Path;
 
-use fjord_core::{ImportOutcome, ImportSettings, ProjectRepo, RemoteHost, Store, Task};
+use fjord_core::{ImportOutcome, ImportSettings, Project, ProjectRepo, RemoteHost, Store, Task};
 use serde::Serialize;
 use thiserror::Error;
 
@@ -187,6 +187,45 @@ impl Forge {
             Forge::Azure(az) => az.create_pull_request(head, base, title, body, draft),
         }
     }
+}
+
+/// The project linked to the repository a folder belongs to, the branch checked
+/// out there and the task working in that branch.
+#[derive(Debug, Serialize)]
+pub struct Workspace {
+    pub project: Project,
+    pub repo: ProjectRepo,
+    pub branch: String,
+    pub task: Option<Task>,
+}
+
+/// Which project `path` belongs to, if any is linked to its repository.
+pub fn workspace_for(store: &Store, path: &Path) -> Result<Option<Workspace>> {
+    let git = Git::open(path)?;
+    let root = git.root().display().to_string();
+    for summary in store.list_projects(false)? {
+        let project = summary.project;
+        let Some(repo) = store.get_project_repo(project.id)? else {
+            continue;
+        };
+        if repo.path != root {
+            continue;
+        }
+        let branch = git.current_branch()?;
+        let task = match store.find_task_by_branch(project.id, &branch)? {
+            Some(task) => Some(task),
+            None => task_id_from_branch(&branch)
+                .and_then(|id| store.get_task(id).ok())
+                .filter(|t| t.project_id == project.id && t.archived_at.is_none()),
+        };
+        return Ok(Some(Workspace {
+            project,
+            repo,
+            branch,
+            task,
+        }));
+    }
+    Ok(None)
 }
 
 pub fn overview(store: &Store, project_id: i64) -> Result<GitOverview> {

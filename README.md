@@ -229,6 +229,7 @@ fjord git main bokost        # back to the main branch
 fjord git status bokost      # branches and recent commits
 fjord git prs bokost         # pull requests + CI; moves merged tasks to done
 fjord git pr 12 --draft      # push the branch and open a pull request
+fjord git which              # the project and task for the current folder
 ```
 
 ## AI agents (MCP)

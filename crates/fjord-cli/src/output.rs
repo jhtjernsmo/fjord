@@ -143,6 +143,20 @@ impl Printer {
         Ok(())
     }
 
+    pub fn workspace(&self, w: Option<&fjord_vcs::Workspace>) -> Result<()> {
+        if self.json {
+            return print_json(&w);
+        }
+        match w {
+            None => println!("No project is linked to this repository."),
+            Some(w) => match &w.task {
+                Some(t) => println!("{}  {}  #{} {}", w.project.name, w.branch, t.id, t.title),
+                None => println!("{}  {}", w.project.name, w.branch),
+            },
+        }
+        Ok(())
+    }
+
     pub fn switched_to(&self, branch: &str) -> Result<()> {
         if self.json {
             return print_json(&serde_json::json!({ "branch": branch }));

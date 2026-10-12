@@ -218,6 +218,8 @@ enum GitCmd {
     Main { project: String },
     /// Pull requests with CI state; moves tasks of merged PRs to done
     Prs { project: String },
+    /// Which project and task the repository containing PATH belongs to (default: current folder)
+    Which { path: Option<PathBuf> },
     /// Push the task's branch and open a pull request
     Pr {
         task: i64,
@@ -530,6 +532,10 @@ fn git(store: &mut Store, out: &output::Printer, cmd: GitCmd) -> Result<()> {
         }
         GitCmd::Pr { task, draft } => {
             out.pull_request(&fjord_vcs::open_pull_request(store, task, draft)?)
+        }
+        GitCmd::Which { path } => {
+            let path = path.unwrap_or_else(|| PathBuf::from("."));
+            out.workspace(fjord_vcs::workspace_for(store, &path)?.as_ref())
         }
     }
 }
