@@ -77,6 +77,7 @@ export const DEFAULT_ACTIONS: ActionDef[] = [
   { id: 'notes.edit', group: 'notes', scope: 'notes', keys: 'e' },
   { id: 'notes.mode', group: 'notes', scope: 'notes', keys: 'v' },
   { id: 'notes.pin', group: 'notes', scope: 'notes', keys: 'P' },
+  { id: 'notes.lock', group: 'notes', scope: 'notes', keys: 'L' },
   { id: 'home.next', group: 'home', scope: 'home', keys: 'j' },
   { id: 'home.prev', group: 'home', scope: 'home', keys: 'k' },
   { id: 'home.open', group: 'home', scope: 'home', keys: 'enter' },

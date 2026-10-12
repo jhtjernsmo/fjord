@@ -20,7 +20,7 @@ pub use imports::{
     DEFAULT_CLOSED_DAYS, ExternalItem, ExternalLink, ImportMapping, ImportOutcome, ImportSettings,
     ImportedTask,
 };
-pub use links::parse_links;
+pub use links::{normalize_folder, parse_links};
 pub use models::*;
 pub use projects::{slugify, status_names};
 pub use store::{Store, config_dir, default_actor};

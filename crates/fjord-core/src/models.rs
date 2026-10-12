@@ -191,8 +191,11 @@ pub struct Note {
     pub project_id: Option<i64>,
     pub title: String,
     pub body_md: String,
+    /// A path like `product/ideas`; empty for no folder.
     pub folder: String,
     pub pinned: bool,
+    /// Opens read-only in the preview until unlocked.
+    pub locked: bool,
     pub created_at: String,
     pub updated_at: String,
 }

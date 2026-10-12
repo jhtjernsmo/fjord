@@ -344,6 +344,22 @@ pub fn set_note_pinned(state: State<AppState>, id: i64, pinned: bool) -> CmdResu
     with_store(&state, |s| s.set_note_pinned(id, pinned))
 }
 
+#[tauri::command]
+pub fn set_note_locked(state: State<AppState>, id: i64, locked: bool) -> CmdResult<Note> {
+    with_store(&state, |s| s.set_note_locked(id, locked))
+}
+
+/// Renames a folder and its subfolders among a project's notes (or the notespace's).
+#[tauri::command]
+pub fn rename_note_folder(
+    state: State<AppState>,
+    project_id: Option<i64>,
+    from: String,
+    to: String,
+) -> CmdResult<usize> {
+    with_store(&state, |s| s.rename_note_folder(project_id, &from, &to))
+}
+
 /// Resolves many `[[link]]` texts at once (for rendering a note).
 #[tauri::command]
 pub fn resolve_links(

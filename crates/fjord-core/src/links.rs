@@ -214,7 +214,7 @@ impl Store {
 
     pub fn set_note_folder(&mut self, id: i64, folder: &str) -> Result<Note> {
         self.get_note(id)?;
-        let folder = folder.trim().trim_matches('/');
+        let folder = normalize_folder(folder);
         self.conn.execute(
             "UPDATE notes SET folder = ?1 WHERE id = ?2",
             params![folder, id],
@@ -230,6 +230,70 @@ impl Store {
         )?;
         self.get_note(id)
     }
+
+    /// Locks a note to the preview (read-only) or unlocks it for editing.
+    pub fn set_note_locked(&mut self, id: i64, locked: bool) -> Result<Note> {
+        self.get_note(id)?;
+        self.conn.execute(
+            "UPDATE notes SET locked = ?1 WHERE id = ?2",
+            params![locked, id],
+        )?;
+        self.get_note(id)
+    }
+
+    /// Renames a folder and everything under it, among one project's notes
+    /// (or the notespace's, with `None`). Returns how many notes moved.
+    pub fn rename_note_folder(
+        &mut self,
+        project_id: Option<i64>,
+        from: &str,
+        to: &str,
+    ) -> Result<usize> {
+        let (from, to) = (normalize_folder(from), normalize_folder(to));
+        if from.is_empty() {
+            return Err(crate::Error::Invalid(
+                "folder to rename must not be empty".into(),
+            ));
+        }
+        let moved = self.conn.execute(
+            "UPDATE notes SET folder = ?3 || substr(folder, length(?2) + 1)
+             WHERE project_id IS ?1 AND (folder = ?2 OR folder LIKE ?2 || '/%')",
+            params![project_id, from, to],
+        )?;
+        // A folder moved to the top level leaves a leading slash on its subfolders.
+        self.conn.execute(
+            "UPDATE notes SET folder = ltrim(folder, '/') WHERE project_id IS ?1 AND folder LIKE '/%'",
+            params![project_id],
+        )?;
+        Ok(moved)
+    }
+
+    /// Every folder that has notes, with its parents, sorted (`a`, `a/b`, `c`).
+    pub fn note_folders(&self, project_id: Option<i64>) -> Result<Vec<String>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT DISTINCT folder FROM notes WHERE project_id IS ?1 AND folder != ''")?;
+        let rows = stmt.query_map([project_id], |r| r.get::<_, String>(0))?;
+        let mut all = std::collections::BTreeSet::new();
+        for folder in rows {
+            let folder = folder?;
+            let parts: Vec<&str> = folder.split('/').collect();
+            for i in 1..=parts.len() {
+                all.insert(parts[..i].join("/"));
+            }
+        }
+        Ok(all.into_iter().collect())
+    }
+}
+
+/// `" Work / Meetings//2026 "` → `"Work/Meetings/2026"`.
+pub fn normalize_folder(folder: &str) -> String {
+    folder
+        .split('/')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 #[cfg(test)]
@@ -237,6 +301,40 @@ mod tests {
     use super::*;
     use crate::models::{NewProject, NewTask};
     use crate::test_util::store;
+
+    #[test]
+    fn nested_folders_rename_and_lock() {
+        let (mut s, _dir) = store();
+        let a = s.create_note(None, "A", "").unwrap();
+        let b = s.create_note(None, "B", "").unwrap();
+        let c = s.create_note(None, "C", "").unwrap();
+        assert_eq!(
+            s.set_note_folder(a.id, " Work / Meetings//2026 ")
+                .unwrap()
+                .folder,
+            "Work/Meetings/2026"
+        );
+        s.set_note_folder(b.id, "Work").unwrap();
+        s.set_note_folder(c.id, "Workshop").unwrap();
+        assert_eq!(
+            s.note_folders(None).unwrap(),
+            ["Work", "Work/Meetings", "Work/Meetings/2026", "Workshop"]
+        );
+
+        // Renaming moves the folder and its subfolders, but not a folder that only starts the same.
+        assert_eq!(s.rename_note_folder(None, "Work", "Jobb").unwrap(), 2);
+        assert_eq!(s.get_note(a.id).unwrap().folder, "Jobb/Meetings/2026");
+        assert_eq!(s.get_note(b.id).unwrap().folder, "Jobb");
+        assert_eq!(s.get_note(c.id).unwrap().folder, "Workshop");
+        // Moving a subfolder to the top level.
+        s.rename_note_folder(None, "Jobb/Meetings", "").unwrap();
+        assert_eq!(s.get_note(a.id).unwrap().folder, "2026");
+        assert!(s.rename_note_folder(None, " ", "x").is_err());
+
+        assert!(!a.locked);
+        assert!(s.set_note_locked(a.id, true).unwrap().locked);
+        assert!(!s.set_note_locked(a.id, false).unwrap().locked);
+    }
 
     #[test]
     fn parses_wiki_links() {

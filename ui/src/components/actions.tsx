@@ -1,5 +1,5 @@
 // Shared entity actions (rename, delete, archive …) and the right-click menus built from them.
-import { Archive, ArchiveRestore, ArrowRight, ExternalLink, Flag, FolderOpen, GitBranch, Palette, Pencil, Trash2, X } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowRight, ExternalLink, Flag, FolderOpen, GitBranch, Lock, Palette, Pencil, Pin, Trash2, X } from 'lucide-react'
 import { api } from '../api'
 import type { Attachment, Note, Project, Status, Task } from '../api'
 import { useApp } from '../data'
@@ -121,6 +121,8 @@ export function useContextMenus() {
     openMenu(e, [
       { label: t('menu.open'), icon: <FolderOpen size={ICON} />, onSelect: onOpen },
       { label: t('menu.rename'), icon: <Pencil size={ICON} />, onSelect: () => actions.renameNote(note) },
+      { label: note.pinned ? t('notes.unpin') : t('notes.pin'), icon: <Pin size={ICON} />, onSelect: () => run(api.setNotePinned(note.id, !note.pinned)) },
+      { label: note.locked ? t('notes.unlock') : t('notes.lock'), icon: <Lock size={ICON} />, onSelect: () => run(api.setNoteLocked(note.id, !note.locked)) },
       { label: t('menu.delete'), icon: <Trash2 size={ICON} />, danger: true, separator: true, onSelect: () => actions.deleteNote(note) },
     ])
 

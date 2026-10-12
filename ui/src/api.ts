@@ -77,8 +77,11 @@ export interface Note {
   project_id: number | null
   title: string
   body_md: string
+  /** A path like "product/ideas"; empty for none. */
   folder: string
   pinned: boolean
+  /** Opens read-only in the preview until unlocked. */
+  locked: boolean
   created_at: string
   updated_at: string
 }
@@ -380,6 +383,8 @@ export const api = {
   moveNote: (id: number, projectId: number | null) => invoke<Note>('move_note', { id, projectId }),
   setNoteFolder: (id: number, folder: string) => invoke<Note>('set_note_folder', { id, folder }),
   setNotePinned: (id: number, pinned: boolean) => invoke<Note>('set_note_pinned', { id, pinned }),
+  setNoteLocked: (id: number, locked: boolean) => invoke<Note>('set_note_locked', { id, locked }),
+  renameNoteFolder: (projectId: number | null, from: string, to: string) => invoke<number>('rename_note_folder', { projectId, from, to }),
   resolveLinks: (texts: string[]) => invoke<(LinkTarget | null)[]>('resolve_links', { texts }),
   backlinks: (kind: LinkTarget['kind'], targetId: number) => invoke<Note[]>('backlinks', { kind, targetId }),
   linkSuggestions: (query: string) => invoke<LinkTarget[]>('link_suggestions', { query }),

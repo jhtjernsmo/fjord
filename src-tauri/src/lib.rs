@@ -68,6 +68,8 @@ pub fn run() {
             commands::move_note,
             commands::set_note_folder,
             commands::set_note_pinned,
+            commands::set_note_locked,
+            commands::rename_note_folder,
             commands::resolve_links,
             commands::backlinks,
             commands::link_suggestions,

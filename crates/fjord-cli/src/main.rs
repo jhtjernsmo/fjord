@@ -69,6 +69,9 @@ enum Command {
         #[arg(long, default_value = "")]
         body: String,
     },
+    /// Notes: list, read, sort into folders, pin and lock
+    #[command(subcommand)]
+    Notes(NotesCmd),
     /// Full-text search across tasks, notes and files
     Search { query: Vec<String> },
     /// Recent activity, for one project or all
@@ -232,6 +235,58 @@ enum GitCmd {
 }
 
 #[derive(Subcommand)]
+enum NotesCmd {
+    /// List notes: all, one project's (--project) or only the notespace's (--free)
+    #[command(alias = "ls")]
+    List {
+        #[arg(long, short)]
+        project: Option<String>,
+        #[arg(long, conflicts_with = "project")]
+        free: bool,
+        /// Only notes in this folder and its subfolders
+        #[arg(long)]
+        folder: Option<String>,
+    },
+    /// Show a note with its body
+    Show { id: i64 },
+    /// Move a note into a folder ("" for none), to a project, or to the notespace (--free)
+    Move {
+        id: i64,
+        /// A path like product/ideas
+        #[arg(long)]
+        folder: Option<String>,
+        #[arg(long, short, conflicts_with = "free")]
+        project: Option<String>,
+        #[arg(long)]
+        free: bool,
+    },
+    /// Folders of a project's notes, or of the notespace without --project
+    Folders {
+        #[arg(long, short)]
+        project: Option<String>,
+    },
+    /// Rename a folder and everything under it ("" moves its contents to the top)
+    RenameFolder {
+        from: String,
+        to: String,
+        #[arg(long, short)]
+        project: Option<String>,
+    },
+    /// Pin a note to the top of the list, or unpin it
+    Pin {
+        id: i64,
+        #[arg(action = clap::ArgAction::Set, value_parser = clap::builder::BoolishValueParser::new())]
+        on: bool,
+    },
+    /// Lock a note to the preview (read-only in the app), or unlock it
+    Lock {
+        id: i64,
+        #[arg(action = clap::ArgAction::Set, value_parser = clap::builder::BoolishValueParser::new())]
+        on: bool,
+    },
+}
+
+#[derive(Subcommand)]
 enum AzureCmd {
     /// Import work items assigned to you into the mapped projects (set up in Fjord's settings)
     Import,
@@ -356,6 +411,7 @@ fn run(cli: Cli) -> Result<()> {
                 .map(|p| p.id);
             out.note(&store.create_note(project_id, &title, &body)?)
         }
+        Command::Notes(cmd) => notes(&mut store, &out, cmd),
         Command::Search { query } => out.search(&store.search(&query.join(" "))?),
         Command::Log { project, limit } => {
             let project_id = project
@@ -549,6 +605,60 @@ fn git(store: &mut Store, out: &output::Printer, cmd: GitCmd) -> Result<()> {
             let path = path.unwrap_or_else(|| PathBuf::from("."));
             out.workspace(fjord_vcs::workspace_for(store, &path)?.as_ref())
         }
+    }
+}
+
+fn notes(store: &mut Store, out: &output::Printer, cmd: NotesCmd) -> Result<()> {
+    let project_id = |store: &Store, p: Option<String>| -> Result<Option<i64>> {
+        Ok(match p {
+            Some(p) => Some(store.find_project(&p)?.id),
+            None => None,
+        })
+    };
+    match cmd {
+        NotesCmd::List {
+            project,
+            free,
+            folder,
+        } => {
+            let mut list = match project_id(store, project)? {
+                Some(id) => store.list_notes(id)?,
+                None => store.list_all_notes(free)?,
+            };
+            if let Some(folder) = folder.map(|f| fjord_core::normalize_folder(&f)) {
+                let prefix = format!("{folder}/");
+                list.retain(|n| n.folder == folder || n.folder.starts_with(&prefix));
+            }
+            out.notes(&list)
+        }
+        NotesCmd::Show { id } => out.note_full(&store.get_note(id)?),
+        NotesCmd::Move {
+            id,
+            folder,
+            project,
+            free,
+        } => {
+            let mut note = store.get_note(id)?;
+            if free {
+                note = store.move_note(id, None)?;
+            } else if let Some(pid) = project_id(store, project)? {
+                note = store.move_note(id, Some(pid))?;
+            }
+            if let Some(folder) = folder {
+                note = store.set_note_folder(id, &folder)?;
+            }
+            out.note_full(&note)
+        }
+        NotesCmd::Folders { project } => {
+            let folders = store.note_folders(project_id(store, project)?)?;
+            out.value(&folders)
+        }
+        NotesCmd::RenameFolder { from, to, project } => {
+            let moved = store.rename_note_folder(project_id(store, project)?, &from, &to)?;
+            out.message(&format!("Moved {moved} notes."))
+        }
+        NotesCmd::Pin { id, on } => out.note_full(&store.set_note_pinned(id, on)?),
+        NotesCmd::Lock { id, on } => out.note_full(&store.set_note_locked(id, on)?),
     }
 }
 
