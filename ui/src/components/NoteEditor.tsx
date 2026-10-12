@@ -1,6 +1,6 @@
 // One note: title, metadata, markdown editor with [[ autocomplete, live preview and backlinks.
 import { useEffect, useRef, useState } from 'react'
-import { FolderKanban, NotebookText, Pin, PinOff, Square, Trash2 } from 'lucide-react'
+import { FolderKanban, Lock, LockOpen, NotebookText, Pin, PinOff, Square, Trash2 } from 'lucide-react'
 import { api, relativeTime } from '../api'
 import type { LinkTarget, Note, ProjectSummary } from '../api'
 import { useActions, useApp, useLive } from '../data'
@@ -8,6 +8,7 @@ import { useNav } from '../nav'
 import type { MessageKey } from '../i18n'
 import { useEntityActions } from './actions'
 import { NoteMarkdown } from './NoteMarkdown'
+import { folderPaths } from '../notesTree'
 
 const AUTOSAVE_MS = 600
 const OPEN_LINK_RE = /\[\[([^\]\n|]*)$/
@@ -35,13 +36,14 @@ export function Backlinks({ kind, id }: { kind: 'project' | 'task' | 'note'; id:
   )
 }
 
-export function NoteEditor({ note, projects, onDeleted }: { note: Note; projects: ProjectSummary[]; onDeleted: () => void }) {
-  const { run, t } = useApp()
+export function NoteEditor({ note, projects, folders = [], onDeleted }: { note: Note; projects: ProjectSummary[]; folders?: Note[]; onDeleted: () => void }) {
+  const { run, t, toast } = useApp()
   const { deleteNote } = useEntityActions()
   const [title, setTitle] = useState(note.title)
   const [body, setBody] = useState(note.body_md)
   const [folder, setFolder] = useState(note.folder)
-  const [mode, setMode] = useState<'split' | 'edit' | 'preview'>('split')
+  const [mode, setMode] = useState<'split' | 'edit' | 'preview'>(note.locked ? 'preview' : 'split')
+  const shownMode = note.locked ? 'preview' : mode
   const [suggest, setSuggest] = useState<{ query: string; items: LinkTarget[]; index: number } | null>(null)
   const textRef = useRef<HTMLTextAreaElement>(null)
   const saved = useRef({ title: note.title, body: note.body_md })
@@ -67,10 +69,11 @@ export function NoteEditor({ note, projects, onDeleted }: { note: Note; projects
   useActions(
     {
       'notes.edit': () => {
+        if (note.locked) return toast(t('notes.lockedHint'), 'info')
         if (mode === 'preview') setMode('split')
         window.setTimeout(() => textRef.current?.focus(), 0)
       },
-      'notes.mode': () => setMode((m) => (m === 'edit' ? 'split' : m === 'split' ? 'preview' : 'edit')),
+      'notes.mode': () => !note.locked && setMode((m) => (m === 'edit' ? 'split' : m === 'split' ? 'preview' : 'edit')),
     },
     'notes',
   )
@@ -109,7 +112,19 @@ export function NoteEditor({ note, projects, onDeleted }: { note: Note; projects
   return (
     <div className="note-editor">
       <div className="note-head">
-        <input className="title-input" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={saveTitle} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} aria-label={t('task.title')} />
+        <input className="title-input" value={title} readOnly={note.locked} onChange={(e) => setTitle(e.target.value)} onBlur={saveTitle} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} aria-label={t('task.title')} />
+        <button
+          className={`icon-btn ${note.locked ? 'on' : ''}`}
+          onClick={() => {
+            run(api.setNoteLocked(note.id, !note.locked))
+            if (note.locked) setMode('split')
+          }}
+          title={note.locked ? t('notes.unlock') : t('notes.lock')}
+          aria-label={note.locked ? t('notes.unlock') : t('notes.lock')}
+          aria-pressed={note.locked}
+        >
+          {note.locked ? <Lock size={15} /> : <LockOpen size={15} />}
+        </button>
         <button className="icon-btn" onClick={() => run(api.setNotePinned(note.id, !note.pinned))} title={note.pinned ? t('notes.unpin') : t('notes.pin')} aria-label={t('notes.pin')}>
           {note.pinned ? <PinOff size={15} /> : <Pin size={15} />}
         </button>
@@ -132,22 +147,35 @@ export function NoteEditor({ note, projects, onDeleted }: { note: Note; projects
         <input
           className="input mono"
           value={folder}
+          list={`folders-${note.id}`}
           placeholder={t('notes.folder')}
           onChange={(e) => setFolder(e.target.value)}
           onBlur={() => folder !== note.folder && run(api.setNoteFolder(note.id, folder))}
+          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
           aria-label={t('notes.folder')}
         />
-        <div className="segmented" role="radiogroup">
-          {(['edit', 'split', 'preview'] as const).map((m) => (
-            <button key={m} className={mode === m ? 'on' : ''} onClick={() => setMode(m)}>
-              {t(`notes.mode.${m}` as MessageKey)}
-            </button>
+        <datalist id={`folders-${note.id}`}>
+          {folderPaths(folders).map((f) => (
+            <option key={f} value={f} />
           ))}
-        </div>
+        </datalist>
+        {note.locked ? (
+          <span className="note-locked">
+            <Lock size={12} /> {t('notes.locked')}
+          </span>
+        ) : (
+          <div className="segmented" role="radiogroup">
+            {(['edit', 'split', 'preview'] as const).map((m) => (
+              <button key={m} className={mode === m ? 'on' : ''} onClick={() => setMode(m)}>
+                {t(`notes.mode.${m}` as MessageKey)}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className={`note-body mode-${mode}`}>
-        {mode !== 'preview' && (
+      <div className={`note-body mode-${shownMode}`}>
+        {shownMode !== 'preview' && (
           <div className="note-input">
             <textarea
               ref={textRef}
@@ -183,7 +211,7 @@ export function NoteEditor({ note, projects, onDeleted }: { note: Note; projects
             )}
           </div>
         )}
-        {mode !== 'edit' && (
+        {shownMode !== 'edit' && (
           <div className={`markdown note-preview ${body ? '' : 'empty'}`}>{body ? <NoteMarkdown markdown={body} /> : t('notes.empty')}</div>
         )}
       </div>

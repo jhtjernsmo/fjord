@@ -7,7 +7,7 @@ use crate::store::{Store, require_text};
 const MAX_SEARCH_HITS: i64 = 50;
 
 pub(crate) const NOTE_COLS: &str =
-    "id, project_id, title, body_md, folder, pinned, created_at, updated_at";
+    "id, project_id, title, body_md, folder, pinned, created_at, updated_at, locked";
 
 pub(crate) fn note_from_row(row: &Row) -> rusqlite::Result<Note> {
     Ok(Note {
@@ -19,6 +19,7 @@ pub(crate) fn note_from_row(row: &Row) -> rusqlite::Result<Note> {
         pinned: row.get(5)?,
         created_at: row.get(6)?,
         updated_at: row.get(7)?,
+        locked: row.get(8)?,
     })
 }
 

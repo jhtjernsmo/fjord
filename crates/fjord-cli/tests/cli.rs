@@ -249,6 +249,42 @@ fn azure_import_needs_setup_and_links_start_empty() {
 }
 
 #[test]
+fn notes_folders_move_rename_pin_and_lock() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    let a = ok_json(d, &["note", "Standup notes"]);
+    let b = ok_json(d, &["note", "Retro"]);
+    let (a, b) = (a["id"].to_string(), b["id"].to_string());
+
+    let moved = ok_json(d, &["notes", "move", &a, "--folder", "Work/Meetings"]);
+    assert_eq!(moved["folder"], "Work/Meetings");
+    ok_json(d, &["notes", "move", &b, "--folder", "Work"]);
+    assert_eq!(
+        ok_json(d, &["notes", "folders"]),
+        serde_json::json!(["Work", "Work/Meetings"])
+    );
+
+    let in_meetings = ok_json(d, &["notes", "list", "--folder", "work/meetings "]);
+    assert_eq!(
+        in_meetings.as_array().unwrap().len(),
+        0,
+        "folders are case-sensitive"
+    );
+    let in_work = ok_json(d, &["notes", "list", "--folder", "Work"]);
+    assert_eq!(in_work.as_array().unwrap().len(), 2);
+
+    ok_json(d, &["notes", "rename-folder", "Work", "Jobb"]);
+    assert_eq!(
+        ok_json(d, &["notes", "show", &a])["folder"],
+        "Jobb/Meetings"
+    );
+
+    assert_eq!(ok_json(d, &["notes", "pin", &a, "on"])["pinned"], true);
+    assert_eq!(ok_json(d, &["notes", "lock", &a, "on"])["locked"], true);
+    assert_eq!(ok_json(d, &["notes", "lock", &a, "off"])["locked"], false);
+}
+
+#[test]
 fn delete_requires_confirmation_or_yes() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();

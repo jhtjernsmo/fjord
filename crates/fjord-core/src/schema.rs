@@ -203,6 +203,10 @@ const MIGRATIONS: &[&str] = &[
     r#"
     ALTER TABLE external_links ADD COLUMN state TEXT;
     "#,
+    // v9: notes locked to the preview (read-only until unlocked)
+    r#"
+    ALTER TABLE notes ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;
+    "#,
 ];
 
 pub fn configure(conn: &Connection) -> Result<()> {

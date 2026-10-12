@@ -30,7 +30,7 @@ the same projects, and you can always see who did what.
 - **Files** — drop files onto the window to attach them to a project or task. Stored content-addressed (deduplicated) with image previews.
 - **Themes** — five built-in themes (Fjord Dark/Light, Nord, Solarized Light, High Contrast), follow the OS with separate light/dark picks, or build your own with live preview: colours, text size, rounding and density; share themes as JSON. `Space T` cycles themes.
 - **Subtasks** — break a task into subtasks (one level) with their own status, priority and branch; cards show progress (2/5), the task panel lists them with check-off, drag to reorder and `A` to add.
-- **Notespace** — Obsidian-style markdown notes, inside a project or free-floating, with folders and pins. Link anything with `[[Project]]`, `[[#12]]` (a task) or `[[Another note]]` — type `[[` for autocomplete — and see backlinks (“mentioned in”) on tasks, projects and notes. Tables, task lists and [Mermaid](https://mermaid.js.org) diagrams render in notes and task descriptions; web links open in your browser.
+- **Notespace** — Obsidian-style markdown notes, inside a project or free-floating, in folders and subfolders (drag a note onto a folder, sort by name or date), with pins and notes you can lock to read-only. Link anything with `[[Project]]`, `[[#12]]` (a task) or `[[Another note]]` — type `[[` for autocomplete — and see backlinks (“mentioned in”) on tasks, projects and notes. Tables, task lists and [Mermaid](https://mermaid.js.org) diagrams render in notes and task descriptions; web links open in your browser.
 - **Full-text search** across tasks, notes and file names (`Space f`).
 - **Keyboard-first** — a leader key with a which-key popup, vim motions on the board, a `Ctrl+K` command palette, and every binding configurable. The mouse works for everything too.
 - **Git, GitHub & Azure DevOps** — link a project to a repo, start a branch with a conventional name from any task (`B`, e.g. `feat/12-add-login`) or link an existing one, see pull requests with CI status, open PRs from a task, and let merged PRs move tasks to done.
@@ -234,6 +234,10 @@ fjord git pr 12 --draft      # push the branch and open a pull request
 fjord git which              # the project and task for the current folder
 fjord azure import           # import Azure Boards work items (same settings as the app)
 fjord azure links bokost     # the work items behind a project's imported tasks
+fjord notes list --folder Work            # notes in a folder and its subfolders
+fjord notes move 7 --folder Work/Meetings  # sort a note into a folder
+fjord notes rename-folder Work Jobb        # rename a folder and everything under it
+fjord notes lock 7 on                      # open read-only in the app
 ```
 
 ## VS Code

@@ -367,6 +367,56 @@ impl Printer {
         Ok(())
     }
 
+    pub fn notes(&self, list: &[Note]) -> Result<()> {
+        if self.json {
+            return print_json(list);
+        }
+        if list.is_empty() {
+            println!("No notes.");
+        }
+        for n in list {
+            let mut marks = Vec::new();
+            if n.pinned {
+                marks.push("pinned");
+            }
+            if n.locked {
+                marks.push("locked");
+            }
+            let folder = if n.folder.is_empty() {
+                String::new()
+            } else {
+                format!("{}/  ", n.folder)
+            };
+            println!("  #{:<5} {folder}{}  {}", n.id, n.title, marks.join(" "));
+        }
+        Ok(())
+    }
+
+    pub fn note_full(&self, n: &Note) -> Result<()> {
+        if self.json {
+            return print_json(n);
+        }
+        println!("#{} {}", n.id, n.title);
+        let mut meta = Vec::new();
+        if !n.folder.is_empty() {
+            meta.push(format!("folder {}", n.folder));
+        }
+        if n.pinned {
+            meta.push("pinned".to_string());
+        }
+        if n.locked {
+            meta.push("locked".to_string());
+        }
+        if !meta.is_empty() {
+            println!("{}", meta.join(" · "));
+        }
+        if !n.body_md.is_empty() {
+            println!();
+            println!("{}", n.body_md);
+        }
+        Ok(())
+    }
+
     pub fn search(&self, hits: &[SearchHit]) -> Result<()> {
         if self.json {
             return print_json(hits);
