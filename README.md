@@ -26,6 +26,7 @@ the same projects, and you can always see who did what.
 
 - **Projects & kanban boards** — drag and drop, or move tasks with `H`/`L`. Rename, recolor, reorder and add columns, and mark one or more as done columns (e.g. Resolved and Done). Right-click a project to change its icon and colour.
 - **Tasks** — markdown descriptions, priority, due dates, overdue warnings, archive & restore. The Overview lists everything due this week across your projects, overdue first.
+- **Standup and Waiting on you (beta)** — on your standup days the Overview drafts the standup for one project (done, in progress, your PRs, where you were mentioned) to copy as text, and lists pull requests waiting for your review or with failed checks. Both are off by default; turn them on in **Settings → Overview**, where every Overview section can be switched on or off.
 - **Files** — drop files onto the window to attach them to a project or task. Stored content-addressed (deduplicated) with image previews.
 - **Themes** — five built-in themes (Fjord Dark/Light, Nord, Solarized Light, High Contrast), follow the OS with separate light/dark picks, or build your own with live preview: colours, text size, rounding and density; share themes as JSON. `Space T` cycles themes.
 - **Subtasks** — break a task into subtasks (one level) with their own status, priority and branch; cards show progress (2/5), the task panel lists them with check-off, drag to reorder and `A` to add.
@@ -34,6 +35,7 @@ the same projects, and you can always see who did what.
 - **Keyboard-first** — a leader key with a which-key popup, vim motions on the board, a `Ctrl+K` command palette, and every binding configurable. The mouse works for everything too.
 - **Git, GitHub & Azure DevOps** — link a project to a repo, start a branch with a conventional name from any task (`B`, e.g. `feat/12-add-login`) or link an existing one, see pull requests with CI status, open PRs from a task, and let merged PRs move tasks to done.
 - **Azure Boards import** — work items assigned to you show up as tasks in the project you choose, with their state mapped to your columns, child items as subtasks, and the discussion readable in the task. Work items where someone @mentions you show up in the Overview.
+- **VS Code extension** — [Fjord for VS Code](https://github.com/jhtjernsmo/fjord-vscode) shows the board next to your code and the current branch's task in the status bar. See [VS Code](#vs-code).
 - **AI-agent ready** — `fjord mcp` exposes 25 tools to MCP clients such as Claude. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
 - **Activity log** — what changed, when, and by whom (you or an agent).
 - **Live updates** — changes from the CLI or an agent appear in the open app within a second or two.
@@ -234,6 +236,20 @@ fjord azure import           # import Azure Boards work items (same settings as 
 fjord azure links bokost     # the work items behind a project's imported tasks
 ```
 
+## VS Code
+
+[Fjord for VS Code](https://github.com/jhtjernsmo/fjord-vscode) puts the board of the project linked to the open folder in the Explorer, and the task for the branch you're on in the status bar.
+
+- start a task (checks out its branch), move it, mark it done or open a pull request from the editor
+- link a folder to a project, and find or download the `fjord` CLI, without leaving VS Code
+- an empty commit message starts with `#12 ` while you're on task 12's branch
+- right-click a TODO to turn it into a task that links back to the line
+- runs the Azure Boards import every 10 minutes, so work items arrive even when the app is closed
+
+It needs the `fjord` CLI 0.2.18 or later and talks to the same local database as the app. Install the `.vsix` from the [extension's releases](https://github.com/jhtjernsmo/fjord-vscode/releases/latest) (`code --install-extension fjord-*.vsix`).
+
+![Fjord for VS Code](docs/screenshots/vscode.png)
+
 ## AI agents (MCP)
 
 `fjord mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server on stdio. Changes it
@@ -294,7 +310,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Translations are welcome: copy the `no` 
 
 ## Roadmap
 
-- More packaging: Flathub, AUR, winget, Homebrew
+- More packaging: Flathub, AUR, winget
 - Tags and saved filters
 - Desktop notifications for due dates
 - Paste images from the clipboard, PDF previews
