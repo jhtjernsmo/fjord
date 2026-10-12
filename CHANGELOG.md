@@ -4,7 +4,7 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
-## Unreleased
+## 0.2.20 — 2026-10-12
 
 - **Git tab:** search branches, and see eight at a time with *Show all* (the branch you're on always stays in view).
 - The parent line on an agent's subtask no longer runs under the AI tag.
