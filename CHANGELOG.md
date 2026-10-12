@@ -4,6 +4,11 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## Unreleased
+
+- **`fjord git which`** prints the project and task the current folder belongs to (with `--json` for scripts and editor extensions).
+- **`fjord azure import`** runs the Azure Boards import from the command line, with the same mappings and login as the app, and **`fjord azure links <project>`** lists the work items behind imported tasks.
+
 ## 0.2.17 — 2026-10-12
 
 - A few small things for the curious. Don't panic.

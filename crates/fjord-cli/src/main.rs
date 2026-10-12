@@ -43,6 +43,9 @@ enum Command {
     /// Git & GitHub: link a repo, branches, pull requests
     #[command(subcommand, alias = "g")]
     Git(GitCmd),
+    /// Azure Boards: import work items assigned to you
+    #[command(subcommand)]
+    Azure(AzureCmd),
     /// Run as an MCP server on stdio (for AI agents; actor defaults to "claude")
     Mcp,
     /// Attach a file to a project (optionally to a task)
@@ -218,12 +221,22 @@ enum GitCmd {
     Main { project: String },
     /// Pull requests with CI state; moves tasks of merged PRs to done
     Prs { project: String },
+    /// Which project and task the repository containing PATH belongs to (default: current folder)
+    Which { path: Option<PathBuf> },
     /// Push the task's branch and open a pull request
     Pr {
         task: i64,
         #[arg(long)]
         draft: bool,
     },
+}
+
+#[derive(Subcommand)]
+enum AzureCmd {
+    /// Import work items assigned to you into the mapped projects (set up in Fjord's settings)
+    Import,
+    /// Azure work items behind a project's imported tasks
+    Links { project: String },
 }
 
 #[derive(Subcommand)]
@@ -314,6 +327,7 @@ fn run(cli: Cli) -> Result<()> {
         Command::Task(cmd) => task(&mut store, &out, cmd),
         Command::Column(cmd) => column(&mut store, &out, cmd),
         Command::Git(cmd) => git(&mut store, &out, cmd),
+        Command::Azure(cmd) => azure(&mut store, &out, cmd),
         Command::Mcp => mcp::serve(&mut store),
         Command::Moo => {
             print!("{}", MOO.trim_start_matches('\n'));
@@ -530,6 +544,40 @@ fn git(store: &mut Store, out: &output::Printer, cmd: GitCmd) -> Result<()> {
         }
         GitCmd::Pr { task, draft } => {
             out.pull_request(&fjord_vcs::open_pull_request(store, task, draft)?)
+        }
+        GitCmd::Which { path } => {
+            let path = path.unwrap_or_else(|| PathBuf::from("."));
+            out.workspace(fjord_vcs::workspace_for(store, &path)?.as_ref())
+        }
+    }
+}
+
+fn azure(store: &mut Store, out: &output::Printer, cmd: AzureCmd) -> Result<()> {
+    match cmd {
+        AzureCmd::Import => {
+            let settings = store.import_settings()?;
+            if !settings.enabled || settings.mappings.is_empty() {
+                anyhow::bail!(
+                    "the Azure Boards import isn't set up; turn it on in Fjord under Settings → Azure DevOps"
+                );
+            }
+            let known: Vec<String> = store
+                .external_ids("azure")?
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            let fetch = fjord_vcs::fetch_import(&settings, &known)?;
+            out.import_report(&fjord_vcs::apply_import(store, &settings, &fetch)?)
+        }
+        AzureCmd::Links { project } => {
+            let p = store.find_project(&project)?;
+            let mut links = Vec::new();
+            for task in store.list_tasks(p.id)? {
+                if let Some(link) = store.external_link_for_task(task.id)? {
+                    links.push(link);
+                }
+            }
+            out.value(&links)
         }
     }
 }

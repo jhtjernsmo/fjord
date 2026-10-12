@@ -220,11 +220,32 @@ fn git_link_branch_and_status() {
     assert_eq!(status["current_branch"], format!("fix/{id}-fix-push"));
     assert_eq!(status["commits"][0]["subject"], "init");
 
+    // A subfolder of the repository resolves to the project and the task on its branch.
+    std::fs::create_dir(repo.join("sub")).unwrap();
+    let which = ok_json(&d, &["git", "which", repo.join("sub").to_str().unwrap()]);
+    assert_eq!(which["project"]["slug"], "demo");
+    assert_eq!(which["branch"], format!("fix/{id}-fix-push"));
+    assert_eq!(which["task"]["id"].as_i64(), task["id"].as_i64());
+
     ok_json(&d, &["git", "auto-move", "demo", "off"]);
     ok_json(&d, &["git", "unlink", "demo"]);
+    let outside = ok_json(&d, &["git", "which", repo.to_str().unwrap()]);
+    assert!(outside.is_null());
     let unlinked = fjord(&d, &["git", "status", "demo"]);
     assert!(!unlinked.status.success());
     assert!(String::from_utf8_lossy(&unlinked.stderr).contains("not linked"));
+}
+
+#[test]
+fn azure_import_needs_setup_and_links_start_empty() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok_json(d, &["project", "add", "Work"]);
+    let import = fjord(d, &["azure", "import"]);
+    assert!(!import.status.success());
+    assert!(String::from_utf8_lossy(&import.stderr).contains("isn't set up"));
+    let links = ok_json(d, &["azure", "links", "work"]);
+    assert_eq!(links, serde_json::json!([]));
 }
 
 #[test]

@@ -143,6 +143,43 @@ impl Printer {
         Ok(())
     }
 
+    pub fn workspace(&self, w: Option<&fjord_vcs::Workspace>) -> Result<()> {
+        if self.json {
+            return print_json(&w);
+        }
+        match w {
+            None => println!("No project is linked to this repository."),
+            Some(w) => match &w.task {
+                Some(t) => println!("{}  {}  #{} {}", w.project.name, w.branch, t.id, t.title),
+                None => println!("{}  {}", w.project.name, w.branch),
+            },
+        }
+        Ok(())
+    }
+
+    pub fn import_report(&self, r: &fjord_vcs::ImportReport) -> Result<()> {
+        if self.json {
+            return print_json(r);
+        }
+        println!(
+            "{} new, {} updated, {} closed, {} unchanged",
+            r.created.len(),
+            r.updated,
+            r.closed,
+            r.unchanged
+        );
+        for t in &r.created {
+            println!("  + #{}  {}", t.id, t.title);
+        }
+        if r.unmapped > 0 {
+            println!(
+                "{} work items are in Azure projects without a Fjord project",
+                r.unmapped
+            );
+        }
+        Ok(())
+    }
+
     pub fn switched_to(&self, branch: &str) -> Result<()> {
         if self.json {
             return print_json(&serde_json::json!({ "branch": branch }));
