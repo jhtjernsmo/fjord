@@ -4,7 +4,7 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
-## Unreleased
+## 0.2.19 — 2026-10-12
 
 - **Git tab:** shows the five pull requests that need you most, ready to merge, changes requested, failing checks or waiting for review first, with *Show all* for the rest, so branches and commits are no longer far down. Each open PR says what it needs, using review state from GitHub and Azure DevOps.
 
