@@ -294,6 +294,8 @@ export interface PullRequest {
   head_sha: string
   updated_at: string
   checks: Checks
+  /** Only looked up for open pull requests. */
+  review?: 'none' | 'required' | 'approved' | 'changes_requested'
 }
 
 export interface LinkedPullRequest extends PullRequest {

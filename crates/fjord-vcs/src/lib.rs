@@ -30,7 +30,7 @@ pub use git::{
     task_id_from_branch,
 };
 pub use github::{
-    Checks, DeviceLogin, DevicePoll, GitHub, GitHubAccount, PullRequest, TokenSource,
+    Checks, DeviceLogin, DevicePoll, GitHub, GitHubAccount, PullRequest, Review, TokenSource,
     connect_github, disconnect_github, find_token, github_account, parse_github_remote,
     poll_github_login, start_github_login,
 };
@@ -1197,6 +1197,7 @@ mod tests {
             head_sha: "s".into(),
             updated_at: String::new(),
             checks: Checks::None,
+            review: Review::None,
         };
         let report = apply_sync(&mut s, p, vec![pr]).unwrap();
         assert_eq!(report.pull_requests[0].task_ids, vec![a.id, b.id]);
@@ -1324,6 +1325,7 @@ mod tests {
             head_sha: "s".into(),
             updated_at: String::new(),
             checks: Checks::None,
+            review: Review::None,
         };
         let report = apply_sync(&mut s, p, vec![pr]).unwrap();
         assert!(report.completed.is_empty());
@@ -1544,6 +1546,7 @@ mod tests {
             head_sha: "s".into(),
             updated_at: String::new(),
             checks: Checks::None,
+            review: Review::None,
         };
         let heads = vec![
             pr("custom-branch"),
