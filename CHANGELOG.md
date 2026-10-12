@@ -4,6 +4,10 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## 0.2.17 — 2026-10-12
+
+- A few small things for the curious. Don't panic.
+
 ## 0.2.16 — 2026-10-11
 
 - **Calmer Overview:** today's date and a one-line summary replace the greeting and the four number cards, section headings are plain, and projects are a compact list in the same style as Due this week.
