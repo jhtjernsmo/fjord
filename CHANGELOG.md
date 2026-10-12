@@ -4,8 +4,12 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
-## Unreleased
+## 0.2.18 — 2026-10-12
 
+- **Standup (beta):** on the days you have standup, the Overview drafts it for one project: what you finished and worked on since the last standup, your pull requests and where you were mentioned in Azure DevOps and GitHub, and what's in progress today. Copy it as text with one click. Turn it on and pick the days and project in **Settings → Overview**.
+- **Waiting on you (beta):** pull requests waiting for your review, your own with changes requested, and the ones whose checks failed, from GitHub and Azure DevOps.
+- **Overview settings:** turn each Overview section on or off.
+- **Fjord for VS Code:** a new [VS Code extension](https://github.com/jhtjernsmo/fjord-vscode) shows your board next to your code, the task for the current branch in the status bar, and starts branches, moves tasks and opens pull requests.
 - **`fjord git which`** prints the project and task the current folder belongs to (with `--json` for scripts and editor extensions).
 - **`fjord azure import`** runs the Azure Boards import from the command line, with the same mappings and login as the app, and **`fjord azure links <project>`** lists the work items behind imported tasks.
 
