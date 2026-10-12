@@ -1,6 +1,7 @@
 // Overview: today's date, what's due, mentions, projects and activity across all projects.
 import { ArchiveRestore, Plus } from 'lucide-react'
 import { api, describeActivity, relativeTime } from '../api'
+import { dayFlair } from '../flair'
 import type { Activity, ProjectSummary } from '../api'
 import { useActions, useApp, useLive } from '../data'
 import { dateLocale } from '../i18n'
@@ -100,6 +101,7 @@ export function Home({ projects, onOpen, onNewProject, keysEnabled }: Props) {
   const open = projects.reduce((n, p) => n + p.task_count - p.done_count, 0)
   const overdue = projects.reduce((n, p) => n + p.overdue_count, 0)
   const [today] = useState(() => new Date())
+  const flair = dayFlair(today)
   const date = today.toLocaleDateString(dateLocale(locale), { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
@@ -107,7 +109,7 @@ export function Home({ projects, onOpen, onNewProject, keysEnabled }: Props) {
       <div className="hello">
         <h2>{date.charAt(0).toUpperCase() + date.slice(1)}</h2>
         <p>
-          {open === 0 ? t('home.noOpen') : t('home.open', { open, projects: projects.length })}
+          {open === 0 ? t('home.noOpen') : t('home.open', { open: flair.open ?? open, projects: projects.length })}
           {overdue > 0 && (
             <>
               {', '}
@@ -115,6 +117,7 @@ export function Home({ projects, onOpen, onNewProject, keysEnabled }: Props) {
             </>
           )}
         </p>
+        {flair.line && <p>{flair.line}</p>}
       </div>
 
       <DueThisWeek projects={projects} />

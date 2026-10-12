@@ -27,6 +27,7 @@ import { NewProjectDialog } from './components/Dialogs'
 import { rememberParent } from './repoName'
 import { SettingsWindow } from './components/Settings'
 import { useThemes } from './themes'
+import { FLAIR_THEME, FLAIR_THEME_ID, FLAIR_UNLOCKED, useKeySequence } from './flair'
 import { Home } from './components/Home'
 import { ActivityView, ArchiveView, FilesView, NotesView } from './components/ProjectViews'
 import { GitView } from './components/GitView'
@@ -82,6 +83,17 @@ export default function App() {
   useEffect(() => {
     document.documentElement.style.setProperty('--accent', projectColor ?? themes.current.colors.accent)
   }, [projectColor, themes.current])
+
+  useKeySequence(() => {
+    themes.saveTheme(FLAIR_THEME)
+    themes.setPrefs({ ...themes.prefs, mode: 'fixed', fixed: FLAIR_THEME_ID })
+    toast(FLAIR_UNLOCKED, 'info')
+  })
+  useEffect(() => {
+    const root = document.documentElement
+    if (themes.current.id === FLAIR_THEME_ID) root.dataset.flair = 'p'
+    else delete root.dataset.flair
+  }, [themes.current.id])
 
   // Dropped files go to the open task, else to the current project.
   useEffect(() => {
