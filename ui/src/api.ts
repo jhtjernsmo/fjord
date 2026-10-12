@@ -90,6 +90,29 @@ export interface GitHubAccount {
 }
 
 /** An Azure Boards work item you were @mentioned in but don't own. */
+/** Something on GitHub or Azure DevOps that needs you: a review, a reply, or your build failing. */
+export interface WaitingItem {
+  kind: 'review' | 'changes' | 'failed'
+  title: string
+  /** owner/repo on GitHub, project/repo on Azure DevOps. */
+  repo: string
+  number: number | null
+  url: string
+  by: string | null
+  at: string
+}
+
+/** A GitHub issue or pull request that @mentions you. */
+export interface GitHubMention {
+  repo: string
+  number: number
+  title: string
+  url: string
+  by: string
+  at: string
+  pull_request: boolean
+}
+
 export interface Mention {
   org: string
   id: number
@@ -366,6 +389,8 @@ export const api = {
   unlinkRepo: (projectId: number) => invoke<void>('unlink_repo', { projectId }),
   installedFromStore: () => invoke<boolean>('installed_from_store'),
   azureMentions: () => invoke<Mention[]>('azure_mentions'),
+  waitingOnYou: () => invoke<WaitingItem[]>('waiting_on_you'),
+  githubMentions: (since: string) => invoke<GitHubMention[]>('github_mentions', { since }),
   addWorkItemTask: (projectId: number, org: string, id: number) => invoke<Task>('add_work_item_task', { projectId, org, id }),
   githubRepoOwners: () => invoke<RepoOwner[]>('github_repo_owners'),
   createGithubRepo: (projectId: number, repo: NewRepo, parent: string) =>

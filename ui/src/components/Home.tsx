@@ -9,6 +9,10 @@ import { AgentTag, ProjectGlyph } from './Icons'
 import { useContextMenus } from './actions'
 import { MentionsSection } from './Mentions'
 import { DueThisWeek } from './DueThisWeek'
+import { Standup } from './Standup'
+import { WaitingOnYou } from './WaitingOnYou'
+import { useOverviewSections } from '../overviewSections'
+import { isStandupDay, useStandupDays, useStandupProject } from '../standup'
 import { useRef, useState } from 'react'
 
 /** Overview shows a short activity preview; "Show all" loads more. */
@@ -102,6 +106,9 @@ export function Home({ projects, onOpen, onNewProject, keysEnabled }: Props) {
   const overdue = projects.reduce((n, p) => n + p.overdue_count, 0)
   const [today] = useState(() => new Date())
   const flair = dayFlair(today)
+  const [sections] = useOverviewSections()
+  const [standupDays] = useStandupDays()
+  const [standupProject] = useStandupProject()
   const date = today.toLocaleDateString(dateLocale(locale), { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
@@ -120,9 +127,13 @@ export function Home({ projects, onOpen, onNewProject, keysEnabled }: Props) {
         {flair.line && <p>{flair.line}</p>}
       </div>
 
-      <DueThisWeek projects={projects} />
+      {sections.standup && isStandupDay(today, standupDays) && <Standup projects={projects} days={standupDays} projectId={standupProject} />}
 
-      <MentionsSection projects={projects} />
+      {sections.due && <DueThisWeek projects={projects} />}
+
+      {sections.waiting && <WaitingOnYou />}
+
+      {sections.mentions && <MentionsSection projects={projects} />}
 
       {projects.length === 0 ? (
         <div className="empty-state">
@@ -132,7 +143,7 @@ export function Home({ projects, onOpen, onNewProject, keysEnabled }: Props) {
             <Plus size={14} /> {t('app.newProject')}
           </button>
         </div>
-      ) : (
+      ) : sections.projects ? (
         <div>
           <div className="section-title" style={{ marginBottom: 8 }}>
             {t('app.projects')}
@@ -167,19 +178,21 @@ export function Home({ projects, onOpen, onNewProject, keysEnabled }: Props) {
             })}
           </div>
         </div>
-      )}
+      ) : null}
 
-      <div>
-        <div className="section-title" style={{ marginBottom: 8 }}>
-          {t('home.recent')}
+      {sections.activity && (
+        <div>
+          <div className="section-title" style={{ marginBottom: 8 }}>
+            {t('home.recent')}
+          </div>
+          <ActivityList items={(activity ?? []).slice(0, showAll ? ACTIVITY_ALL : ACTIVITY_PREVIEW)} projects={projects} />
+          {(showAll || (activity?.length ?? 0) > ACTIVITY_PREVIEW) && (
+            <button className="show-more" onClick={() => setShowAll((v) => !v)}>
+              {showAll ? t('home.showLess') : t('home.showAll')}
+            </button>
+          )}
         </div>
-        <ActivityList items={(activity ?? []).slice(0, showAll ? ACTIVITY_ALL : ACTIVITY_PREVIEW)} projects={projects} />
-        {(showAll || (activity?.length ?? 0) > ACTIVITY_PREVIEW) && (
-          <button className="show-more" onClick={() => setShowAll((v) => !v)}>
-            {showAll ? t('home.showLess') : t('home.showAll')}
-          </button>
-        )}
-      </div>
+      )}
 
       {archived.length > 0 && (
         <div>

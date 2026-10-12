@@ -10,6 +10,7 @@ pub mod git;
 pub mod github;
 pub mod new_repo;
 mod process;
+pub mod waiting;
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -34,6 +35,7 @@ pub use github::{
     poll_github_login, start_github_login,
 };
 pub use new_repo::{GITIGNORE_TEMPLATES, LICENSES, NewRepo, RepoOwner};
+pub use waiting::{GitHubMention, WaitingItem, WaitingKind};
 
 const RECENT_COMMITS: usize = 15;
 
@@ -548,6 +550,25 @@ fn import_orgs(settings: &ImportSettings) -> Vec<String> {
 /// organizations the import is set up for.
 pub fn fetch_mentions(settings: &ImportSettings) -> Result<Vec<Mention>> {
     azure_mentions::recent_mentions(&import_orgs(settings))
+}
+
+/// Network only: pull requests waiting for you on GitHub (if signed in) and in the Azure DevOps
+/// organizations Fjord knows about, from Azure Boards import and linked repositories.
+pub fn fetch_waiting(settings: &ImportSettings, repo_orgs: &[String]) -> Result<Vec<WaitingItem>> {
+    let mut orgs = import_orgs(settings);
+    orgs.extend(repo_orgs.iter().map(|o| o.to_lowercase()));
+    orgs.sort();
+    orgs.dedup();
+    waiting::waiting_on_you(github::find_token().as_deref(), &orgs)
+}
+
+/// Network only: GitHub issues and pull requests that @mention you since `since` (YYYY-MM-DD).
+/// Empty when you aren't signed in to GitHub.
+pub fn fetch_github_mentions(since: &str) -> Result<Vec<GitHubMention>> {
+    match github::find_token() {
+        Some(token) => waiting::github_mentions(&token, since),
+        None => Ok(Vec::new()),
+    }
 }
 
 /// Network only: the work item to turn into a task (see [`add_work_item_task`]).
