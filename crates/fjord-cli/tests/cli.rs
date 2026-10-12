@@ -237,6 +237,18 @@ fn git_link_branch_and_status() {
 }
 
 #[test]
+fn azure_import_needs_setup_and_links_start_empty() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok_json(d, &["project", "add", "Work"]);
+    let import = fjord(d, &["azure", "import"]);
+    assert!(!import.status.success());
+    assert!(String::from_utf8_lossy(&import.stderr).contains("isn't set up"));
+    let links = ok_json(d, &["azure", "links", "work"]);
+    assert_eq!(links, serde_json::json!([]));
+}
+
+#[test]
 fn delete_requires_confirmation_or_yes() {
     let dir = tempfile::tempdir().unwrap();
     let d = dir.path();

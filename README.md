@@ -230,6 +230,8 @@ fjord git status bokost      # branches and recent commits
 fjord git prs bokost         # pull requests + CI; moves merged tasks to done
 fjord git pr 12 --draft      # push the branch and open a pull request
 fjord git which              # the project and task for the current folder
+fjord azure import           # import Azure Boards work items (same settings as the app)
+fjord azure links bokost     # the work items behind a project's imported tasks
 ```
 
 ## AI agents (MCP)

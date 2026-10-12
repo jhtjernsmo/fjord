@@ -157,6 +157,29 @@ impl Printer {
         Ok(())
     }
 
+    pub fn import_report(&self, r: &fjord_vcs::ImportReport) -> Result<()> {
+        if self.json {
+            return print_json(r);
+        }
+        println!(
+            "{} new, {} updated, {} closed, {} unchanged",
+            r.created.len(),
+            r.updated,
+            r.closed,
+            r.unchanged
+        );
+        for t in &r.created {
+            println!("  + #{}  {}", t.id, t.title);
+        }
+        if r.unmapped > 0 {
+            println!(
+                "{} work items are in Azure projects without a Fjord project",
+                r.unmapped
+            );
+        }
+        Ok(())
+    }
+
     pub fn switched_to(&self, branch: &str) -> Result<()> {
         if self.json {
             return print_json(&serde_json::json!({ "branch": branch }));
