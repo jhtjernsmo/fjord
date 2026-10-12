@@ -707,7 +707,8 @@ kbd {
 .markdown hr { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
 
 /* Long titles: leave room for the AI badge and break long words instead of overflowing the card. */
-.agent-badge + .card-title { padding-right: 34px; }
+/* The AI tag sits in the top-right corner; keep the first line of text clear of it. */
+.agent-badge + .card-parent, .agent-badge + .card-title { padding-right: 34px; }
 .card-title { overflow-wrap: anywhere; min-width: 0; }
 .card { min-width: 0; }
 .import-mapping select { max-width: 160px; }
