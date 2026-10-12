@@ -6,6 +6,7 @@ import { CircleCheck, CircleDashed, Code2, CircleX, ExternalLink, FolderGit2, Gi
 import { api, errorMessage, relativeTime, remoteOf } from '../api'
 import type { Checks, LinkedPullRequest, ProjectRepo } from '../api'
 import { PR_PREVIEW, prStatus, sortPullRequests } from '../prStatus'
+import { matchBranches, visibleBranches } from '../branchList'
 import { useApp, useLive } from '../data'
 import type { MessageKey } from '../i18n'
 import { NewRepoFields } from './NewRepoFields'
@@ -182,6 +183,8 @@ export function GitView({ projectId, onOpenTask, openCreateRepo, onCreateRepoDon
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [allPrs, setAllPrs] = useState(false)
+  const [branchQuery, setBranchQuery] = useState('')
+  const [allBranches, setAllBranches] = useState(false)
   const hasGithub = !!remoteOf(repo)
   const sortedPrs = sortPullRequests(prs ?? [])
   const shownPrs = allPrs ? sortedPrs : sortedPrs.slice(0, PR_PREVIEW)
@@ -275,8 +278,21 @@ export function GitView({ projectId, onOpenTask, openCreateRepo, onCreateRepoDon
       {overview && (
         <div className="git-columns">
           <section className="git-section">
-            <div className="section-title">{t('git.branches')}</div>
-            {overview.branches.map((b) => (
+            <div className="section-title">
+              {t('git.branches')} <span className="count">{overview.branches.length}</span>
+            </div>
+            {overview.branches.length > 5 && (
+              <input
+                className="input branch-search"
+                value={branchQuery}
+                onChange={(e) => setBranchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Escape' && setBranchQuery('')}
+                placeholder={t('git.searchBranches')}
+                aria-label={t('git.searchBranches')}
+              />
+            )}
+            {branchQuery && matchBranches(overview.branches, branchQuery).length === 0 && <div className="hint">{t('git.noBranchMatch')}</div>}
+            {visibleBranches(overview.branches, branchQuery, allBranches).map((b) => (
               <div className={`branch-row ${b.current ? 'current' : ''}`} key={b.name}>
                 <GitBranch size={13} />
                 <span className="mono grow">{b.name}</span>
@@ -285,6 +301,11 @@ export function GitView({ projectId, onOpenTask, openCreateRepo, onCreateRepoDon
                 <span className="mono dim">{b.sha}</span>
               </div>
             ))}
+            {!branchQuery && overview.branches.length > visibleBranches(overview.branches, '', false).length && (
+              <button className="pr-more" onClick={() => setAllBranches((a) => !a)}>
+                {allBranches ? t('git.showFewerBranches') : t('git.showAllBranches', { n: overview.branches.length })}
+              </button>
+            )}
           </section>
           <section className="git-section">
             <div className="section-title">{t('git.commits')}</div>
