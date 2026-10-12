@@ -5,6 +5,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { CircleCheck, CircleDashed, Code2, CircleX, ExternalLink, FolderGit2, GitBranch, GitMerge, GitPullRequest, RefreshCw, Unlink, CornerUpLeft, CloudUpload, FolderPlus } from 'lucide-react'
 import { api, errorMessage, relativeTime, remoteOf } from '../api'
 import type { Checks, LinkedPullRequest, ProjectRepo } from '../api'
+import { PR_PREVIEW, prStatus, sortPullRequests } from '../prStatus'
 import { useApp, useLive } from '../data'
 import type { MessageKey } from '../i18n'
 import { NewRepoFields } from './NewRepoFields'
@@ -40,6 +41,14 @@ export function ChecksIcon({ checks }: { checks: Checks }) {
   if (checks === 'failure') return <CircleX size={14} className="bad" aria-label="CI failed" />
   if (checks === 'pending') return <CircleDashed size={14} className="pending" aria-label="CI running" />
   return <span className="checks-none" />
+}
+
+/** "Ready to merge", "Needs review" and so on, for open pull requests where it says something. */
+export function PrStatusLabel({ pr }: { pr: LinkedPullRequest }) {
+  const { t } = useApp()
+  const status = prStatus(pr)
+  if (!status) return null
+  return <span className={`pr-status pr-status-${status}`}>{t(`git.status.${status}` as MessageKey)}</span>
 }
 
 export function PrStateBadge({ pr }: { pr: LinkedPullRequest }) {
@@ -172,7 +181,10 @@ export function GitView({ projectId, onOpenTask, openCreateRepo, onCreateRepoDon
   const prs = usePullRequests(projectId)
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
+  const [allPrs, setAllPrs] = useState(false)
   const hasGithub = !!remoteOf(repo)
+  const sortedPrs = sortPullRequests(prs ?? [])
+  const shownPrs = allPrs ? sortedPrs : sortedPrs.slice(0, PR_PREVIEW)
 
   const sync = useCallback(
     async (quiet = false) => {
@@ -234,12 +246,13 @@ export function GitView({ projectId, onOpenTask, openCreateRepo, onCreateRepoDon
         {syncError && <div className="error-box">{syncError}</div>}
         {hasGithub && prs && prs.length === 0 && <div className="hint">{t('git.noPrs')}</div>}
         <div className="pr-list">
-          {(prs ?? []).map((pr) => (
+          {shownPrs.map((pr) => (
             <div className="pr-row" key={pr.number}>
               <ChecksIcon checks={pr.checks} />
               <span className="mono dim">#{pr.number}</span>
               <span className="pr-title">{pr.title}</span>
               <PrStateBadge pr={pr} />
+              <PrStatusLabel pr={pr} />
               <span className="mono dim pr-branch">{pr.head}</span>
               {(pr.task_ids ?? (pr.task_id ? [pr.task_id] : [])).map((id) => (
                 <button key={id} className="chip" onClick={() => onOpenTask(id)}>
@@ -252,6 +265,11 @@ export function GitView({ projectId, onOpenTask, openCreateRepo, onCreateRepoDon
             </div>
           ))}
         </div>
+        {sortedPrs.length > PR_PREVIEW && (
+          <button className="pr-more" onClick={() => setAllPrs((a) => !a)}>
+            {allPrs ? t('git.showFewerPrs') : t('git.showAllPrs', { n: sortedPrs.length })}
+          </button>
+        )}
       </section>
 
       {overview && (

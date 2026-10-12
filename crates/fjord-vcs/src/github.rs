@@ -3,6 +3,7 @@
 //! OS credential store) or the GitHub CLI (`gh auth token`);
 //! public repositories can also be read without a token.
 
+use std::collections::HashMap;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -24,6 +25,19 @@ pub enum Checks {
     Failure,
 }
 
+/// Where a pull request stands with its reviewers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Review {
+    /// No reviewers asked and no reviews yet.
+    #[default]
+    None,
+    /// Waiting for a requested reviewer.
+    Required,
+    Approved,
+    ChangesRequested,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PullRequest {
     pub number: u64,
@@ -38,6 +52,9 @@ pub struct PullRequest {
     pub head_sha: String,
     pub updated_at: String,
     pub checks: Checks,
+    /// Review state; only looked up for open pull requests.
+    #[serde(default)]
+    pub review: Review,
 }
 
 #[derive(Deserialize)]
@@ -65,6 +82,14 @@ struct ApiPull {
     head: ApiRef,
     base: ApiRef,
     updated_at: String,
+    #[serde(default)]
+    requested_reviewers: Vec<ApiUser>,
+}
+
+#[derive(Deserialize)]
+struct ApiReview {
+    user: Option<ApiUser>,
+    state: String,
 }
 
 #[derive(Deserialize)]
@@ -102,11 +127,37 @@ impl From<ApiPull> for PullRequest {
             head_sha: p.head.sha,
             updated_at: p.updated_at,
             checks: Checks::None,
+            review: if p.requested_reviewers.is_empty() {
+                Review::None
+            } else {
+                Review::Required
+            },
         }
     }
 }
 
 /// Folds individual check runs into one state: any failure wins, then pending.
+/// A pull request's review state from its reviews (oldest first) and whether a
+/// requested reviewer still hasn't answered. Only each reviewer's latest
+/// approval or change request counts; comments don't change anything.
+pub fn combine_reviews(reviews: Vec<(String, String)>, waiting: bool) -> Review {
+    let mut latest: HashMap<String, String> = HashMap::new();
+    for (login, state) in reviews {
+        if state == "APPROVED" || state == "CHANGES_REQUESTED" || state == "DISMISSED" {
+            latest.insert(login, state);
+        }
+    }
+    if latest.values().any(|s| s == "CHANGES_REQUESTED") {
+        Review::ChangesRequested
+    } else if waiting {
+        Review::Required
+    } else if latest.values().any(|s| s == "APPROVED") {
+        Review::Approved
+    } else {
+        Review::None
+    }
+}
+
 pub fn combine_checks<'a>(runs: impl IntoIterator<Item = (&'a str, Option<&'a str>)>) -> Checks {
     let mut seen = false;
     let mut pending = false;
@@ -369,9 +420,22 @@ impl GitHub {
         let mut prs: Vec<PullRequest> = pulls.into_iter().map(PullRequest::from).collect();
         for pr in prs.iter_mut().filter(|p| p.state == "open") {
             pr.checks = self.checks(&pr.head_sha).unwrap_or(Checks::None);
+            let waiting = pr.review == Review::Required;
+            pr.review = self
+                .reviews(pr.number)
+                .map_or(pr.review, |r| combine_reviews(r, waiting));
         }
         prs.sort_by_key(|p| p.state != "open");
         Ok(prs)
+    }
+
+    /// Each reviewer's reviews, oldest first, as (login, state).
+    fn reviews(&self, number: u64) -> Result<Vec<(String, String)>> {
+        let reviews: Vec<ApiReview> = self.get(&format!("/pulls/{number}/reviews?per_page=100"))?;
+        Ok(reviews
+            .into_iter()
+            .filter_map(|r| r.user.map(|u| (u.login, r.state)))
+            .collect())
     }
 
     pub fn checks(&self, sha: &str) -> Result<Checks> {
@@ -565,6 +629,50 @@ pub(crate) fn api_error(e: HttpError) -> VcsError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn reviews(list: &[(&str, &str)]) -> Vec<(String, String)> {
+        list.iter()
+            .map(|(u, s)| (u.to_string(), s.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn review_state_uses_each_reviewers_latest_verdict() {
+        assert_eq!(combine_reviews(vec![], false), Review::None);
+        assert_eq!(combine_reviews(vec![], true), Review::Required);
+        assert_eq!(
+            combine_reviews(reviews(&[("a", "APPROVED")]), false),
+            Review::Approved
+        );
+        // A later approval replaces the same reviewer's change request; comments don't count.
+        assert_eq!(
+            combine_reviews(
+                reviews(&[
+                    ("a", "CHANGES_REQUESTED"),
+                    ("a", "COMMENTED"),
+                    ("a", "APPROVED")
+                ]),
+                false
+            ),
+            Review::Approved
+        );
+        assert_eq!(
+            combine_reviews(
+                reviews(&[("a", "APPROVED"), ("b", "CHANGES_REQUESTED")]),
+                false
+            ),
+            Review::ChangesRequested
+        );
+        // Re-requested after an approval: waiting again.
+        assert_eq!(
+            combine_reviews(reviews(&[("a", "APPROVED")]), true),
+            Review::Required
+        );
+        assert_eq!(
+            combine_reviews(reviews(&[("a", "APPROVED"), ("a", "DISMISSED")]), false),
+            Review::None
+        );
+    }
 
     #[test]
     fn connect_rejects_malformed_tokens_without_calling_github() {

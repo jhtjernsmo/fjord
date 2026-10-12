@@ -10,7 +10,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::github::{
-    Checks, HttpError, PullRequest, TokenSource, agent, checked, combine_checks, with_message,
+    Checks, HttpError, PullRequest, Review, TokenSource, agent, checked, combine_checks,
+    with_message,
 };
 use crate::{Result, VcsError, credentials};
 
@@ -187,6 +188,32 @@ struct ApiPull {
     last_merge_source_commit: Option<ApiCommitRef>,
     creation_date: String,
     closed_date: Option<String>,
+    #[serde(default)]
+    reviewers: Vec<ApiReviewer>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiReviewer {
+    /// 10 approved, 5 approved with suggestions, 0 no vote, -5 waiting for author, -10 rejected
+    vote: i32,
+    #[serde(default)]
+    is_required: bool,
+}
+
+/// A pull request's review state from its reviewers' votes.
+fn review_from_votes(reviewers: &[ApiReviewer]) -> Review {
+    if reviewers.iter().any(|r| r.vote < 0) {
+        Review::ChangesRequested
+    } else if reviewers.iter().any(|r| r.is_required && r.vote == 0) {
+        Review::Required
+    } else if reviewers.iter().any(|r| r.vote >= 5) {
+        Review::Approved
+    } else if reviewers.is_empty() {
+        Review::None
+    } else {
+        Review::Required
+    }
 }
 
 #[derive(Deserialize)]
@@ -383,6 +410,7 @@ impl AzureDevOps {
                 .last_merge_source_commit
                 .map(|c| c.commit_id)
                 .unwrap_or_default(),
+            review: review_from_votes(&p.reviewers),
             updated_at: p.closed_date.unwrap_or(p.creation_date),
             checks: Checks::None,
         }
@@ -955,6 +983,33 @@ fn decode_entities(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn reviewer(vote: i32, is_required: bool) -> ApiReviewer {
+        ApiReviewer { vote, is_required }
+    }
+
+    #[test]
+    fn review_state_from_azure_votes() {
+        assert_eq!(review_from_votes(&[]), Review::None);
+        assert_eq!(review_from_votes(&[reviewer(0, false)]), Review::Required);
+        assert_eq!(
+            review_from_votes(&[reviewer(10, false), reviewer(0, false)]),
+            Review::Approved
+        );
+        assert_eq!(
+            review_from_votes(&[reviewer(10, false), reviewer(0, true)]),
+            Review::Required
+        );
+        assert_eq!(review_from_votes(&[reviewer(5, true)]), Review::Approved);
+        assert_eq!(
+            review_from_votes(&[reviewer(10, true), reviewer(-5, false)]),
+            Review::ChangesRequested
+        );
+        assert_eq!(
+            review_from_votes(&[reviewer(-10, false)]),
+            Review::ChangesRequested
+        );
+    }
 
     #[test]
     fn parses_azure_remotes() {
