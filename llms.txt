@@ -2,7 +2,7 @@
 
 > Fjord is a free, open-source desktop app for keeping track of projects: kanban boards, markdown notes and files, stored in one SQLite file on your own computer. No account, no server, no telemetry. It runs on Linux, Windows and macOS, is made to be used from the keyboard, has Git, GitHub and Azure DevOps built in, and includes an MCP server so AI agents can work on the same boards.
 
-Made by Jonas Hollund Tjernsmo in Oslo. Licensed MIT or Apache-2.0. Built with Rust, Tauri, SQLite and React. Latest version: 0.2.19.
+Made by Jonas Hollund Tjernsmo in Oslo. Licensed MIT or Apache-2.0. Built with Rust, Tauri, SQLite and React. Latest version: 0.2.20.
 
 ## What it does
 
