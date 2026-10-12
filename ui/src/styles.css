@@ -720,3 +720,6 @@ kbd {
 .device-code { display: flex; align-items: center; gap: 8px; }
 .device-code .mono { font-size: 22px; letter-spacing: .12em; font-weight: 600; }
 .device-login .btn { align-self: flex-start; }
+
+html[data-flair='p'] body { font-family: var(--mono); text-shadow: 0 0 3px rgba(57, 255, 20, 0.35); }
+html[data-flair='p'] body::after { content: ''; position: fixed; inset: 0; z-index: 9999; pointer-events: none; background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, 0.18) 2px 3px); }

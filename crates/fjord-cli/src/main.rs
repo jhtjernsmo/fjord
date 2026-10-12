@@ -74,7 +74,20 @@ enum Command {
         #[arg(long, default_value_t = 20)]
         limit: i64,
     },
+    #[command(hide = true)]
+    Moo,
 }
+
+const MOO: &str = r"
+ _________________________
+< Have you shipped today? >
+ -------------------------
+        \   ^__^
+         \  (oo)\_______
+            (__)\       )\/\
+                ||----w |
+                ||     ||
+";
 
 #[derive(Subcommand)]
 enum ProjectCmd {
@@ -302,6 +315,10 @@ fn run(cli: Cli) -> Result<()> {
         Command::Column(cmd) => column(&mut store, &out, cmd),
         Command::Git(cmd) => git(&mut store, &out, cmd),
         Command::Mcp => mcp::serve(&mut store),
+        Command::Moo => {
+            print!("{}", MOO.trim_start_matches('\n'));
+            Ok(())
+        }
         Command::Attach {
             project,
             path,

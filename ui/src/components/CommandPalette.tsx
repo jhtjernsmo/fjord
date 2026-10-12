@@ -7,6 +7,7 @@ import type { ProjectSummary, SearchHit } from '../api'
 import { useApp } from '../data'
 import type { MessageKey } from '../i18n'
 import { DEFAULT_ACTIONS, displayKeys } from '../keymap'
+import { usePaletteLine } from '../flair'
 import { ProjectGlyph } from './Icons'
 
 export type PaletteMode = 'commands' | 'projects' | 'search'
@@ -58,6 +59,7 @@ export function CommandPalette({ mode, projects, onClose, onAction, onProject, o
   const [hits, setHits] = useState<SearchHit[]>([])
   const [index, setIndex] = useState(0)
   const listRef = useRef<HTMLUListElement>(null)
+  const line = usePaletteLine(mode === 'commands' ? query : '')
 
   useEffect(() => {
     if (mode !== 'search') return
@@ -104,12 +106,19 @@ export function CommandPalette({ mode, projects, onClose, onAction, onProject, o
     }))
   }, [mode, query, hits, projects, keymap, onAction, onProject, onHit, t])
 
+  const visible = line ? [] : items
+
   useEffect(() => setIndex(0), [query, mode])
   useEffect(() => {
     listRef.current?.children[index]?.scrollIntoView({ block: 'nearest' })
   }, [index])
 
   const choose = (item: Item | undefined) => {
+    if (line) {
+      onClose()
+      toast(line, 'info')
+      return
+    }
     if (!item) return
     onClose()
     item.run()
@@ -127,9 +136,9 @@ export function CommandPalette({ mode, projects, onClose, onAction, onProject, o
           onKeyDown={(e) => {
             const down = e.key === 'ArrowDown' || (e.ctrlKey && (e.key === 'j' || e.key === 'n'))
             const up = e.key === 'ArrowUp' || (e.ctrlKey && (e.key === 'k' || e.key === 'p'))
-            if (down) setIndex((i) => Math.min(i + 1, items.length - 1))
+            if (down) setIndex((i) => Math.min(i + 1, visible.length - 1))
             else if (up) setIndex((i) => Math.max(i - 1, 0))
-            else if (e.key === 'Enter') choose(items[index])
+            else if (e.key === 'Enter') choose(visible[index])
             else if (e.key === 'Escape') onClose()
             else return
             e.preventDefault()
@@ -137,7 +146,7 @@ export function CommandPalette({ mode, projects, onClose, onAction, onProject, o
           }}
         />
         <ul ref={listRef}>
-          {items.map((item, i) => (
+          {visible.map((item, i) => (
             <li key={item.key} className={i === index ? 'on' : ''} onMouseEnter={() => setIndex(i)} onClick={() => choose(item)}>
               <span className="li-icon">{item.icon}</span>
               <span className="label">{item.label}</span>
@@ -145,7 +154,8 @@ export function CommandPalette({ mode, projects, onClose, onAction, onProject, o
             </li>
           ))}
         </ul>
-        {items.length === 0 && (
+        {line && <div className="none">{line}</div>}
+        {!line && visible.length === 0 && (
           <div className="none">{mode === 'search' && !query ? t('palette.startTyping') : t('palette.noMatches')}</div>
         )}
       </div>

@@ -16,6 +16,7 @@ import { CSS } from '@dnd-kit/utilities'
 import confetti from 'canvas-confetti'
 import { AlignLeft, CalendarDays, CornerLeftUp, GitBranch, ListChecks } from 'lucide-react'
 import { api, isOverdue } from '../api'
+import { cardTitle, lateLine } from '../flair'
 import type { Board as BoardData, Status, Task } from '../api'
 import { useActions, useApp } from '../data'
 import type { MessageKey } from '../i18n'
@@ -105,7 +106,7 @@ function CardBody({ task, statuses, className = '' }: { task: Task; statuses: St
       )}
       <div className="card-title">{task.title}</div>
       <div className="card-meta">
-        <span className="card-id">#{task.id}</span>
+        <span className="card-id" title={cardTitle(task.id)}>#{task.id}</span>
         {subs && (
           <span className={`chip subtask-chip ${subs.done === subs.total ? 'complete' : ''}`} title={t('subtasks.title')}>
             <ListChecks size={11} strokeWidth={1.8} /> {subs.done}/{subs.total}
@@ -255,7 +256,10 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
     const target = columns[targetCol]
     if (!target) return
     await run(api.moveTask(task.id, target.status.id, beforeId))
-    if (target.status.is_done) celebrateIfAllDone()
+    if (!target.status.is_done) return
+    celebrateIfAllDone()
+    const late = lateLine()
+    if (late) toast(late, 'info')
   }
 
   const reorder = async (delta: -1 | 1) => {
