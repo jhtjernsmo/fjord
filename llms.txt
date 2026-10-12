@@ -2,12 +2,12 @@
 
 > Fjord is a free, open-source desktop app for keeping track of projects: kanban boards, markdown notes and files, stored in one SQLite file on your own computer. No account, no server, no telemetry. It runs on Linux, Windows and macOS, is made to be used from the keyboard, has Git, GitHub and Azure DevOps built in, and includes an MCP server so AI agents can work on the same boards.
 
-Made by Jonas Hollund Tjernsmo in Oslo. Licensed MIT or Apache-2.0. Built with Rust, Tauri, SQLite and React. Latest version: 0.2.17.
+Made by Jonas Hollund Tjernsmo in Oslo. Licensed MIT or Apache-2.0. Built with Rust, Tauri, SQLite and React. Latest version: 0.2.18.
 
 ## What it does
 
 - Boards with custom columns, priorities, due dates, subtasks, drag and drop, filters and an archive.
-- An Overview with what's due this week across all projects, mentions from Azure DevOps and project progress.
+- An Overview with what's due this week across all projects, mentions from Azure DevOps and project progress. Optional (beta): a standup draft on your standup days, and pull requests waiting on you.
 - Markdown notes with [[wiki links]] to projects, tasks and other notes, backlinks, tables and Mermaid diagrams.
 - Files attached to projects or tasks, copied into Fjord's data folder.
 - Search across tasks, notes and file names.
@@ -15,6 +15,7 @@ Made by Jonas Hollund Tjernsmo in Oslo. Licensed MIT or Apache-2.0. Built with R
 - Git: link a project to a local repository and start a branch from any task (feat/12-add-login); the name can be edited first. Shows pull requests and CI status, opens a PR from a task and moves the task to Done when the PR is merged. Works with GitHub and Azure DevOps. Can create a new GitHub repository for a project.
 - Azure Boards: imports work items assigned to you as tasks, child items as subtasks.
 - AI agents: `fjord mcp` is an MCP server (add it with `claude mcp add fjord -- fjord mcp`). Agents can read boards and notes, add and move tasks, write notes and open pull requests, but can't delete anything. There's also a command line tool, `fjord`.
+- VS Code extension (Fjord for VS Code): the board in the Explorer, the task for the current branch in the status bar, start branches, move tasks, open pull requests, and run the Azure Boards import from the editor.
 - Themes (five built in, or your own), English and Norwegian, built-in updater.
 
 ## Who it's for
@@ -38,6 +39,7 @@ Fjord doesn't try to replace Git, GitHub or your editor. It links tasks to branc
 - [README with all shortcuts](https://github.com/jhtjernsmo/fjord/blob/main/README.md)
 - [Changelog](https://github.com/jhtjernsmo/fjord/blob/main/CHANGELOG.md)
 - [Issues](https://github.com/jhtjernsmo/fjord/issues)
+- [Fjord for VS Code](https://github.com/jhtjernsmo/fjord-vscode)
 
 ## Data and privacy
 
