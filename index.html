@@ -30,7 +30,7 @@
   "applicationCategory": "BusinessApplication",
   "applicationSubCategory": "Project management",
   "operatingSystem": "Linux, Windows, macOS",
-  "softwareVersion": "0.2.20",
+  "softwareVersion": "0.2.21",
   "downloadUrl": "https://github.com/jhtjernsmo/fjord/releases/latest",
   "installUrl": "https://jhtjernsmo.github.io/fjord/#download",
   "releaseNotes": "https://github.com/jhtjernsmo/fjord/blob/main/CHANGELOG.md",
@@ -38,7 +38,7 @@
   "isAccessibleForFree": true,
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "inLanguage": ["en", "nb"],
-  "featureList": ["Kanban boards with custom columns, priorities, due dates and subtasks", "Due this week overview across all projects", "Markdown notes with [[wiki links]], backlinks, tables and Mermaid diagrams", "Files attached to projects and tasks", "Keyboard-first: leader key, which-key menu, command palette, remappable keys", "Git branches per task, pull requests and CI status for GitHub and Azure DevOps", "Azure Boards import and @mentions", "MCP server and command line tool for AI agents", "Local-first: one SQLite file, no account, no telemetry", "Themes, English and Norwegian"],
+  "featureList": ["Kanban boards with custom columns, priorities, due dates and subtasks", "Due this week overview across all projects", "Markdown notes with [[wiki links]], backlinks, tables, Mermaid diagrams and PDF export", "User story analysis notes from a template", "Files attached to projects and tasks", "Keyboard-first: leader key, which-key menu, command palette, remappable keys", "Git branches per task, pull requests and CI status for GitHub and Azure DevOps", "Azure Boards import and @mentions", "MCP server and command line tool for AI agents", "Local-first: one SQLite file, no account, no telemetry", "Themes, English and Norwegian"],
   "author": { "@type": "Person", "name": "Jonas Hollund Tjernsmo", "url": "https://github.com/jhtjernsmo", "address": { "@type": "PostalAddress", "addressLocality": "Oslo", "addressCountry": "NO" } },
   "sameAs": ["https://github.com/jhtjernsmo/fjord"]
 }
@@ -207,8 +207,11 @@
     <li>English and Norwegian.</li>
   </ul>
 
-  <h2 id="new">New in 0.2.18 to 0.2.20</h2>
+  <h2 id="new">New in 0.2.18 to 0.2.21</h2>
   <ul>
+    <li><strong>User story analysis:</strong> start an analysis from any task. It becomes a note from your own template, linked to the task and its Azure work item, and you can save it as a PDF.</li>
+    <li>Any note can be previewed as an A4 page and saved as a PDF.</li>
+    <li>Work on subtasks shows up under the parent task in the standup, with how many are done.</li>
     <li>Search the branches on the Git tab, and see eight at a time until you ask for all of them.</li>
     <li>Notes in folders and subfolders: drag a note onto a folder, sort by name or date, and lock a note so it always opens read-only.</li>
     <li>The Git tab shows the five pull requests that need you, with what each one needs: ready to merge, needs review, changes requested or failing checks.</li>
