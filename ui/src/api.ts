@@ -417,6 +417,8 @@ export const api = {
   detachFile: (id: number) => invoke<void>('detach_file', { id }),
   openAttachment: (id: number) => invoke<void>('open_attachment', { id }),
   analysisAzureTarget: (noteId: number) => invoke<AnalysisTarget | null>('analysis_azure_target', { noteId }),
+  /** Beta: reply in the work item's Discussion; returns the comment as Azure saved it. */
+  replyAzureDiscussion: (taskId: number, text: string) => invoke<WorkItemComment>('reply_azure_discussion', { taskId, text }),
   azureUpdatePreview: (noteId: number) => invoke<AzureUpdatePreview>('azure_update_preview', { noteId }),
   azureUpdateApply: (noteId: number, rev: number, changes: AzureFieldChange[]) => invoke<number>('azure_update_apply', { noteId, rev, changes }),
   externalFiles: (taskId: number) => invoke<ExternalFile[]>('external_files', { taskId }),

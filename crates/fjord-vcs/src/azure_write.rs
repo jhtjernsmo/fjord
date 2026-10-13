@@ -7,8 +7,9 @@ use pulldown_cmark::{Event, Options, Parser, html};
 use serde::{Deserialize, Serialize};
 
 use crate::azure::{
-    API_VERSION, ApiWorkItem, HOST, api_error, check_org, encode, field_str, find_auth,
-    html_to_markdown, is_built_in_risk, is_risk_name, read_json,
+    API_VERSION, ApiComment, ApiWorkItem, HOST, WorkItemComment, api_error, check_org,
+    comment_from, encode, field_str, find_auth, html_to_markdown, is_built_in_risk, is_risk_name,
+    read_json,
 };
 use crate::github::{HttpError, agent, checked};
 use crate::{Result, VcsError};
@@ -263,6 +264,40 @@ pub fn apply_update(
     Ok(item.rev())
 }
 
+/// The longest reply Fjord sends; Azure's own limit is far higher.
+const MAX_REPLY_CHARS: usize = 20_000;
+
+/// Adds a comment to a work item's Discussion, written in markdown. Returns it as Azure saved it.
+pub fn post_comment(org: &str, project: &str, id: u64, markdown: &str) -> Result<WorkItemComment> {
+    let org = check_org(org)?;
+    let text = markdown.trim();
+    if text.is_empty() {
+        return Err(VcsError::Azure("the reply is empty".into()));
+    }
+    if text.chars().count() > MAX_REPLY_CHARS {
+        return Err(VcsError::Azure(format!(
+            "the reply is longer than {MAX_REPLY_CHARS} characters"
+        )));
+    }
+    let (auth, _) = find_auth(org).ok_or_else(|| VcsError::NoAzureToken(org.to_string()))?;
+    let body = serde_json::json!({ "text": markdown_to_html(text) }).to_string();
+    let mut res = agent()
+        .post(&format!(
+            "{HOST}/{}/{}/_apis/wit/workItems/{id}/comments?api-version=7.1-preview.4",
+            encode(org),
+            encode(project)
+        ))
+        .header("Accept", "application/json")
+        .header("Authorization", &auth.header())
+        .content_type("application/json")
+        .send(body.as_str())
+        .map_err(HttpError::from)
+        .and_then(checked)
+        .map_err(|e| api_error(e, org))?;
+    let saved: ApiComment = read_json(&mut res, org)?;
+    Ok(comment_from(saved))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -284,6 +319,12 @@ mod tests {
             markdown_to_html("Hi <script>x</script>"),
             "<p>Hi &lt;script&gt;x&lt;/script&gt;</p>"
         );
+    }
+
+    #[test]
+    fn empty_replies_are_not_sent() {
+        assert!(post_comment("contoso", "App", 1, "  \n ").is_err());
+        assert!(post_comment("contoso", "App", 1, &"x".repeat(MAX_REPLY_CHARS + 1)).is_err());
     }
 
     #[test]

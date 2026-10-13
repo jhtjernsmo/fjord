@@ -116,6 +116,7 @@ pub fn run() {
             git_commands::analysis_azure_target,
             git_commands::azure_update_preview,
             git_commands::azure_update_apply,
+            git_commands::reply_azure_discussion,
             git_commands::add_work_item_task,
             git_commands::azure_discussion,
             git_commands::task_external_link,

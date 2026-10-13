@@ -974,17 +974,18 @@ pub fn parse_work_item_url(url: &str) -> Option<(String, String, u64)> {
 }
 
 fn comments_from(list: ApiComments) -> Vec<WorkItemComment> {
-    list.comments
-        .into_iter()
-        .map(|c| WorkItemComment {
-            author: c.created_by.display_name,
-            created: c.created_date,
-            text_md: html_to_markdown(&c.text),
-        })
-        .collect()
+    list.comments.into_iter().map(comment_from).collect()
 }
 
-/// The Discussion of a work item, oldest first. Read-only.
+pub(crate) fn comment_from(c: ApiComment) -> WorkItemComment {
+    WorkItemComment {
+        author: c.created_by.display_name,
+        created: c.created_date,
+        text_md: html_to_markdown(&c.text),
+    }
+}
+
+/// The Discussion of a work item, oldest first. (Replying is in [`crate::azure_write`].)
 pub fn work_item_comments(org: &str, project: &str, id: u64) -> Result<Vec<WorkItemComment>> {
     let org = check_org(org)?;
     let (auth, _) = find_auth(org).ok_or_else(|| VcsError::NoAzureToken(org.to_string()))?;

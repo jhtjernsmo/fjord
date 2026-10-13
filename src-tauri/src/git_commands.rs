@@ -427,6 +427,31 @@ pub async fn azure_discussion(
     off_thread(move || fjord_vcs::work_item_comments(&org, &project, id).map(Some)).await
 }
 
+/// Beta: replies in the Discussion of an imported task's work item.
+#[tauri::command]
+pub async fn reply_azure_discussion(
+    state: State<'_, AppState>,
+    task_id: i64,
+    text: String,
+) -> CmdResult<fjord_vcs::WorkItemComment> {
+    let (enabled, link) = with_store(&state, |s| {
+        Ok((
+            s.import_settings()?.write_back,
+            s.external_link_for_task(task_id)?,
+        ))
+    })?;
+    if !enabled {
+        return Err("replying in Azure is turned off (Settings → Integrations)".into());
+    }
+    let Some((org, project, id)) = link
+        .filter(|l| l.source == "azure")
+        .and_then(|l| fjord_vcs::parse_work_item_url(&l.url))
+    else {
+        return Err("this task wasn't imported from Azure Boards".into());
+    };
+    off_thread(move || fjord_vcs::azure_write::post_comment(&org, &project, id, &text)).await
+}
+
 /// Where an imported task came from (to show its link), or None.
 #[tauri::command]
 pub fn task_external_link(

@@ -844,3 +844,9 @@ html[data-flair='p'] body::after { content: ''; position: fixed; inset: 0; z-ind
 .azure-change-old { border-left: 2px solid var(--line-2); color: var(--muted); }
 .azure-update-error { color: var(--danger); font-size: 13px; }
 .azure-update-target { font-size: 15px; font-weight: 600; margin-top: -6px; }
+
+/* ---------- replying in an Azure discussion (beta) ---------- */
+.discussion-reply { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.discussion-reply .md-editor { min-height: 70px; font-family: var(--font); font-size: 13px; }
+.discussion-reply-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.discussion-reply-bar .hint { padding: 0; }
