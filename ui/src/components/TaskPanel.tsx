@@ -1,6 +1,6 @@
 // Slide-in task details: title, status, priority, due date, markdown, files.
 import { editorLabel, openInEditor } from '../editor'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import { MARKDOWN_COMPONENTS, MARKDOWN_PLUGINS } from './NoteMarkdown'
 import { motion } from 'motion/react'
@@ -17,8 +17,40 @@ import { Backlinks } from './NoteEditor'
 import { copyTaskRef } from './taskRef'
 import { Subtasks } from './Subtasks'
 import { AzureDiscussion } from './AzureDiscussion'
+import { useStoredPref } from '../storedPref'
 
 const PRIORITY_LEVELS = [0, 1, 2, 3]
+/** Narrowest the panel gets: wide enough for every button in its header. */
+const PANEL_MIN = 480
+const PANEL_DEFAULT = 520
+/** Room left of the panel when dragged as wide as it goes. */
+const PANEL_MARGIN = 160
+const parseWidth = (raw: unknown) => (typeof raw === 'number' && raw > 0 ? raw : PANEL_DEFAULT)
+
+/** The panel's width, dragged by its left edge and remembered on this device. */
+function usePanelWidth() {
+  const [saved, save] = useStoredPref('fjord.taskPanelWidth', parseWidth, PANEL_DEFAULT)
+  const [dragging, setDragging] = useState<number | null>(null)
+  const ref = useRef<HTMLElement>(null)
+  const clamp = (w: number) => Math.round(Math.min(Math.max(w, PANEL_MIN), window.innerWidth - PANEL_MARGIN))
+  const handle = {
+    onPointerDown: (e: React.PointerEvent) => {
+      e.currentTarget.setPointerCapture(e.pointerId)
+      setDragging(clamp(saved))
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      const right = ref.current?.getBoundingClientRect().right
+      if (dragging !== null && right !== undefined) setDragging(clamp(right - e.clientX))
+    },
+    onPointerUp: () => {
+      if (dragging !== null) save(() => dragging)
+      setDragging(null)
+    },
+    onDoubleClick: () => save(() => PANEL_DEFAULT),
+  }
+  const width = Math.max(dragging ?? saved, PANEL_MIN)
+  return { ref, handle, style: { width: `min(${width}px, 100%)` }, dragging: dragging !== null }
+}
 
 /** An image in the description; Azure images show the copy the import downloaded. */
 function DescriptionImage({ src, alt, local }: { src?: string; alt?: string; local: Map<string, number> }) {
@@ -100,6 +132,7 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
     const local = localCopies(externalFiles ?? [])
     return { ...MARKDOWN_COMPONENTS, img: ({ src, alt }: { src?: string; alt?: string }) => <DescriptionImage src={src} alt={alt} local={local} /> }
   }, [externalFiles])
+  const panel = usePanelWidth()
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [editing, setEditing] = useState(false)
@@ -148,15 +181,18 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
     <>
       <div className="scrim" onClick={onClose} />
       <motion.aside
-        className="panel"
+        ref={panel.ref}
+        className={`panel${panel.dragging ? ' resizing' : ''}`}
+        style={panel.style}
         initial={{ x: 60, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 420, damping: 36 }}
         aria-label={task.title}
       >
+        <div className="panel-resize" role="separator" aria-orientation="vertical" aria-label={t('task.resize')} title={t('task.resize')} {...panel.handle} />
         <div className="panel-head">
           <span className="mono">#{task.id}</span>
-          <span>
+          <span className="panel-meta">
             {creator} · {relativeTime(task.created_at, t, locale)}
           </span>
           <span className="spacer" />
