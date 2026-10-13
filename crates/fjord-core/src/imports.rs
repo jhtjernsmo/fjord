@@ -373,6 +373,17 @@ mod tests {
     }
 
     #[test]
+    fn writing_to_azure_is_off_unless_turned_on() {
+        assert!(!ImportSettings::default().write_back);
+        // Settings saved by older versions don't have the field.
+        let old: ImportSettings =
+            serde_json::from_str(r#"{"enabled":true,"mappings":[]}"#).unwrap();
+        assert!(!old.write_back);
+        assert!(old.download_files);
+        assert_eq!(old.risk_field, "");
+    }
+
+    #[test]
     fn import_settings_round_trip_and_validate_projects() {
         let (mut s, _d) = store();
         assert_eq!(s.import_settings().unwrap(), ImportSettings::default());
