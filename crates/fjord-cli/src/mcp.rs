@@ -6,7 +6,7 @@ use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
 
 use anyhow::{Context, Result, anyhow, bail};
-use fjord_core::{NewProject, NewTask, Note, Store, TaskPatch, parse_links};
+use fjord_core::{NewProject, NewTask, Note, Store, Task, TaskPatch, parse_links};
 use serde_json::{Value, json};
 
 const PROTOCOL_VERSION: &str = "2025-06-18";
@@ -130,9 +130,11 @@ fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "move_task",
-            "Move a task to another column.",
-            json!({ "id": { "type": "integer" }, "status": { "type": "string" } }),
-            &["id", "status"],
+            "Move a task to another column, or to another project (its subtasks and files go with it; \
+             without status it lands in the column with the same name).",
+            json!({ "id": { "type": "integer" }, "status": { "type": "string" },
+                    "project": { "type": "string", "description": "Name or slug of the project to move it to" } }),
+            &["id"],
         ),
         tool(
             "complete_task",
@@ -290,6 +292,26 @@ fn opt_str(args: &Value, key: &str) -> Option<String> {
     args.get(key).and_then(Value::as_str).map(str::to_string)
 }
 
+/// Moves a task to a column by name, in its own project or in `project`.
+pub(crate) fn move_task_to(
+    store: &mut Store,
+    id: i64,
+    status: Option<&str>,
+    project: Option<&str>,
+) -> Result<Task> {
+    let task = store.get_task(id)?;
+    let target = match project {
+        Some(p) => store.find_project(p)?.id,
+        None => task.project_id,
+    };
+    let status = status.map(|s| store.find_status(target, s)).transpose()?;
+    match (status, target == task.project_id) {
+        (Some(s), true) => Ok(store.move_task(id, s.id, None)?),
+        (None, true) if project.is_none() => Err(anyhow!("give a status or a project")),
+        (s, _) => Ok(store.move_task_to_project(id, target, s.map(|s| s.id))?),
+    }
+}
+
 fn note_summary(n: &Note) -> Value {
     json!({ "id": n.id, "title": n.title, "project_id": n.project_id, "folder": n.folder,
             "pinned": n.pinned, "updated_at": n.updated_at })
@@ -381,11 +403,12 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
             };
             serde_json::to_value(store.update_task(int_arg(args, "id")?, patch)?)?
         }
-        "move_task" => {
-            let task = store.get_task(int_arg(args, "id")?)?;
-            let status = store.find_status(task.project_id, str_arg(args, "status")?)?;
-            serde_json::to_value(store.move_task(task.id, status.id, None)?)?
-        }
+        "move_task" => serde_json::to_value(move_task_to(
+            store,
+            int_arg(args, "id")?,
+            opt_str(args, "status").as_deref(),
+            opt_str(args, "project").as_deref(),
+        )?)?,
         "complete_task" => {
             let task = store.get_task(int_arg(args, "id")?)?;
             let done = store
@@ -603,6 +626,30 @@ mod tests {
                 .iter()
                 .all(|a| a["actor"] == "claude")
         );
+    }
+
+    #[test]
+    fn move_task_to_another_project() {
+        let (mut s, _d) = store();
+        call(&mut s, 1, "create_project", json!({ "name": "Old" }));
+        call(&mut s, 2, "create_project", json!({ "name": "New" }));
+        let task = call(
+            &mut s,
+            3,
+            "create_task",
+            json!({ "project": "old", "title": "T" }),
+        );
+        let id = task["structuredContent"]["result"]["id"].as_i64().unwrap();
+        let moved = call(
+            &mut s,
+            4,
+            "move_task",
+            json!({ "id": id, "project": "new", "status": "done" }),
+        );
+        let new_id = s.find_project("new").unwrap().id;
+        assert_eq!(moved["structuredContent"]["result"]["project_id"], new_id);
+        let neither = call(&mut s, 5, "move_task", json!({ "id": id }));
+        assert_eq!(neither["isError"], true);
     }
 
     #[test]

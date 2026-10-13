@@ -179,9 +179,16 @@ enum TaskCmd {
         #[arg(long)]
         no_due: bool,
     },
-    /// Move a task to another status (name or id)
+    /// Move a task to another status (name or id), or to another project with --project
     #[command(alias = "mv")]
-    Move { id: i64, status: String },
+    Move {
+        id: i64,
+        #[arg(required_unless_present = "project")]
+        status: Option<String>,
+        /// Project to move it to; subtasks and files go with it
+        #[arg(long, short)]
+        project: Option<String>,
+    },
     /// Move a task to the project's done column
     Done { id: i64 },
     /// Start a user story analysis: a note from the template, linked to the task (or show the one it has)
@@ -535,11 +542,16 @@ fn task(store: &mut Store, out: &output::Printer, cmd: TaskCmd) -> Result<()> {
                 },
             )?)
         }
-        TaskCmd::Move { id, status } => {
-            let t = store.get_task(id)?;
-            let s = store.find_status(t.project_id, &status)?;
-            out.task(&store.move_task(id, s.id, None)?)
-        }
+        TaskCmd::Move {
+            id,
+            status,
+            project,
+        } => out.task(&mcp::move_task_to(
+            store,
+            id,
+            status.as_deref(),
+            project.as_deref(),
+        )?),
         TaskCmd::Done { id } => {
             let t = store.get_task(id)?;
             let done = store

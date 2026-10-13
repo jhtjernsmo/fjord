@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Markdown from 'react-markdown'
 import { MARKDOWN_COMPONENTS, MARKDOWN_PLUGINS } from './NoteMarkdown'
 import { motion } from 'motion/react'
-import { Archive, CircleCheck, ClipboardList, Code2, ExternalLink, GitBranch, GitPullRequest, Link2, Trash2, Unlink, X, CornerUpLeft, CornerDownRight } from 'lucide-react'
+import { Archive, ArrowRightLeft, CircleCheck, ClipboardList, Code2, ExternalLink, GitBranch, GitPullRequest, Link2, Trash2, Unlink, X, CornerUpLeft, CornerDownRight } from 'lucide-react'
 import { useContextMenus, useEntityActions, useStoryAnalysis } from './actions'
 import { api, formatBytes, relativeTime, remoteOf } from '../api'
 import type { Attachment, Status, Task, TaskPatch } from '../api'
@@ -88,7 +88,7 @@ interface Props {
 
 export function TaskPanel({ taskId, statuses, onClose }: Props) {
   const { run, t, locale, toast } = useApp()
-  const { deleteTask } = useEntityActions()
+  const { deleteTask, moveToProject } = useEntityActions()
   const analyze = useStoryAnalysis()
   const projectId = statuses[0].project_id
   // undefined while loading, null if the task disappeared (e.g. archived elsewhere).
@@ -132,6 +132,7 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
           'panel.copyRef': () => copyTaskRef(task, toast, t),
           'panel.archive': () => run(api.archiveTask(task.id, true), t('toast.archivedTask', { name: task.title })),
           'panel.analyze': () => analyze(task),
+          'panel.moveProject': () => moveToProject(task, onClose),
         }
       : {},
     'panel',
@@ -161,6 +162,9 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
           <span className="spacer" />
           <button className="btn ghost" onClick={() => analyze(task)} title={t('analysis.hint')}>
             <ClipboardList size={14} /> {analysis ? t('analysis.open') : t('analysis.short')}
+          </button>
+          <button className="btn ghost" onClick={() => moveToProject(task, onClose)} title={t('moveProject.title')} aria-label={t('moveProject.title')}>
+            <ArrowRightLeft size={14} />
           </button>
           <button className="btn ghost" onClick={() => run(api.archiveTask(task.id, true), t('task.archived')).then(onClose)}>
             <Archive size={14} /> {t('task.archive')}

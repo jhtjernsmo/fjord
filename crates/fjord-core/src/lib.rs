@@ -15,6 +15,7 @@ mod settings;
 mod statuses;
 mod store;
 mod tasks;
+mod transfer;
 
 pub use analysis::{
     ANALYSIS_FOLDER, AnalysisContext, DEFAULT_ANALYSIS_TEMPLATE, StoryParts, analysis_title,
