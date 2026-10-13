@@ -10,8 +10,14 @@ import { TaskWindow } from './components/TaskWindow'
 
 routeExternalLinks()
 
-// A popped-out task window loads index.html?task=<id>.
-const poppedOutTask = Number(new URLSearchParams(location.search).get('task')) || null
+// A popped-out task window gets its task id from the window's init script
+// (?task=<id> works too, for the browser mock).
+declare global {
+  interface Window {
+    __FJORD_TASK_WINDOW__?: number
+  }
+}
+const poppedOutTask = window.__FJORD_TASK_WINDOW__ ?? (Number(new URLSearchParams(location.search).get('task')) || null)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

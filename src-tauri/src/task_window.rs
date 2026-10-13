@@ -4,6 +4,8 @@
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
 
+use crate::window_fit::fit_to_screen;
+
 const MAIN: &str = "main";
 const LABEL_PREFIX: &str = "task-";
 /// The main window listens for this to open what a task window links to.
@@ -21,20 +23,25 @@ pub enum MainNav {
 }
 
 /// Opens the task in its own window, or brings forward the one it already has.
+/// Async on purpose: building a window in a synchronous command deadlocks on Windows.
 #[tauri::command]
-pub fn open_task_window(app: AppHandle, task_id: i64, title: String) -> Result<(), String> {
+pub async fn open_task_window(app: AppHandle, task_id: i64, title: String) -> Result<(), String> {
     let label = format!("{LABEL_PREFIX}{task_id}");
     if let Some(window) = app.get_webview_window(&label) {
         let _ = window.unminimize();
         return window.set_focus().map_err(|e| e.to_string());
     }
-    let url = WebviewUrl::App(format!("index.html?task={task_id}").into());
-    WebviewWindowBuilder::new(&app, &label, url)
+    // The task id goes in a script rather than the URL: a query string in an app
+    // path isn't served the same way on every platform.
+    let window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
+        .initialization_script(format!("window.__FJORD_TASK_WINDOW__ = {task_id};"))
         .title(format!("#{task_id} {title} · Fjord"))
         .inner_size(SIZE.0, SIZE.1)
         .min_inner_size(MIN_SIZE.0, MIN_SIZE.1)
+        .center()
         .build()
         .map_err(|e| e.to_string())?;
+    fit_to_screen(&window);
     Ok(())
 }
 
