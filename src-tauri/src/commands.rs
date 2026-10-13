@@ -106,6 +106,18 @@ pub fn move_task(
 }
 
 #[tauri::command]
+pub fn move_task_to_project(
+    state: State<AppState>,
+    id: i64,
+    project_id: i64,
+    status_id: Option<i64>,
+) -> CmdResult<Task> {
+    with_store(&state, |s| {
+        s.move_task_to_project(id, project_id, status_id)
+    })
+}
+
+#[tauri::command]
 pub fn archive_task(state: State<AppState>, id: i64, archived: bool) -> CmdResult<Task> {
     with_store(&state, |s| s.set_task_archived(id, archived))
 }

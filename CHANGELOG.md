@@ -4,6 +4,10 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## 0.2.24 — 2026-10-13
+
+- **Move a task to another project:** right-click a task → *Move to project…*, the ⇄ button in the task panel, or `m`. Subtasks, files and the story analysis go with it, and it lands in the column with the same name (or pick one). From the CLI: `fjord task move <id> --project <name>`; agents can pass `project` to `move_task`.
+
 ## 0.2.23 — 2026-10-13
 
 - **Get dismissed mentions back:** *Import mentions* fetches your Azure DevOps mentions again and shows the ones you dismissed or added as a task (Settings → Integrations, `Space I`, or Ctrl+K). The Overview also offers *Show hidden* when some are hidden.

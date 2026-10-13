@@ -32,6 +32,8 @@ interface MenusValue {
   openMenu: (e: { clientX: number; clientY: number; preventDefault: () => void }, items: MenuItem[]) => void
   confirm: (options: ConfirmOptions) => Promise<boolean>
   prompt: (options: PromptOptions) => Promise<string | null>
+  /** Shows any dialog; it gets a function that closes it. */
+  openDialog: (render: (close: () => void) => ReactNode) => void
 }
 
 const MenusContext = createContext<MenusValue | null>(null)
@@ -45,6 +47,7 @@ export function useMenus(): MenusValue {
 type Dialog =
   | { kind: 'confirm'; options: ConfirmOptions; resolve: (ok: boolean) => void }
   | { kind: 'prompt'; options: PromptOptions; resolve: (value: string | null) => void }
+  | { kind: 'custom'; render: (close: () => void) => ReactNode }
 
 const EDGE_PX = 8
 
@@ -74,9 +77,10 @@ export function MenuProvider({ children }: { children: ReactNode }) {
     (options: PromptOptions) => new Promise<string | null>((resolve) => setDialog({ kind: 'prompt', options, resolve })),
     [],
   )
+  const openDialog = useCallback((render: (close: () => void) => ReactNode) => setDialog({ kind: 'custom', render }), [])
 
   return (
-    <MenusContext.Provider value={{ openMenu, confirm, prompt }}>
+    <MenusContext.Provider value={{ openMenu, confirm, prompt, openDialog }}>
       {children}
       {menu && <ContextMenu {...menu} onClose={() => setMenu(null)} />}
       {dialog?.kind === 'confirm' && (
@@ -88,6 +92,7 @@ export function MenuProvider({ children }: { children: ReactNode }) {
           }}
         />
       )}
+      {dialog?.kind === 'custom' && dialog.render(() => setDialog(null))}
       {dialog?.kind === 'prompt' && (
         <PromptDialog
           options={dialog.options}

@@ -45,6 +45,7 @@ pub fn run() {
             commands::create_task,
             commands::update_task,
             commands::move_task,
+            commands::move_task_to_project,
             commands::archive_task,
             commands::list_archived_tasks,
             commands::list_due_tasks,

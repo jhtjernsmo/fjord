@@ -391,6 +391,8 @@ export const api = {
   updateTask: (id: number, patch: TaskPatch) => invoke<Task>('update_task', { id, patch }),
   moveTask: (id: number, statusId: number, beforeTaskId: number | null = null) =>
     invoke<Task>('move_task', { id, statusId, beforeTaskId }),
+  moveTaskToProject: (id: number, projectId: number, statusId: number | null = null) =>
+    invoke<Task>('move_task_to_project', { id, projectId, statusId }),
   archiveTask: (id: number, archived: boolean) => invoke<Task>('archive_task', { id, archived }),
   deleteTask: (id: number) => invoke<void>('delete_task', { id }),
   deleteProject: (id: number) => invoke<void>('delete_project', { id }),
