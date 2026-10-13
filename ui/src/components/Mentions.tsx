@@ -5,7 +5,7 @@ import { ExternalLink, ListPlus, X } from 'lucide-react'
 import { api, relativeTime } from '../api'
 import type { Mention, ProjectSummary } from '../api'
 import { useApp, useLive } from '../data'
-import { dismissMention, setMentions, useMentions } from '../mentions'
+import { dismissMention, restoreMentions, setMentions, useHiddenMentions, useMentions } from '../mentions'
 import { importNotificationsOn, notify } from './AzureImport'
 import { useMenus } from './Menus'
 import { ProjectGlyph } from './Icons'
@@ -116,12 +116,13 @@ function MentionRow({ mention, projects }: { mention: Mention; projects: Project
   )
 }
 
-/** The Overview section; renders nothing when there are no mentions. */
+/** The Overview section; renders nothing when there are no mentions, shown or hidden. */
 export function MentionsSection({ projects }: { projects: ProjectSummary[] }) {
   const { t } = useApp()
   const mentions = useMentions()
+  const hidden = useHiddenMentions()
   const [showAll, setShowAll] = useState(false)
-  if (mentions.length === 0) return null
+  if (mentions.length === 0 && hidden === 0) return null
   // Newest first, whichever organization it came from.
   const sorted = [...mentions].sort((a, b) => b.at.localeCompare(a.at))
   return (
@@ -130,6 +131,11 @@ export function MentionsSection({ projects }: { projects: ProjectSummary[] }) {
         <span className="mentions-heading">
           {t('mentions.title')} <span className="count">{mentions.length}</span>
         </span>
+        {hidden > 0 && (
+          <button className="show-more mentions-restore" onClick={() => restoreMentions()} title={t('mentions.importHint')}>
+            {t('mentions.showHidden', { n: hidden })}
+          </button>
+        )}
       </div>
       <div className="mentions">
         {(showAll ? sorted : sorted.slice(0, SHOWN)).map((m) => (

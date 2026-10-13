@@ -25,6 +25,7 @@ import { CommandPalette } from './components/CommandPalette'
 import type { PaletteMode } from './components/CommandPalette'
 import { NewProjectDialog } from './components/Dialogs'
 import { rememberParent } from './repoName'
+import { importMentions } from './mentions'
 import { SettingsWindow } from './components/Settings'
 import { useThemes } from './themes'
 import { FLAIR_THEME, FLAIR_THEME_ID, FLAIR_UNLOCKED, useKeySequence } from './flair'
@@ -42,7 +43,7 @@ const TABS: Tab[] = ['board', 'notes', 'files', 'git', 'activity', 'archive']
 
 const GLOBAL_ACTIONS = [
   'palette.open', 'help.toggle', 'panel.close', 'go.home', 'go.notes', 'project.pick', 'project.new', 'project.archive',
-  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'theme.cycle', 'app.reportBug', 'git.sync', 'git.createRepo', 'azure.import', 'view.archive', 'view.git', 'editor.open', 'view.sidebar',
+  'search.open', 'view.board', 'view.notes', 'view.files', 'view.activity', 'task.new', 'lang.toggle', 'settings.open', 'theme.cycle', 'app.reportBug', 'git.sync', 'git.createRepo', 'azure.import', 'azure.mentions', 'view.archive', 'view.git', 'editor.open', 'view.sidebar',
 ]
 
 export default function App() {
@@ -180,6 +181,10 @@ export default function App() {
         api
           .runAzureImport()
           .then((r) => toast(t('import.report', { created: r.created.length, updated: r.updated, closed: r.closed, unmapped: r.unmapped, files: r.files }), 'success'))
+          .catch((err) => toast(errorMessage(err), 'error')),
+      'azure.mentions': () =>
+        importMentions()
+          .then((r) => toast(t('mentions.imported', { total: r.total, restored: r.restored }), 'success'))
           .catch((err) => toast(errorMessage(err), 'error')),
       'task.new': () => {
         if (!projectId) {

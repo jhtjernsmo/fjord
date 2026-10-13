@@ -1,6 +1,7 @@
 // Azure Boards mentions: the last fetched list (shared by the runner and the
 // Overview) and which ones the user has seen or dismissed.
 import { useSyncExternalStore } from 'react'
+import { api } from './api'
 import type { Mention } from './api'
 
 const DISMISSED_KEY = 'fjord.dismissedMentions'
@@ -57,6 +58,34 @@ export function dismissMention(m: Mention): void {
   writeSet(DISMISSED_KEY, dismissed)
   snapshot = visible()
   emit()
+}
+
+/** How many of the fetched mentions are hidden because they were dismissed or added as a task. */
+export function hiddenCount(): number {
+  return current.length - snapshot.length
+}
+
+/** Shows every dismissed mention again, e.g. after deleting the task one became. */
+export function restoreMentions(): number {
+  const restored = hiddenCount()
+  dismissed = new Set()
+  writeSet(DISMISSED_KEY, dismissed)
+  snapshot = visible()
+  emit()
+  return restored
+}
+
+/** Fetches mentions from Azure DevOps now and shows the dismissed ones again. */
+export async function importMentions(): Promise<{ total: number; restored: number }> {
+  setMentions(await api.azureMentions())
+  const restored = restoreMentions()
+  return { total: current.length, restored }
+}
+
+/** Hidden mentions, for "Show hidden (n)"; updates with the list. */
+export function useHiddenMentions(): number {
+  useMentions()
+  return hiddenCount()
 }
 
 export function useMentions(): Mention[] {

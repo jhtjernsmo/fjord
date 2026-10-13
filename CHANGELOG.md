@@ -4,6 +4,10 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## Unreleased
+
+- **Get dismissed mentions back:** *Import mentions* fetches your Azure DevOps mentions again and shows the ones you dismissed or added as a task (Settings → Integrations, `Space I`, or Ctrl+K). The Overview also offers *Show hidden* when some are hidden.
+
 ## 0.2.22 — 2026-10-13
 
 - **Acceptance criteria and risk in your analysis template:** `{{acceptance}}` and `{{risk}}` take those sections out of the task description and put them where your template says. Turn it off under Settings → Templates.

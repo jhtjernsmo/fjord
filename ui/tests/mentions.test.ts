@@ -45,4 +45,18 @@ describe('mentions store', () => {
     expect(mentionKey(again)).not.toBe(mentionKey(mention(1)))
     expect(setMentions([again]).map((m) => m.at)).toEqual([again.at])
   })
+
+  test('dismissed mentions come back when restored', async () => {
+    const { dismissMention, hiddenCount, restoreMentions, setMentions, useMentions } = await freshStore()
+    setMentions([mention(1), mention(2)])
+    dismissMention(mention(1))
+    expect(hiddenCount()).toBe(1)
+    expect(restoreMentions()).toBe(1)
+    expect(hiddenCount()).toBe(0)
+    // Also after a restart: the dismissal is forgotten in storage too.
+    const next = await freshStore()
+    next.setMentions([mention(1), mention(2)])
+    expect(next.hiddenCount()).toBe(0)
+    expect(typeof useMentions).toBe('function')
+  })
 })

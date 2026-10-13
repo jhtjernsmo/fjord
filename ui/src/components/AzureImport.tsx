@@ -1,8 +1,9 @@
 // Azure Boards import: Settings section (which Azure project goes into which Fjord
 // project) and the background runner that imports every few minutes.
 import { useEffect, useRef, useState } from 'react'
-import { Download, Plus, X } from 'lucide-react'
+import { AtSign, Download, Plus, X } from 'lucide-react'
 import { api, errorMessage } from '../api'
+import { importMentions } from '../mentions'
 import type { ImportMapping, ImportReport, ImportSettings, Task } from '../api'
 import type { MessageKey } from '../i18n'
 import { useApp, useLive } from '../data'
@@ -110,6 +111,18 @@ export function AzureImportSettings() {
   const setMapping = (i: number, patch: Partial<ImportMapping>) =>
     setSettings({ ...settings, mappings: settings.mappings.map((m, j) => (j === i ? { ...m, ...patch } : m)) })
 
+  const fetchMentions = async () => {
+    setBusy(true)
+    try {
+      const r = await importMentions()
+      toast(t('mentions.imported', { total: r.total, restored: r.restored }), 'success')
+    } catch (e) {
+      toast(errorMessage(e), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const importNow = async () => {
     setBusy(true)
     try {
@@ -197,6 +210,9 @@ export function AzureImportSettings() {
         </button>
         <button className="btn" disabled={busy || settings.mappings.length === 0} onClick={importNow}>
           <Download size={13} /> {t('import.now')}
+        </button>
+        <button className="btn" disabled={busy || settings.mappings.length === 0} onClick={fetchMentions} title={t('mentions.importHint')}>
+          <AtSign size={13} /> {t('mentions.import')}
         </button>
       </div>
       <span className="hint">{t('import.hint')}</span>
