@@ -349,6 +349,45 @@ pub fn set_note_locked(state: State<AppState>, id: i64, locked: bool) -> CmdResu
     with_store(&state, |s| s.set_note_locked(id, locked))
 }
 
+#[derive(Serialize)]
+pub struct StoryAnalysis {
+    note: Note,
+    /// False when the task already had an analysis and that one was returned.
+    created: bool,
+}
+
+/// Starts a user story analysis for a task, or returns the one it already has.
+#[tauri::command]
+pub fn create_story_analysis(state: State<AppState>, task_id: i64) -> CmdResult<StoryAnalysis> {
+    with_store(&state, |s| s.create_story_analysis(task_id))
+        .map(|(note, created)| StoryAnalysis { note, created })
+}
+
+#[tauri::command]
+pub fn story_analysis(state: State<AppState>, task_id: i64) -> CmdResult<Option<Note>> {
+    with_store(&state, |s| s.story_analysis(task_id))
+}
+
+#[tauri::command]
+pub fn analysis_template(state: State<AppState>) -> CmdResult<String> {
+    with_store(&state, |s| s.analysis_template())
+}
+
+/// An empty template goes back to the built-in one.
+#[tauri::command]
+pub fn set_analysis_template(state: State<AppState>, template: String) -> CmdResult<String> {
+    with_store(&state, |s| {
+        s.set_analysis_template(&template)?;
+        s.analysis_template()
+    })
+}
+
+/// Opens the system print dialog for the window, where "Save as PDF" lives on every platform.
+#[tauri::command]
+pub fn print_page(webview: tauri::Webview) -> CmdResult<()> {
+    webview.print().map_err(|e| e.to_string())
+}
+
 /// Renames a folder and its subfolders among a project's notes (or the notespace's).
 #[tauri::command]
 pub fn rename_note_folder(

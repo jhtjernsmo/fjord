@@ -1,6 +1,7 @@
 //! Fjord core: projects, tasks, files, notes, search and activity on SQLite.
 //! Shared by the GUI, the `fjord` CLI and the MCP server.
 
+mod analysis;
 mod error;
 mod files;
 mod imports;
@@ -15,6 +16,7 @@ mod statuses;
 mod store;
 mod tasks;
 
+pub use analysis::{ANALYSIS_FOLDER, AnalysisContext, DEFAULT_ANALYSIS_TEMPLATE, render_analysis};
 pub use error::{Error, Result};
 pub use imports::{
     DEFAULT_CLOSED_DAYS, ExternalItem, ExternalLink, ImportMapping, ImportOutcome, ImportSettings,

@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
 import { MARKDOWN_COMPONENTS, MARKDOWN_PLUGINS } from './NoteMarkdown'
 import { motion } from 'motion/react'
-import { Archive, CircleCheck, Code2, ExternalLink, GitBranch, GitPullRequest, Link2, Trash2, Unlink, X, CornerUpLeft, CornerDownRight } from 'lucide-react'
-import { useContextMenus, useEntityActions } from './actions'
+import { Archive, CircleCheck, ClipboardList, Code2, ExternalLink, GitBranch, GitPullRequest, Link2, Trash2, Unlink, X, CornerUpLeft, CornerDownRight } from 'lucide-react'
+import { useContextMenus, useEntityActions, useStoryAnalysis } from './actions'
 import { api, formatBytes, relativeTime, remoteOf } from '../api'
 import type { Attachment, Status, Task, TaskPatch } from '../api'
 import { useActions, useApp, useLive } from '../data'
@@ -66,10 +66,12 @@ interface Props {
 export function TaskPanel({ taskId, statuses, onClose }: Props) {
   const { run, t, locale, toast } = useApp()
   const { deleteTask } = useEntityActions()
+  const analyze = useStoryAnalysis()
   const projectId = statuses[0].project_id
   // undefined while loading, null if the task disappeared (e.g. archived elsewhere).
   const [task] = useLive(async () => (await api.getBoard(projectId)).tasks.find((x) => x.id === taskId) ?? null, [taskId])
   const [files] = useLive(() => api.listAttachments(projectId, taskId), [taskId])
+  const [analysis] = useLive(() => api.storyAnalysis(taskId).catch(() => null), [taskId])
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [editing, setEditing] = useState(false)
@@ -101,6 +103,7 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
           'panel.edit': () => setEditing(true),
           'panel.copyRef': () => copyTaskRef(task, toast, t),
           'panel.archive': () => run(api.archiveTask(task.id, true), t('toast.archivedTask', { name: task.title })),
+          'panel.analyze': () => analyze(task),
         }
       : {},
     'panel',
@@ -128,6 +131,9 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
             {creator} · {relativeTime(task.created_at, t, locale)}
           </span>
           <span className="spacer" />
+          <button className="btn ghost" onClick={() => analyze(task)} title={t('analysis.hint')}>
+            <ClipboardList size={14} /> {analysis ? t('analysis.open') : t('analysis.short')}
+          </button>
           <button className="btn ghost" onClick={() => run(api.archiveTask(task.id, true), t('task.archived')).then(onClose)}>
             <Archive size={14} /> {t('task.archive')}
           </button>

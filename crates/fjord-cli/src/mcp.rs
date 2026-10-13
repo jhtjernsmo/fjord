@@ -174,6 +174,12 @@ fn tool_definitions() -> Vec<Value> {
             &["id"],
         ),
         tool(
+            "analyze_story",
+            "Start a user story analysis for a task: creates a note from the user's analysis template in the project's Analysis folder, linked to the task, and returns it. If the task already has one, returns that instead (created = false). Fill in the sections with update_note; keep the headings.",
+            json!({ "task": { "type": "integer" } }),
+            &["task"],
+        ),
+        tool(
             "list_new_imports",
             "Tasks imported from Azure Boards that no agent has analyzed yet, with their task and link. Analyze each one (update_task to append a short summary, acceptance criteria and suggested subtasks to the body; create_task for subtasks if useful), then call mark_analyzed.",
             json!({}),
@@ -430,6 +436,10 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
             json!({ "note": note, "links": links })
         }
         "update_note" => serde_json::to_value(update_note(store, args)?)?,
+        "analyze_story" => {
+            let (note, created) = store.create_story_analysis(int_arg(args, "task")?)?;
+            json!({ "note": note, "created": created })
+        }
         "list_new_imports" => serde_json::to_value(store.unanalyzed_imports()?)?,
         "mark_analyzed" => {
             serde_json::to_value(store.mark_import_analyzed(int_arg(args, "task")?)?)?
@@ -538,7 +548,7 @@ mod tests {
         );
         let tools =
             handle_line(&mut s, r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#).unwrap();
-        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 25);
+        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 26);
         let unknown = handle_line(&mut s, r#"{"jsonrpc":"2.0","id":3,"method":"nope"}"#).unwrap();
         assert_eq!(unknown["error"]["code"], -32601);
         let bad = handle_line(&mut s, "{not json").unwrap();
@@ -679,6 +689,30 @@ mod tests {
         assert_eq!(
             moved_back["structuredContent"]["result"]["project_id"],
             Value::Null
+        );
+    }
+
+    #[test]
+    fn agent_starts_a_story_analysis_once() {
+        let (mut s, _d) = store();
+        call(&mut s, 1, "create_project", json!({ "name": "Bokost" }));
+        let t = call(
+            &mut s,
+            2,
+            "create_task",
+            json!({ "project": "bokost", "title": "Split an expense" }),
+        );
+        let task_id = t["structuredContent"]["result"]["id"].as_i64().unwrap();
+        let first = call(&mut s, 3, "analyze_story", json!({ "task": task_id }));
+        let result = &first["structuredContent"]["result"];
+        assert_eq!(result["created"], true);
+        assert_eq!(result["note"]["title"], "Analysis: Split an expense");
+        assert_eq!(result["note"]["folder"], "Analysis");
+        let again = call(&mut s, 4, "analyze_story", json!({ "task": task_id }));
+        assert_eq!(again["structuredContent"]["result"]["created"], false);
+        assert_eq!(
+            again["structuredContent"]["result"]["note"]["id"],
+            result["note"]["id"]
         );
     }
 

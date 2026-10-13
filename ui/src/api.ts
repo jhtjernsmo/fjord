@@ -384,6 +384,13 @@ export const api = {
   setNoteFolder: (id: number, folder: string) => invoke<Note>('set_note_folder', { id, folder }),
   setNotePinned: (id: number, pinned: boolean) => invoke<Note>('set_note_pinned', { id, pinned }),
   setNoteLocked: (id: number, locked: boolean) => invoke<Note>('set_note_locked', { id, locked }),
+  createStoryAnalysis: (taskId: number) => invoke<{ note: Note; created: boolean }>('create_story_analysis', { taskId }),
+  storyAnalysis: (taskId: number) => invoke<Note | null>('story_analysis', { taskId }),
+  analysisTemplate: () => invoke<string>('analysis_template'),
+  /** An empty template goes back to the built-in one; returns the template now in use. */
+  setAnalysisTemplate: (template: string) => invoke<string>('set_analysis_template', { template }),
+  /** The system print dialog, where "Save as PDF" lives. */
+  printPage: () => invoke<void>('print_page'),
   renameNoteFolder: (projectId: number | null, from: string, to: string) => invoke<number>('rename_note_folder', { projectId, from, to }),
   resolveLinks: (texts: string[]) => invoke<(LinkTarget | null)[]>('resolve_links', { texts }),
   backlinks: (kind: LinkTarget['kind'], targetId: number) => invoke<Note[]>('backlinks', { kind, targetId }),
