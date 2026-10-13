@@ -595,6 +595,8 @@ pub fn add_work_item_task(store: &mut Store, project_id: i64, item: &WorkItem) -
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AnalysisTarget {
     pub task_id: i64,
+    /// The task's title, shown so the user can see which work item gets the update.
+    pub title: String,
     pub org: String,
     pub id: u64,
     pub url: String,
@@ -602,16 +604,16 @@ pub struct AnalysisTarget {
     pub risk_md: String,
 }
 
-/// Store only: the first task the note links to that came from Azure Boards, if any.
+/// Store only: the work item behind an analysis note. That's the task the analysis was
+/// made for (the one whose analysis this note is), else the first linked task that came
+/// from Azure Boards. Other tasks the note mentions are never the target.
 pub fn analysis_target(store: &Store, note_id: i64) -> Result<Option<AnalysisTarget>> {
     let note = store.get_note(note_id)?;
+    let mut imported = Vec::new();
     for text in fjord_core::parse_links(&note.body_md) {
-        let Some(target) = store.resolve_link(&text)? else {
+        let Some(target) = store.resolve_link(&text)?.filter(|t| t.kind == "task") else {
             continue;
         };
-        if target.kind != "task" {
-            continue;
-        }
         let Some(link) = store.external_link_for_task(target.id)? else {
             continue;
         };
@@ -620,17 +622,39 @@ pub fn analysis_target(store: &Store, note_id: i64) -> Result<Option<AnalysisTar
         else {
             continue;
         };
-        let parts = fjord_core::split_story(&note.body_md);
-        return Ok(Some(AnalysisTarget {
-            task_id: target.id,
-            org,
-            id,
-            url: link.url,
-            acceptance_md: parts.acceptance,
-            risk_md: parts.risk,
-        }));
+        // How sure we are this is the task the analysis was made for.
+        let score = if note.title == fjord_core::analysis_title(&target.label) {
+            2
+        } else if store
+            .story_analysis(target.id)?
+            .is_some_and(|n| n.id == note_id)
+        {
+            1
+        } else {
+            0
+        };
+        imported.push((score, target, org, id, link.url));
     }
-    Ok(None)
+    // The best match wins; on a tie, the one linked first (the template's Story line).
+    let Some(best) = imported.iter().map(|(score, ..)| *score).max() else {
+        return Ok(None);
+    };
+    let i = imported
+        .iter()
+        .position(|(score, ..)| *score == best)
+        .expect("a best score exists");
+    let chosen = imported.swap_remove(i);
+    let (_, task, org, id, url) = chosen;
+    let parts = fjord_core::split_story(&note.body_md);
+    Ok(Some(AnalysisTarget {
+        task_id: task.id,
+        title: task.label,
+        org,
+        id,
+        url,
+        acceptance_md: parts.acceptance,
+        risk_md: parts.risk,
+    }))
 }
 
 /// Most files downloaded per import; the rest come with the next one.

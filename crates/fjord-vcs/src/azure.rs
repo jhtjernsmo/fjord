@@ -5,6 +5,9 @@
 //! Auth, in order: $AZURE_DEVOPS_EXT_PAT, a personal access token saved in Settings
 //! for the organization (OS credential store), or the Azure CLI (`az login`).
 
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -135,8 +138,42 @@ pub(crate) fn find_auth(org: &str) -> Option<(Auth, TokenSource)> {
     az_cli_token()
 }
 
-/// A Microsoft Entra token for Azure DevOps from the Azure CLI's sign-in.
+/// Entra tokens from `az` last an hour or more; reuse one for a while instead of
+/// starting `az` (a second or two each time) for every request.
+const AZ_TOKEN_TTL: Duration = Duration::from_secs(20 * 60);
+/// After `az` had no token (not installed or not signed in), ask again this soon.
+const AZ_MISS_TTL: Duration = Duration::from_secs(30);
+
+static AZ_TOKEN: Mutex<Option<(Instant, Option<String>)>> = Mutex::new(None);
+
+/// A Microsoft Entra token for Azure DevOps from the Azure CLI's sign-in, cached.
 fn az_cli_token() -> Option<(Auth, TokenSource)> {
+    let mut cached = AZ_TOKEN.lock().unwrap_or_else(|e| e.into_inner());
+    let fresh = |(at, token): &(Instant, Option<String>)| {
+        at.elapsed()
+            < if token.is_some() {
+                AZ_TOKEN_TTL
+            } else {
+                AZ_MISS_TTL
+            }
+    };
+    let token = match cached.as_ref().filter(|c| fresh(c)) {
+        Some((_, token)) => token.clone(),
+        None => {
+            let token = run_az_get_token();
+            *cached = Some((Instant::now(), token.clone()));
+            token
+        }
+    };
+    token.map(|t| (Auth::Bearer(t), TokenSource::Cli))
+}
+
+/// Forgets the cached `az` token, e.g. after Azure DevOps turned it down.
+pub(crate) fn forget_az_token() {
+    *AZ_TOKEN.lock().unwrap_or_else(|e| e.into_inner()) = None;
+}
+
+fn run_az_get_token() -> Option<String> {
     let out = crate::process::tool("az")
         .args([
             "account",
@@ -151,7 +188,7 @@ fn az_cli_token() -> Option<(Auth, TokenSource)> {
         .output()
         .ok()?;
     let token = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    (out.status.success() && !token.is_empty()).then_some((Auth::Bearer(token), TokenSource::Cli))
+    (out.status.success() && !token.is_empty()).then_some(token)
 }
 
 // ---------- API shapes ----------
@@ -429,6 +466,7 @@ pub(crate) fn read_json<T: serde::de::DeserializeOwned>(
         .and_then(|v| v.to_str().ok())
         .is_some_and(|v| v.contains("json"));
     if res.status().as_u16() == 203 || !is_json {
+        forget_az_token();
         return Err(VcsError::Azure(format!(
             "Azure DevOps did not accept the token for «{org}» (expired, or missing scopes)"
         )));
@@ -439,6 +477,9 @@ pub(crate) fn read_json<T: serde::de::DeserializeOwned>(
 }
 
 pub(crate) fn api_error(e: HttpError, org: &str) -> VcsError {
+    if matches!(e, HttpError::Status(401, _)) {
+        forget_az_token();
+    }
     match e {
         HttpError::Status(401, _) => VcsError::NoAzureToken(org.to_string()),
         HttpError::Status(403, message) => VcsError::Azure(with_message(

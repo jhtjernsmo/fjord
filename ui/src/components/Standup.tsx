@@ -17,19 +17,27 @@ const ACTIVITY_LIMIT = 500
 
 /** The names GitHub and Azure DevOps know you by, to pick out your own pull requests. */
 async function myNames(orgs: string[]): Promise<string[]> {
-  const github = await api.githubAccount().catch(() => null)
-  const azure = await Promise.all(orgs.map((org) => api.azureAccount(org).catch(() => null)))
+  const [github, azure] = await Promise.all([api.githubAccount().catch(() => null), Promise.all(orgs.map((org) => api.azureAccount(org).catch(() => null)))])
   return [github?.login, ...azure.map((a) => a?.user)].filter((n): n is string => !!n)
 }
 
-/** Pull requests of the projects' linked repositories. A project without a repo has none. */
-async function pullRequests(projects: ProjectSummary[]): Promise<{ prs: PullRequest[]; orgs: string[]; githubRepos: string[] }> {
+interface Repos {
+  /** Every project with a linked repository. */
+  linked: ProjectSummary[]
+  /** Azure DevOps organizations of those repositories. */
+  orgs: string[]
+  /** owner/repo of the GitHub ones, lowercase. */
+  githubRepos: string[]
+}
+
+/** The projects' linked repositories. Local only. */
+async function linkedRepos(projects: ProjectSummary[]): Promise<Repos> {
   const repos = await Promise.all(projects.map((p) => api.getProjectRepo(p.id).catch(() => null)))
-  const linked = projects.filter((_, i) => repos[i])
-  const reports = await Promise.all(linked.map((p) => api.syncPullRequests(p.id).catch(() => null)))
-  const orgs = [...new Set(repos.map((r) => r?.azure_org).filter((o): o is string => !!o))]
-  const githubRepos = repos.flatMap((r) => (r?.github_owner && r.github_repo ? [`${r.github_owner}/${r.github_repo}`.toLowerCase()] : []))
-  return { prs: reports.flatMap((r) => r?.pull_requests ?? []), orgs, githubRepos }
+  return {
+    linked: projects.filter((_, i) => repos[i]),
+    orgs: [...new Set(repos.map((r) => r?.azure_org).filter((o): o is string => !!o))],
+    githubRepos: repos.flatMap((r) => (r?.github_owner && r.github_repo ? [`${r.github_owner}/${r.github_repo}`.toLowerCase()] : [])),
+  }
 }
 
 /** GitHub mentions since the last standup; for one project, only those in its linked repository. */
@@ -45,19 +53,30 @@ async function azureScope(projectId: number | null): Promise<{ org: string; proj
   return (settings?.mappings ?? []).filter((m) => m.fjord_project_id === projectId)
 }
 
-async function loadDraft(projects: ProjectSummary[], since: Date, oneProject: boolean): Promise<Omit<StandupDraft, 'mentions'>> {
+type LocalDraft = Pick<StandupDraft, 'done' | 'workedOn' | 'today'>
+type NetworkDraft = Pick<StandupDraft, 'closedPrs' | 'openPrs' | 'githubMentions'>
+
+/** Your tasks: read from the local database, so it's quick and always current. */
+async function loadLocal(projects: ProjectSummary[], since: Date): Promise<LocalDraft> {
   const ids = new Set(projects.map((p) => p.id))
-  const [activity, actor, boards, { prs, orgs, githubRepos }] = await Promise.all([
-    api.recentActivity(null, ACTIVITY_LIMIT),
-    api.actor(),
-    Promise.all(projects.map((p) => api.getBoard(p.id))),
-    pullRequests(projects),
-  ])
-  const onGitHub = await githubMentions(since, oneProject ? githubRepos : null)
+  const [activity, actor, boards] = await Promise.all([api.recentActivity(null, ACTIVITY_LIMIT), api.actor(), Promise.all(projects.map((p) => api.getBoard(p.id)))])
   const ownActivity = activity.filter((a) => a.project_id !== null && ids.has(a.project_id))
-  const tasks = buildStandup(ownActivity, boards.flatMap((b) => b.tasks), boards.flatMap((b) => b.statuses), since, actor)
-  return { ...tasks, ...myPullRequests(prs, await myNames(orgs), since), githubMentions: onGitHub }
+  return buildStandup(ownActivity, boards.flatMap((b) => b.tasks), boards.flatMap((b) => b.statuses), since, actor)
 }
+
+/** Pull requests and mentions from GitHub and Azure DevOps, all asked for at once. */
+async function loadNetwork(projects: ProjectSummary[], since: Date, oneProject: boolean): Promise<NetworkDraft> {
+  const repos = await linkedRepos(projects)
+  const [reports, names, onGitHub] = await Promise.all([
+    Promise.all(repos.linked.map((p) => api.syncPullRequests(p.id).catch(() => null))),
+    myNames(repos.orgs),
+    githubMentions(since, oneProject ? repos.githubRepos : null),
+  ])
+  const prs = reports.flatMap((r) => r?.pull_requests ?? [])
+  return { ...myPullRequests(prs, names, since), githubMentions: onGitHub }
+}
+
+const NO_NETWORK: NetworkDraft = { closedPrs: [], openPrs: [], githubMentions: [] }
 
 /** A top-level task; the subtasks you worked on fold out under it. */
 function EntryItem({ entry, isDone }: { entry: StandupEntry; isDone: boolean }) {
@@ -147,17 +166,20 @@ export function Standup({ projects, days, projectId }: { projects: ProjectSummar
   const since = previousStandup(today, days)
   const scope = projectId === null ? projects : projects.filter((p) => p.id === projectId)
   const scopeIds = scope.map((p) => p.id).join()
-  const [loaded] = useLive(() => memo(`standup:${scopeIds}:${localIso(since)}`, () => loadDraft(scope, since, projectId !== null)), [scopeIds, days.join(), today])
+  const [local] = useLive(() => loadLocal(scope, since), [scopeIds, days.join(), today])
+  // The network part is remembered for a few minutes and fills in when it arrives.
+  const [network] = useLive(() => memo(`standup:${scopeIds}:${localIso(since)}`, () => loadNetwork(scope, since, projectId !== null)), [scopeIds, days.join(), today])
   const [mentionScope] = useLive(() => azureScope(projectId), [projectId])
   const allMentions = useMentions()
-  if (!loaded || mentionScope === undefined) return null
-  const draft: StandupDraft = { ...loaded, mentions: mentionsSince(allMentions, since, mentionScope) }
+  if (!local) return null
+  const draft: StandupDraft = { ...local, ...(network ?? NO_NETWORK), mentions: mentionScope === undefined ? [] : mentionsSince(allMentions, since, mentionScope) }
+  const loadingNetwork = network === undefined
   const sinceLabel = t('standup.since', { day: since.toLocaleDateString(dateLocale(locale), { weekday: 'long' }) })
   const copy = () =>
     navigator.clipboard
       ?.writeText(standupText(draft, { since: sinceLabel, done: t('standup.done'), today: t('standup.today'), blockers: t('standup.blockers'), none: t('standup.none'), merged: t('standup.merged'), closed: t('standup.closed'), inReview: t('standup.inReview'), mentioned: t('standup.mentioned'), subtasks: (done, total) => t('standup.subtasks', { done, total }) }))
       .then(() => toast(t('standup.copied'), 'success'))
-  const summary = t('standup.summary', { done: draft.done.length, worked: draft.workedOn.length, prs: draft.closedPrs.length + draft.openPrs.length, mentions: draft.mentions.length + draft.githubMentions.length, today: draft.today.length })
+  const summary = t('standup.summary', { done: draft.done.length, worked: draft.workedOn.length, prs: loadingNetwork ? '…' : draft.closedPrs.length + draft.openPrs.length, mentions: loadingNetwork ? '…' : draft.mentions.length + draft.githubMentions.length, today: draft.today.length })
   const projectName = projectId === null ? null : scope[0]?.name
   return (
     <div className="standup">
@@ -167,6 +189,7 @@ export function Standup({ projects, days, projectId }: { projects: ProjectSummar
           <span className="standup-name">{t('standup.title')}</span>
           {projectName && <span className="standup-project">{projectName}</span>}
           <span className="standup-summary">{summary}</span>
+          {loadingNetwork && <span className="standup-loading">{t('standup.loading')}</span>}
         </button>
         <button className="btn" onClick={copy} title={t('standup.copyHint')}>
           <Copy size={13} /> {t('standup.copy')}

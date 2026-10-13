@@ -17,8 +17,8 @@ mod store;
 mod tasks;
 
 pub use analysis::{
-    ANALYSIS_FOLDER, AnalysisContext, DEFAULT_ANALYSIS_TEMPLATE, StoryParts, render_analysis,
-    split_story,
+    ANALYSIS_FOLDER, AnalysisContext, DEFAULT_ANALYSIS_TEMPLATE, StoryParts, analysis_title,
+    render_analysis, split_story,
 };
 pub use error::{Error, Result};
 pub use imports::{

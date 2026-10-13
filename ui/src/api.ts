@@ -58,6 +58,7 @@ export interface Board {
 /** The Azure work item an analysis note is about. */
 export interface AnalysisTarget {
   task_id: number
+  title: string
   org: string
   id: number
   url: string
@@ -76,6 +77,7 @@ export interface AzureFieldChange {
 export interface AzureUpdatePreview {
   org: string
   id: number
+  title: string
   url: string
   rev: number
   changes: AzureFieldChange[]

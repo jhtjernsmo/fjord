@@ -64,6 +64,9 @@ export function AzureUpdateDialog({ noteId, onClose }: { noteId: number; onClose
         {!preview && !error && <p className="dim">{t('azureUpdate.loading')}</p>}
         {preview && (
           <>
+            <p className="azure-update-target">
+              <span className="mono dim">#{preview.id}</span> {preview.title}
+            </p>
             <p className="dim">{t('azureUpdate.intro', { id: preview.id })}</p>
             {preview.changes.length === 0 && <p>{t('azureUpdate.nothing')}</p>}
             {preview.changes.map((c) => (

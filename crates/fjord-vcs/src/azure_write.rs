@@ -34,6 +34,8 @@ pub struct FieldChange {
 pub struct UpdatePreview {
     pub org: String,
     pub id: u64,
+    /// The work item's title in Azure, so the user can see it's the right one.
+    pub title: String,
     pub url: String,
     /// The revision the preview was made from; the update only applies on top of it.
     pub rev: i64,
@@ -181,6 +183,7 @@ pub fn preview_update(
     Ok(UpdatePreview {
         org: org.to_string(),
         id,
+        title: field_str(&item.fields, "System.Title"),
         url: format!(
             "{HOST}/{}/{}/_workitems/edit/{id}",
             encode(org),

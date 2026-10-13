@@ -31,6 +31,11 @@ pub const ANALYSIS_FOLDER: &str = "Analysis";
 /// Analysis notes are titled `Analysis: <task title>`.
 const TITLE_PREFIX: &str = "Analysis: ";
 
+/// The title an analysis of a task with this title gets.
+pub fn analysis_title(task_title: &str) -> String {
+    format!("{TITLE_PREFIX}{task_title}")
+}
+
 pub const DEFAULT_ANALYSIS_TEMPLATE: &str = "\
 **Story:** {{link}}{{source}}
 
@@ -256,7 +261,7 @@ impl Store {
                 split_sections,
             },
         );
-        let title = format!("{TITLE_PREFIX}{}", task.title);
+        let title = analysis_title(&task.title);
         let note = self.add_note(task.project_id, &title, &body)?;
         let note = self.set_note_folder(note.id, ANALYSIS_FOLDER)?;
         Ok((note, true))
