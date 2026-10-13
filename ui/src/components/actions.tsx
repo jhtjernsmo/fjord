@@ -1,5 +1,5 @@
 // Shared entity actions (rename, delete, archive …) and the right-click menus built from them.
-import { Archive, ArchiveRestore, ArrowRight, ExternalLink, Flag, FolderOpen, GitBranch, Lock, Palette, Pencil, Pin, Trash2, X } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowRight, ClipboardList, ExternalLink, Flag, FolderOpen, GitBranch, Lock, Palette, Pencil, Pin, Trash2, X } from 'lucide-react'
 import { api } from '../api'
 import type { Attachment, Note, Project, Status, Task } from '../api'
 import { useApp } from '../data'
@@ -62,12 +62,25 @@ export function useEntityActions() {
   return { renameTask, deleteTask, renameProject, archiveProject, deleteProject, renameNote, deleteNote }
 }
 
+/** Opens the task's user story analysis, making it from the template the first time. */
+export function useStoryAnalysis() {
+  const { run, t, toast } = useApp()
+  const nav = useNav()
+  return async (task: Task) => {
+    const result = await run(api.createStoryAnalysis(task.id))
+    if (!result) return
+    nav.openNote(result.note.id, result.note.project_id)
+    if (result.created) toast(t('analysis.created'), 'success')
+  }
+}
+
 /** Menus for each kind of item. Each returns a function you can pass to onContextMenu. */
 export function useContextMenus() {
   const { run, t, toast } = useApp()
   const { openMenu } = useMenus()
   const nav = useNav()
   const actions = useEntityActions()
+  const analyze = useStoryAnalysis()
 
   const taskMenu = (task: Task, statuses: Status[], opts: { onOpen: () => void; hasRepo?: boolean }) => (e: React.MouseEvent) => {
     const others = statuses.filter((s) => s.id !== task.status_id)
@@ -89,6 +102,7 @@ export function useContextMenus() {
           onSelect: () => run(api.updateTask(task.id, { priority: p })),
         })),
     ]
+    items.push({ label: t('analysis.start'), icon: <ClipboardList size={ICON} />, separator: true, onSelect: () => analyze(task) })
     if (opts.hasRepo) {
       items.push({
         label: t('git.startBranch'),

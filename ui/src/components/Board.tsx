@@ -24,7 +24,7 @@ import { AgentTag } from './Icons'
 import { focusSubtaskOnOpen } from './Subtasks'
 import { copyTaskRef } from './taskRef'
 import { AddColumn, ColumnHeader, EMPTY_FILTER, FilterBar, isFiltering } from './Columns'
-import { useContextMenus, useEntityActions } from './actions'
+import { useContextMenus, useEntityActions, useStoryAnalysis } from './actions'
 import { useLive } from '../data'
 import type { BoardFilter } from './Columns'
 
@@ -188,6 +188,7 @@ function Column(props: {
 export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysEnabled }: Props) {
   const { run, t, toast } = useApp()
   const { taskMenu } = useContextMenus()
+  const analyze = useStoryAnalysis()
   const { deleteTask } = useEntityActions()
   const [repo] = useLive(() => api.getProjectRepo(board.project.id), [board.project.id])
   const { statuses, tasks: allTasks } = board
@@ -301,6 +302,7 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
         run(api.startBranch(current.id)).then((r) => r && toast(t('git.branchStarted', { branch: r.branch }), 'success')),
       'board.toggleSubtasks': () => setFilter((f) => ({ ...f, subtasks: !f.subtasks })),
       'task.copyRef': () => current && copyTaskRef(current, toast, t),
+      'task.analyze': () => current && analyze(current),
       'task.addSubtaskHere': () => {
         if (!current) return
         focusSubtaskOnOpen.current = true

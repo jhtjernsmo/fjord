@@ -10,7 +10,7 @@ import { localIso } from '../dueWeek'
 import { memo } from '../memo'
 import { buildStandup, mentionsSince, myPullRequests, previousStandup, standupText } from '../standup'
 import { useMentions } from '../mentions'
-import type { StandupDraft, Weekday } from '../standup'
+import type { StandupDraft, StandupEntry, Weekday } from '../standup'
 
 /** Enough history for a week between standups. */
 const ACTIVITY_LIMIT = 500
@@ -59,17 +59,48 @@ async function loadDraft(projects: ProjectSummary[], since: Date, oneProject: bo
   return { ...tasks, ...myPullRequests(prs, await myNames(orgs), since), githubMentions: onGitHub }
 }
 
-function StandupList({ title, tasks, done = [], prs = [], mentions = [], githubMentions = [] }: { title: string; tasks: Task[]; done?: Task[]; prs?: PullRequest[]; mentions?: Mention[]; githubMentions?: GitHubMention[] }) {
-  const { t, run } = useApp()
+/** A top-level task; the subtasks you worked on fold out under it. */
+function EntryItem({ entry, isDone }: { entry: StandupEntry; isDone: boolean }) {
+  const { t } = useApp()
   const nav = useNav()
-  const item = (task: Task, isDone: boolean) => (
-    <li key={task.id}>
-      <button data-home-item data-home-action="open" onClick={() => nav.openTask(task.project_id, task.id)}>
-        <span className="mono dim">#{task.id}</span> {task.title}
-        {isDone && <span className="standup-done"> {t('standup.done')}</span>}
-      </button>
+  const [open, setOpen] = useState(false)
+  const { task, subtasks, progress } = entry
+  const open_ = (target: Task) => nav.openTask(target.project_id, target.id)
+  return (
+    <li>
+      <div className="standup-entry">
+        {subtasks.length > 0 ? (
+          <button className="standup-fold" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label={t('standup.showSubtasks')} title={t('standup.showSubtasks')}>
+            {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          </button>
+        ) : (
+          <span className="standup-fold" />
+        )}
+        <button data-home-item data-home-action="open" onClick={() => open_(task)}>
+          <span className="mono dim">#{task.id}</span> {task.title}
+          {progress && <span className="standup-state"> {t('standup.subtasks', { done: progress.done, total: progress.total })}</span>}
+          {isDone && <span className="standup-done"> {t('standup.done')}</span>}
+        </button>
+      </div>
+      {open && (
+        <ul className="standup-subtasks">
+          {subtasks.map(({ task: sub, done }) => (
+            <li key={sub.id}>
+              <button data-home-item data-home-action="open" onClick={() => open_(sub)}>
+                <span className="mono dim">#{sub.id}</span> {sub.title}
+                {done && <span className="standup-done"> {t('standup.done')}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </li>
   )
+}
+
+function StandupList({ title, tasks, done = [], prs = [], mentions = [], githubMentions = [] }: { title: string; tasks: StandupEntry[]; done?: StandupEntry[]; prs?: PullRequest[]; mentions?: Mention[]; githubMentions?: GitHubMention[] }) {
+  const { t, run } = useApp()
+  const item = (entry: StandupEntry, isDone: boolean) => <EntryItem key={entry.task.id} entry={entry} isDone={isDone} />
   return (
     <div className="standup-col">
       <div className="standup-col-title">{title}</div>
@@ -124,7 +155,7 @@ export function Standup({ projects, days, projectId }: { projects: ProjectSummar
   const sinceLabel = t('standup.since', { day: since.toLocaleDateString(dateLocale(locale), { weekday: 'long' }) })
   const copy = () =>
     navigator.clipboard
-      ?.writeText(standupText(draft, { since: sinceLabel, done: t('standup.done'), today: t('standup.today'), blockers: t('standup.blockers'), none: t('standup.none'), merged: t('standup.merged'), closed: t('standup.closed'), inReview: t('standup.inReview'), mentioned: t('standup.mentioned') }))
+      ?.writeText(standupText(draft, { since: sinceLabel, done: t('standup.done'), today: t('standup.today'), blockers: t('standup.blockers'), none: t('standup.none'), merged: t('standup.merged'), closed: t('standup.closed'), inReview: t('standup.inReview'), mentioned: t('standup.mentioned'), subtasks: (done, total) => t('standup.subtasks', { done, total }) }))
       .then(() => toast(t('standup.copied'), 'success'))
   const summary = t('standup.summary', { done: draft.done.length, worked: draft.workedOn.length, prs: draft.closedPrs.length + draft.openPrs.length, mentions: draft.mentions.length + draft.githubMentions.length, today: draft.today.length })
   const projectName = projectId === null ? null : scope[0]?.name

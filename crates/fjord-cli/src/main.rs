@@ -184,6 +184,8 @@ enum TaskCmd {
     Move { id: i64, status: String },
     /// Move a task to the project's done column
     Done { id: i64 },
+    /// Start a user story analysis: a note from the template, linked to the task (or show the one it has)
+    Analyze { id: i64 },
     /// Archive a task (reversible)
     Archive { id: i64 },
     /// Restore an archived task
@@ -513,6 +515,7 @@ fn task(store: &mut Store, out: &output::Printer, cmd: TaskCmd) -> Result<()> {
             out.task(&store.create_task(new)?)
         }
         TaskCmd::Show { id } => out.task(&store.get_task(id)?),
+        TaskCmd::Analyze { id } => out.note_full(&store.create_story_analysis(id)?.0),
         TaskCmd::Edit {
             id,
             title,

@@ -79,7 +79,14 @@ function LinkChip({ target, label, resolved }: { target: string; label: string; 
   )
 }
 
-export function NoteMarkdown({ markdown }: { markdown: string }) {
+/** For paper: a link becomes its text, and a bare [[#12]] also gets the task's title. */
+function PrintedLink({ label, resolved }: { label: string; resolved: LinkTarget | null | undefined }) {
+  const withTitle = resolved?.kind === 'task' && label === `#${resolved.id}` ? `${label} ${resolved.label}` : label
+  return <span className="link-printed">{withTitle}</span>
+}
+
+/** `printed` renders links as plain text, for the PDF preview. */
+export function NoteMarkdown({ markdown, printed = false }: { markdown: string; printed?: boolean }) {
   const { version } = useApp()
   const targets = useMemo(() => linkTargets(markdown), [markdown])
   const [resolved, setResolved] = useState<Record<string, LinkTarget | null>>({})
@@ -105,7 +112,9 @@ export function NoteMarkdown({ markdown }: { markdown: string }) {
         a: ({ href, children }) => {
           if (href?.startsWith(SCHEME)) {
             const target = decodeURIComponent(href.slice(SCHEME.length))
-            return <LinkChip target={target} label={String(children)} resolved={target in resolved ? resolved[target] : undefined} />
+            const found = target in resolved ? resolved[target] : undefined
+            if (printed) return <PrintedLink label={String(children)} resolved={found} />
+            return <LinkChip target={target} label={String(children)} resolved={found} />
           }
           return (
             <a href={href} rel="noreferrer">

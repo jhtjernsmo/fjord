@@ -2,6 +2,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, test } from 'vitest'
 import type { Activity, Mention, PullRequest, Status, Task } from '../src/api'
+import type { StandupEntry } from '../src/standup'
 import { buildStandup, isStandupDay, mentionsSince, myPullRequests, previousStandup, standupText, useStandupDays, useStandupProject } from '../src/standup'
 
 const status = (id: number, position: number, is_done = false): Status =>
@@ -9,6 +10,8 @@ const status = (id: number, position: number, is_done = false): Status =>
 
 const task = (id: number, status_id: number, extra: Partial<Task> = {}): Task =>
   ({ id, project_id: 1, status_id, title: `Task ${id}`, body_md: '', priority: 0, due_at: null, position: id, created_by: 'jonas', created_at: '', updated_at: '', archived_at: null, branch: null, parent_id: null, child_order: 0, ...extra }) as Task
+
+const ids = (entries: StandupEntry[]) => entries.map((e) => e.task.id)
 
 const act_ = (task_id: number, action: string, created_at: string, actor = 'jonas'): Activity =>
   ({ id: task_id * 100, project_id: 1, task_id, actor, action, subject: '', detail: null, created_at }) as Activity
@@ -52,17 +55,17 @@ describe('buildStandup', () => {
   const draft = buildStandup(activity, tasks, statuses, new Date(2026, 9, 9), 'jonas')
 
   test('splits your own work since the last standup into done and worked on', () => {
-    expect(draft.done.map((t) => t.id)).toEqual([1])
-    expect(draft.workedOn.map((t) => t.id)).toEqual([2])
+    expect(ids(draft.done)).toEqual([1])
+    expect(ids(draft.workedOn)).toEqual([2])
   })
 
   test("today lists what's in progress, not the backlog", () => {
-    expect(draft.today.map((t) => t.id)).toEqual([2, 4])
+    expect(ids(draft.today)).toEqual([2, 4])
   })
 
   test('formats as plain text with pull requests, mentions and an empty blockers line', () => {
     const full = { ...draft, closedPrs: [pr(12, 'merged', 'jhtjernsmo', '2026-10-10T10:00:00Z')], openPrs: [pr(14, 'open', 'jhtjernsmo', '2026-10-11T10:00:00Z')], mentions: [mention(4211, '2026-10-10T08:00:00Z')], githubMentions: [{ repo: 'acme/api', number: 7, title: 'Flaky login test', url: 'https://github.com/acme/api/issues/7', by: 'ola', at: '2026-10-10T09:00:00Z', pull_request: false }] }
-    const labels = { since: 'Since Friday', done: 'done', today: 'Today', blockers: 'Blockers', none: 'None', merged: 'merged', closed: 'closed', inReview: 'in review', mentioned: 'Mentioned in' }
+    const labels = { since: 'Since Friday', done: 'done', today: 'Today', blockers: 'Blockers', none: 'None', merged: 'merged', closed: 'closed', inReview: 'in review', mentioned: 'Mentioned in', subtasks: (done: number, total: number) => `${done}/${total} subtasks done` }
     expect(standupText(full, labels)).toBe(
       [
         'Since Friday',
@@ -81,6 +84,58 @@ describe('buildStandup', () => {
         '- None',
       ].join('\n'),
     )
+  })
+})
+
+describe('buildStandup with subtasks', () => {
+  const statuses = [status(1, 0), status(2, 1), status(3, 2, true)]
+  const tasks = [
+    task(10, 2), // parent in progress, not touched itself
+    task(11, 3, { parent_id: 10 }), // subtask finished since Friday
+    task(12, 2, { parent_id: 10 }), // subtask worked on
+    task(13, 1, { parent_id: 10 }), // subtask not touched
+    task(20, 3), // parent done, touched
+    task(21, 3, { parent_id: 20 }),
+    task(30, 2, { parent_id: 99 }), // parent archived or gone
+    task(99, 2, { archived_at: '2026-10-01' }),
+  ]
+  const activity = [
+    act_(11, 'task.move', '2026-10-09T13:00:00'),
+    act_(12, 'task.update', '2026-10-10T10:00:00'),
+    act_(20, 'task.move', '2026-10-10T11:00:00'),
+    act_(21, 'task.move', '2026-10-10T11:00:00'),
+    act_(30, 'task.update', '2026-10-10T12:00:00'),
+  ]
+  const draft = buildStandup(activity, tasks, statuses, new Date(2026, 9, 9), 'jonas')
+
+  test('subtasks never get lines of their own, their parent does', () => {
+    expect(ids(draft.done)).toEqual([20])
+    expect(ids(draft.workedOn)).toEqual([10, 30])
+  })
+
+  test('the parent carries the subtasks you touched and how far along all of them are', () => {
+    const parent = draft.workedOn[0]
+    expect(parent.subtasks.map((s) => [s.task.id, s.done])).toEqual([
+      [11, true],
+      [12, false],
+    ])
+    expect(parent.progress).toEqual({ done: 1, total: 3 })
+    expect(draft.done[0].subtasks.map((s) => s.task.id)).toEqual([21])
+  })
+
+  test('a subtask whose parent is archived stands on its own', () => {
+    expect(draft.workedOn[1]).toEqual({ task: tasks[6], subtasks: [], progress: null })
+  })
+
+  test('today shows parents with progress, not subtasks', () => {
+    expect(ids(draft.today)).toEqual([10, 30])
+    expect(draft.today[0].progress).toEqual({ done: 1, total: 3 })
+  })
+
+  test('the text has one line per parent with its progress', () => {
+    const labels = { since: 'Since Friday', done: 'done', today: 'Today', blockers: 'Blockers', none: 'None', merged: 'merged', closed: 'closed', inReview: 'in review', mentioned: 'Mentioned in', subtasks: (done: number, total: number) => `${done}/${total} subtasks done` }
+    const text = standupText({ ...draft, closedPrs: [], openPrs: [], mentions: [], githubMentions: [] }, labels)
+    expect(text.split('\n').slice(0, 4)).toEqual(['Since Friday', '- Task 20 (#20), 1/1 subtasks done – done', '- Task 10 (#10), 1/3 subtasks done', '- Task 30 (#30)'])
   })
 })
 

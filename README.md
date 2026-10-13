@@ -36,7 +36,7 @@ the same projects, and you can always see who did what.
 - **Git, GitHub & Azure DevOps** — link a project to a repo, start a branch with a conventional name from any task (`B`, e.g. `feat/12-add-login`) or link an existing one, see pull requests with CI status, open PRs from a task, and let merged PRs move tasks to done.
 - **Azure Boards import** — work items assigned to you show up as tasks in the project you choose, with their state mapped to your columns, child items as subtasks, and the discussion readable in the task. Work items where someone @mentions you show up in the Overview.
 - **VS Code extension** — [Fjord for VS Code](https://github.com/jhtjernsmo/fjord-vscode) shows the board next to your code and the current branch's task in the status bar. See [VS Code](#vs-code).
-- **AI-agent ready** — `fjord mcp` exposes 25 tools to MCP clients such as Claude. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
+- **AI-agent ready** — `fjord mcp` exposes 26 tools to MCP clients such as Claude. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
 - **Activity log** — what changed, when, and by whom (you or an agent).
 - **Live updates** — changes from the CLI or an agent appear in the open app within a second or two.
 - **English and Norwegian** — English by default; adding a language is one file.

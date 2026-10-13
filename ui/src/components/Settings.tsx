@@ -1,7 +1,7 @@
 // Settings window: a menu of sections on the left, the section on the right.
 import { EditorSettings } from './EditorSettings'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bot, Database, Keyboard, LayoutDashboard, Palette, PlugZap, RefreshCw, Search, SlidersHorizontal, UserRound, X } from 'lucide-react'
+import { Bot, ClipboardList, Database, Keyboard, LayoutDashboard, Palette, PlugZap, RefreshCw, Search, SlidersHorizontal, UserRound, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { api } from '../api'
 import { useApp } from '../data'
@@ -14,7 +14,7 @@ import { GitHubSettings } from './GitHubSettings'
 import { ThemeSettings } from './ThemeSettings'
 import { OverviewSettings } from './OverviewSettings'
 
-type SectionId = 'general' | 'overview' | 'appearance' | 'accounts' | 'integrations' | 'keyboard' | 'updates' | 'agents' | 'data'
+type SectionId = 'general' | 'overview' | 'appearance' | 'accounts' | 'integrations' | 'templates' | 'keyboard' | 'updates' | 'agents' | 'data'
 
 interface Section {
   id: SectionId
@@ -29,6 +29,7 @@ const SECTIONS: Section[] = [
   { id: 'appearance', icon: Palette, keywords: 'theme dark light color colour font size density accent tema farge' },
   { id: 'accounts', icon: UserRound, keywords: 'github azure devops token login sign in az' },
   { id: 'integrations', icon: PlugZap, keywords: 'azure boards import work items editor ide vs code jetbrains' },
+  { id: 'templates', icon: ClipboardList, keywords: 'template user story analysis acceptance criteria pdf mal analyse brukerhistorie' },
   { id: 'keyboard', icon: Keyboard, keywords: 'shortcuts keys keymap hurtigtaster' },
   { id: 'updates', icon: RefreshCw, keywords: 'update version release oppdatering' },
   { id: 'agents', icon: Bot, keywords: 'mcp ai agent claude' },
@@ -129,6 +130,44 @@ function PathsSection({ kind }: { kind: 'keyboard' | 'agents' | 'data' }) {
   )
 }
 
+/** Settings → Templates: the markdown a user story analysis starts from. */
+function AnalysisTemplateSection() {
+  const { t, run, toast } = useApp()
+  const [template, setTemplate] = useState<string | null>(null)
+  const [saved, setSaved] = useState('')
+  useEffect(() => {
+    api.analysisTemplate().then((value) => {
+      setTemplate(value)
+      setSaved(value)
+    })
+  }, [])
+  if (template === null) return null
+  const save = async (next: string) => {
+    const now = await run(api.setAnalysisTemplate(next))
+    if (now === undefined) return
+    setTemplate(now)
+    setSaved(now)
+    toast(t('settings.saved'), 'success')
+  }
+  return (
+    <div className="row">
+      {t('analysis.template')}
+      <textarea className="md-editor template-editor" value={template} onChange={(e) => setTemplate(e.target.value)} spellCheck={false} aria-label={t('analysis.template')} />
+      <span className="hint">
+        {t('analysis.templateHint')} <code className="mono">{'{{title}} {{link}} {{source}} {{description}} {{project}} {{date}} {{author}}'}</code>
+      </span>
+      <div className="template-actions">
+        <button className="btn ghost" onClick={() => save('')}>
+          {t('analysis.reset')}
+        </button>
+        <button className="btn primary" disabled={template === saved} onClick={() => save(template)}>
+          {t('settings.save')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function SectionBody({ id }: { id: SectionId }) {
   switch (id) {
     case 'general':
@@ -151,6 +190,8 @@ function SectionBody({ id }: { id: SectionId }) {
           <AzureImportSettings />
         </>
       )
+    case 'templates':
+      return <AnalysisTemplateSection />
     case 'updates':
       return <UpdateSettings />
     default:
