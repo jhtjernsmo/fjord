@@ -4,6 +4,10 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## 0.2.26 — 2026-10-13
+
+- **Fixed: the pop-out task window stayed blank and couldn't be closed on Windows.** It now opens centred and inside the screen.
+
 ## 0.2.25 — 2026-10-13
 
 - **Pop a task out into its own window:** the new button in the task panel (or `o`) opens the task in a window you can put beside the board or full screen on another monitor. It stays up to date, takes dropped files, and links in it open in the main window.
