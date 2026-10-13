@@ -179,7 +179,7 @@ export default function App() {
       'azure.import': () =>
         api
           .runAzureImport()
-          .then((r) => toast(t('import.report', { created: r.created.length, updated: r.updated, closed: r.closed, unmapped: r.unmapped }), 'success'))
+          .then((r) => toast(t('import.report', { created: r.created.length, updated: r.updated, closed: r.closed, unmapped: r.unmapped, files: r.files }), 'success'))
           .catch((err) => toast(errorMessage(err), 'error')),
       'task.new': () => {
         if (!projectId) {

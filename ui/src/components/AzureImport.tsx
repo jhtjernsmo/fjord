@@ -82,7 +82,7 @@ export function AzureImportRunner() {
   return null
 }
 
-const EMPTY: ImportSettings = { enabled: false, mappings: [], closed_days: 30, risk_field: '' }
+const EMPTY: ImportSettings = { enabled: false, mappings: [], closed_days: 30, risk_field: '', download_files: true }
 const CLOSED_DAY_CHOICES = [0, 7, 30, 90]
 
 export function AzureImportSettings() {
@@ -114,7 +114,7 @@ export function AzureImportSettings() {
     setBusy(true)
     try {
       const r = await api.runAzureImport()
-      toast(t('import.report', { created: r.created.length, updated: r.updated, closed: r.closed, unmapped: r.unmapped }), 'success')
+      toast(t('import.report', { created: r.created.length, updated: r.updated, closed: r.closed, unmapped: r.unmapped, files: r.files }), 'success')
     } catch (e) {
       toast(errorMessage(e), 'error')
     } finally {
@@ -141,6 +141,10 @@ export function AzureImportSettings() {
             </option>
           ))}
         </select>
+      </label>
+      <label className="toggle-label">
+        <input type="checkbox" checked={settings.download_files ?? true} onChange={(e) => save({ ...settings, download_files: e.target.checked })} />
+        {t('import.downloadFiles')}
       </label>
       <label className="inline-select">
         {t('import.riskField')}

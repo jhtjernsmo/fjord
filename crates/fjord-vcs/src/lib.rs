@@ -3,6 +3,7 @@
 //! tasks along the board as their PRs get merged.
 
 pub mod azure;
+pub mod azure_files;
 pub mod azure_mentions;
 pub mod credentials;
 pub mod editor;
@@ -464,6 +465,8 @@ pub struct ImportReport {
     pub regrouped: usize,
     /// Imported tasks moved to done because their work item was closed in Azure.
     pub closed: usize,
+    /// Attachments and pasted images downloaded from the work items.
+    pub files: usize,
 }
 
 /// Everything the import needs from Azure, fetched without touching the store.
@@ -585,6 +588,73 @@ pub fn fetch_work_item(org: &str, id: u64, risk: &str) -> Result<WorkItem> {
 pub fn add_work_item_task(store: &mut Store, project_id: i64, item: &WorkItem) -> Result<Task> {
     let (task, _) = store.upsert_imported_task(project_id, &item.to_external_item())?;
     Ok(task)
+}
+
+/// Most files downloaded per import; the rest come with the next one.
+const MAX_FILES_PER_IMPORT: usize = 30;
+
+/// A work item file the task doesn't have yet.
+#[derive(Debug, Clone)]
+pub struct PendingFile {
+    pub task_id: i64,
+    pub org: String,
+    pub file: azure_files::AzureFile,
+}
+
+/// Store only: files on the fetched work items that their tasks haven't got yet.
+pub fn pending_files(store: &Store, fetch: &ImportFetch) -> Result<Vec<PendingFile>> {
+    let tasks: HashMap<String, i64> = store.external_ids("azure")?.into_iter().collect();
+    let mut pending = Vec::new();
+    for item in fetch.items.iter().filter(|i| !i.files.is_empty()) {
+        let key = format!("{}/{}", item.org.to_lowercase(), item.id);
+        let Some(&task_id) = tasks.get(&key) else {
+            continue;
+        };
+        let ids: Vec<String> = item.files.iter().map(|f| f.id.clone()).collect();
+        let missing = store.missing_external_files(task_id, &ids)?;
+        pending.extend(
+            item.files
+                .iter()
+                .filter(|f| missing.contains(&f.id))
+                .map(|f| PendingFile {
+                    task_id,
+                    org: item.org.clone(),
+                    file: f.clone(),
+                }),
+        );
+        if pending.len() >= MAX_FILES_PER_IMPORT {
+            break;
+        }
+    }
+    pending.truncate(MAX_FILES_PER_IMPORT);
+    Ok(pending)
+}
+
+/// Network only: downloads the pending files. A file that fails is left out and
+/// tried again on the next import.
+pub fn download_files(pending: Vec<PendingFile>) -> Vec<(PendingFile, Vec<u8>)> {
+    pending
+        .into_iter()
+        .filter_map(|p| {
+            let bytes = azure_files::download_file(&p.org, &p.file).ok()?;
+            Some((p, bytes))
+        })
+        .collect()
+}
+
+/// Store only: attaches downloaded files to their tasks. Returns how many were added.
+pub fn store_files(store: &mut Store, downloaded: &[(PendingFile, Vec<u8>)]) -> Result<usize> {
+    for (p, bytes) in downloaded {
+        store.attach_external_file(p.task_id, &p.file.id, &p.file.name, bytes)?;
+    }
+    Ok(downloaded.len())
+}
+
+/// For the CLI and agents, which don't mind holding the store: pending files,
+/// downloaded and attached in one go.
+pub fn import_files(store: &mut Store, fetch: &ImportFetch) -> Result<usize> {
+    let pending = pending_files(store, fetch)?;
+    store_files(store, &download_files(pending))
 }
 
 /// Network only, without hierarchy: open work items assigned to you.
@@ -999,6 +1069,7 @@ mod tests {
             description_md: String::new(),
             acceptance_md: String::new(),
             risk_md: String::new(),
+            files: Vec::new(),
             priority: Some(2),
             due: None,
             parent: None,
@@ -1013,6 +1084,31 @@ mod tests {
         assert_eq!(report.created[0].title, "Item 1");
         let again = apply_import(&mut s, &settings, &fetch).unwrap();
         assert_eq!((again.created.len(), again.unchanged), (0, 1));
+
+        // Files on the mapped item are pending once; after storing, nothing is.
+        let file = |id: &str, name: &str| azure_files::AzureFile {
+            id: id.into(),
+            name: name.into(),
+            url: format!("https://dev.azure.com/contoso/_apis/wit/attachments/{id}"),
+        };
+        let mut with_files = items.to_vec();
+        with_files[0].files = vec![file("a1", "log.txt"), file("b2", "image.png")];
+        with_files[1].files = vec![file("c3", "unmapped.png")];
+        let fetch = ImportFetch {
+            items: with_files,
+            ..Default::default()
+        };
+        let pending = pending_files(&s, &fetch).unwrap();
+        let names: Vec<&str> = pending.iter().map(|p| p.file.name.as_str()).collect();
+        assert_eq!(names, ["log.txt", "image.png"]);
+        let downloaded: Vec<_> = pending
+            .into_iter()
+            .map(|p| (p, b"bytes".to_vec()))
+            .collect();
+        assert_eq!(store_files(&mut s, &downloaded).unwrap(), 2);
+        let task = report.created[0].id;
+        assert_eq!(s.list_attachments(p, Some(task)).unwrap().len(), 2);
+        assert!(pending_files(&s, &fetch).unwrap().is_empty());
     }
 
     #[test]
@@ -1046,6 +1142,7 @@ mod tests {
             description_md: String::new(),
             acceptance_md: String::new(),
             risk_md: String::new(),
+            files: Vec::new(),
             priority: None,
             due: None,
             parent,
@@ -1260,6 +1357,7 @@ mod tests {
             description_md: String::new(),
             acceptance_md: String::new(),
             risk_md: String::new(),
+            files: Vec::new(),
             priority: None,
             due: None,
             parent: None,
@@ -1369,6 +1467,7 @@ mod tests {
             description_md: String::new(),
             acceptance_md: String::new(),
             risk_md: String::new(),
+            files: Vec::new(),
             priority: None,
             due: None,
             parent: None,
@@ -1455,6 +1554,7 @@ mod tests {
             description_md: String::new(),
             acceptance_md: String::new(),
             risk_md: String::new(),
+            files: Vec::new(),
             priority: None,
             due: None,
             parent: None,

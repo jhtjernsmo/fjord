@@ -609,6 +609,9 @@ pub(crate) struct ApiWorkItem {
     pub(crate) id: u64,
     rev: i64,
     pub(crate) fields: serde_json::Map<String, serde_json::Value>,
+    /// Only there when asked for with `$expand=relations`.
+    #[serde(default)]
+    pub(crate) relations: Vec<crate::azure_files::ApiRelation>,
 }
 
 /// An Azure Boards work item, with HTML fields already turned into markdown.
@@ -632,6 +635,8 @@ pub struct WorkItem {
     pub due: Option<String>,
     /// The parent work item (e.g. the User Story above a Task).
     pub parent: Option<u64>,
+    /// Attachments and images pasted into the description, acceptance criteria or risk.
+    pub files: Vec<crate::azure_files::AzureFile>,
 }
 
 impl WorkItem {
@@ -722,6 +727,13 @@ pub(crate) fn work_item_from(org: &str, item: ApiWorkItem, risk: &str) -> WorkIt
         d if d.trim().is_empty() => field_str(f, "Microsoft.VSTS.TCM.ReproSteps"),
         d => d,
     };
+    let acceptance = field_str(f, "Microsoft.VSTS.Common.AcceptanceCriteria");
+    let risk_html = risk_field(f, risk);
+    let files = crate::azure_files::work_item_files(
+        org,
+        &item.relations,
+        &[&description, &acceptance, &risk_html],
+    );
     let due = [
         field_str(f, "Microsoft.VSTS.Scheduling.DueDate"),
         field_str(f, "Microsoft.VSTS.Scheduling.TargetDate"),
@@ -739,13 +751,14 @@ pub(crate) fn work_item_from(org: &str, item: ApiWorkItem, risk: &str) -> WorkIt
         area: field_str(f, "System.AreaPath"),
         title: field_str(f, "System.Title"),
         description_md: html_to_markdown(&description),
-        acceptance_md: html_to_markdown(&field_str(f, "Microsoft.VSTS.Common.AcceptanceCriteria")),
-        risk_md: html_to_markdown(&risk_field(f, risk)),
+        acceptance_md: html_to_markdown(&acceptance),
+        risk_md: html_to_markdown(&risk_html),
         priority: f
             .get("Microsoft.VSTS.Common.Priority")
             .and_then(|v| v.as_i64()),
         due,
         parent: f.get("System.Parent").and_then(|v| v.as_u64()),
+        files,
     }
 }
 
@@ -781,8 +794,9 @@ pub(crate) fn fetch_work_items(
         .take(MAX_WORK_ITEMS)
         .map(u64::to_string)
         .collect();
+    // Azure won't combine a field list with $expand; all fields come with relations.
     let fields = if fields.is_empty() {
-        String::new()
+        "&$expand=relations".to_string()
     } else {
         format!("&fields={fields}")
     };
@@ -934,7 +948,7 @@ pub fn work_item_comments(org: &str, project: &str, id: u64) -> Result<Vec<WorkI
 }
 
 /// Good-enough HTML → markdown for work item descriptions: paragraphs, line breaks,
-/// lists, bold/italic, links and code; other tags are dropped, entities decoded.
+/// lists, bold/italic, links, images and code; other tags are dropped, entities decoded.
 pub fn html_to_markdown(html: &str) -> String {
     let mut out = String::new();
     let mut rest = html;
@@ -984,6 +998,18 @@ pub fn html_to_markdown(html: &str) -> String {
                     .and_then(|h| h.split('"').next())
                     .map(decode_entities);
                 out.push('[');
+            }
+            ("img", false) => {
+                let attr = |name: &str| {
+                    tag.split(&format!("{name}=\""))
+                        .nth(1)
+                        .and_then(|v| v.split('"').next())
+                        .map(decode_entities)
+                };
+                if let Some(src) = attr("src") {
+                    let alt = attr("alt").unwrap_or_default().replace(['[', ']'], "");
+                    out.push_str(&format!("![{alt}]({})", src.replace(' ', "%20")));
+                }
             }
             ("a", true) => match link_href.take() {
                 Some(href) => out.push_str(&format!("]({href})")),
@@ -1164,6 +1190,12 @@ mod tests {
             "Users get logged out.\n\n**Steps**:\n\n- Open app\n- Wait & see\n\nSee [the log](https://example.com/log) <3"
         );
         assert_eq!(html_to_markdown(""), "");
+        assert_eq!(
+            html_to_markdown(
+                r#"<p>See <img alt="[shot]" src="https://dev.azure.com/c/_apis/wit/attachments/x?fileName=a b.png&amp;download=false"></p>"#
+            ),
+            "See ![shot](https://dev.azure.com/c/_apis/wit/attachments/x?fileName=a%20b.png&download=false)"
+        );
     }
 
     #[test]

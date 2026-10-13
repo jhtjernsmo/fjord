@@ -55,6 +55,13 @@ export interface Board {
   tasks: Task[]
 }
 
+/** A file the import downloaded from a work item (an Azure attachment or pasted image). */
+export interface ExternalFile {
+  external_id: string
+  /** null once the file was removed from the task */
+  attachment_id: number | null
+}
+
 export interface Attachment {
   id: number
   project_id: number
@@ -158,6 +165,8 @@ export interface ImportSettings {
   closed_days: number
   /** Azure field with the risk description, e.g. Custom.RiskDescription; empty finds one named "risk". */
   risk_field: string
+  /** Download attachments and pasted images to the task. */
+  download_files: boolean
 }
 
 export interface WorkItemComment {
@@ -183,6 +192,8 @@ export interface ImportReport {
   unmapped: number
   regrouped: number
   closed: number
+  /** Attachments and pasted images downloaded from the work items. */
+  files: number
 }
 
 export interface DeviceLogin {
@@ -374,6 +385,7 @@ export const api = {
     invoke<AttachOutcome[]>('attach_files', { projectId, taskId, paths }),
   detachFile: (id: number) => invoke<void>('detach_file', { id }),
   openAttachment: (id: number) => invoke<void>('open_attachment', { id }),
+  externalFiles: (taskId: number) => invoke<ExternalFile[]>('external_files', { taskId }),
   previewAttachment: (id: number) => invoke<string | null>('preview_attachment', { id }),
   listNotes: (projectId: number) => invoke<Note[]>('list_notes', { projectId }),
   addNote: (projectId: number, title: string, bodyMd: string) => invoke<Note>('add_note', { projectId, title, bodyMd }),

@@ -233,7 +233,20 @@ pub async fn run_azure_import(state: State<'_, AppState>) -> CmdResult<fjord_vcs
     })?;
     let fetch_settings = settings.clone();
     let fetch = off_thread(move || fjord_vcs::fetch_import(&fetch_settings, &known)).await?;
-    with_store(&state, |s| fjord_vcs::apply_import(s, &settings, &fetch))
+    let (mut report, pending) = with_store(&state, |s| {
+        let report = fjord_vcs::apply_import(s, &settings, &fetch)?;
+        let pending = if settings.download_files {
+            fjord_vcs::pending_files(s, &fetch)?
+        } else {
+            Vec::new()
+        };
+        Ok((report, pending))
+    })?;
+    if !pending.is_empty() {
+        let downloaded = off_thread(move || Ok(fjord_vcs::download_files(pending))).await?;
+        report.files = with_store(&state, |s| fjord_vcs::store_files(s, &downloaded))?;
+    }
+    Ok(report)
 }
 
 /// Azure Boards work items you were mentioned in but don't own (Overview).
@@ -275,11 +288,27 @@ pub async fn add_work_item_task(
     org: String,
     id: u64,
 ) -> CmdResult<Task> {
-    let risk = with_store(&state, |s| Ok(s.import_settings()?.risk_field))?;
+    let settings = with_store(&state, |s| Ok(s.import_settings()?))?;
+    let risk = settings.risk_field.clone();
     let item = off_thread(move || fjord_vcs::fetch_work_item(&org, id, &risk)).await?;
-    with_store(&state, |s| {
-        fjord_vcs::add_work_item_task(s, project_id, &item)
-    })
+    let fetch = fjord_vcs::ImportFetch {
+        items: vec![item],
+        ..Default::default()
+    };
+    let (task, pending) = with_store(&state, |s| {
+        let task = fjord_vcs::add_work_item_task(s, project_id, &fetch.items[0])?;
+        let pending = if settings.download_files {
+            fjord_vcs::pending_files(s, &fetch)?
+        } else {
+            Vec::new()
+        };
+        Ok((task, pending))
+    })?;
+    if !pending.is_empty() {
+        let downloaded = off_thread(move || Ok(fjord_vcs::download_files(pending))).await?;
+        with_store(&state, |s| fjord_vcs::store_files(s, &downloaded))?;
+    }
+    Ok(task)
 }
 
 /// Starts "Sign in with GitHub": returns the code the user types on github.com.

@@ -470,7 +470,11 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
                 .map(|(id, _)| id)
                 .collect();
             let fetch = fjord_vcs::fetch_import(&settings, &known)?;
-            serde_json::to_value(fjord_vcs::apply_import(store, &settings, &fetch)?)?
+            let mut report = fjord_vcs::apply_import(store, &settings, &fetch)?;
+            if settings.download_files {
+                report.files = fjord_vcs::import_files(store, &fetch)?;
+            }
+            serde_json::to_value(report)?
         }
         "backlinks" => {
             serde_json::to_value(store.backlinks(str_arg(args, "kind")?, int_arg(args, "id")?)?)?

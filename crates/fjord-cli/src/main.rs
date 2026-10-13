@@ -680,7 +680,11 @@ fn azure(store: &mut Store, out: &output::Printer, cmd: AzureCmd) -> Result<()> 
                 .map(|(id, _)| id)
                 .collect();
             let fetch = fjord_vcs::fetch_import(&settings, &known)?;
-            out.import_report(&fjord_vcs::apply_import(store, &settings, &fetch)?)
+            let mut report = fjord_vcs::apply_import(store, &settings, &fetch)?;
+            if settings.download_files {
+                report.files = fjord_vcs::import_files(store, &fetch)?;
+            }
+            out.import_report(&report)
         }
         AzureCmd::Links { project } => {
             let p = store.find_project(&project)?;

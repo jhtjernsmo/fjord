@@ -207,6 +207,16 @@ const MIGRATIONS: &[&str] = &[
     r#"
     ALTER TABLE notes ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;
     "#,
+    // v10: files downloaded from an imported item (Azure attachments and pasted images),
+    // so each is fetched once. A removed attachment keeps its row and isn't fetched again.
+    r#"
+    CREATE TABLE external_files (
+        task_id       INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+        external_id   TEXT NOT NULL,
+        attachment_id INTEGER REFERENCES attachments(id) ON DELETE SET NULL,
+        PRIMARY KEY (task_id, external_id)
+    );
+    "#,
 ];
 
 pub fn configure(conn: &Connection) -> Result<()> {

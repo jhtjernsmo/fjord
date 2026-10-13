@@ -349,6 +349,15 @@ pub fn set_note_locked(state: State<AppState>, id: i64, locked: bool) -> CmdResu
     with_store(&state, |s| s.set_note_locked(id, locked))
 }
 
+/// Files downloaded from the task's work item, for showing pasted images inline.
+#[tauri::command]
+pub fn external_files(
+    state: State<AppState>,
+    task_id: i64,
+) -> CmdResult<Vec<fjord_core::ExternalFile>> {
+    with_store(&state, |s| s.external_files(task_id))
+}
+
 #[derive(Serialize)]
 pub struct StoryAnalysis {
     note: Note,

@@ -78,6 +78,13 @@ pub struct ImportSettings {
     /// Empty finds a field with "risk" in its name.
     #[serde(default)]
     pub risk_field: String,
+    /// Download attachments and pasted images to the task.
+    #[serde(default = "default_true")]
+    pub download_files: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for ImportSettings {
@@ -87,6 +94,7 @@ impl Default for ImportSettings {
             mappings: Vec::new(),
             closed_days: DEFAULT_CLOSED_DAYS,
             risk_field: String::new(),
+            download_files: true,
         }
     }
 }

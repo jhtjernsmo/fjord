@@ -184,6 +184,15 @@ pub struct Attachment {
     pub created_at: String,
 }
 
+/// A file downloaded from an imported item, e.g. an Azure Boards attachment.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExternalFile {
+    /// The file's id in the other system (an Azure attachment GUID).
+    pub external_id: String,
+    /// The attachment it became; None after it was removed from the task.
+    pub attachment_id: Option<i64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Note {
     pub id: i64,

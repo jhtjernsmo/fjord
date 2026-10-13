@@ -71,6 +71,7 @@ pub fn run() {
             commands::set_note_locked,
             commands::rename_note_folder,
             commands::create_story_analysis,
+            commands::external_files,
             commands::story_analysis,
             commands::analysis_template,
             commands::set_analysis_template,
