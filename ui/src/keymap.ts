@@ -38,6 +38,7 @@ export const DEFAULT_ACTIONS: ActionDef[] = [
   { id: 'git.sync', group: 'project', scope: 'global', keys: '<leader>r' },
   { id: 'editor.open', group: 'project', scope: 'global', keys: '<leader>e' },
   { id: 'azure.import', group: 'project', scope: 'global', keys: '<leader>i' },
+  { id: 'azure.mentions', group: 'project', scope: 'global', keys: '<leader>I' },
   { id: 'git.createRepo', group: 'project', scope: 'global', keys: '<leader>G' },
   { id: 'board.left', group: 'board', scope: 'board', keys: 'h' },
   { id: 'board.right', group: 'board', scope: 'board', keys: 'l' },
