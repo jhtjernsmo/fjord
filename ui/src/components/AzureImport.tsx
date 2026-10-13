@@ -82,7 +82,7 @@ export function AzureImportRunner() {
   return null
 }
 
-const EMPTY: ImportSettings = { enabled: false, mappings: [], closed_days: 30 }
+const EMPTY: ImportSettings = { enabled: false, mappings: [], closed_days: 30, risk_field: '' }
 const CLOSED_DAY_CHOICES = [0, 7, 30, 90]
 
 export function AzureImportSettings() {
@@ -141,6 +141,18 @@ export function AzureImportSettings() {
             </option>
           ))}
         </select>
+      </label>
+      <label className="inline-select">
+        {t('import.riskField')}
+        <input
+          className="input mono"
+          value={settings.risk_field ?? ''}
+          placeholder={t('import.riskFieldAuto')}
+          onChange={(e) => setSettings({ ...settings, risk_field: e.target.value })}
+          onBlur={() => save(settings)}
+          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          aria-label={t('import.riskField')}
+        />
       </label>
       <label className="toggle-label">
         <input

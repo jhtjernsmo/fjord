@@ -74,6 +74,8 @@ pub fn run() {
             commands::story_analysis,
             commands::analysis_template,
             commands::set_analysis_template,
+            commands::analysis_split_sections,
+            commands::set_analysis_split_sections,
             commands::print_page,
             commands::resolve_links,
             commands::backlinks,

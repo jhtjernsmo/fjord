@@ -587,10 +587,11 @@ pub fn assigned_query(closed_days: u32) -> String {
     )
 }
 const MAX_WORK_ITEMS: usize = 200;
-const WORK_ITEM_FIELDS: &str = "System.Id,System.Rev,System.Parent,System.Title,System.Description,System.TeamProject,\
-     System.AreaPath,System.WorkItemType,System.State,Microsoft.VSTS.Common.Priority,\
-     Microsoft.VSTS.Scheduling.DueDate,Microsoft.VSTS.Scheduling.TargetDate,\
-     Microsoft.VSTS.Common.AcceptanceCriteria,Microsoft.VSTS.TCM.ReproSteps";
+/// Imports ask for every field: the risk field is often a custom one (e.g. `Custom.RiskDescription`)
+/// whose name we can't know up front.
+const ALL_FIELDS: &str = "";
+/// Azure's own risk field, a pick list ("2 - Medium"); a custom description field wins over it.
+const BUILT_IN_RISK_FIELD: &str = "Microsoft.VSTS.Common.Risk";
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -623,6 +624,8 @@ pub struct WorkItem {
     pub title: String,
     pub description_md: String,
     pub acceptance_md: String,
+    /// The risk field: the one named in the import settings, or else one with "risk" in its name.
+    pub risk_md: String,
     /// Azure priority 1 (highest) to 4.
     pub priority: Option<i64>,
     /// YYYY-MM-DD
@@ -647,6 +650,10 @@ impl WorkItem {
         if !self.acceptance_md.trim().is_empty() {
             body.push_str("\n\n### Acceptance criteria\n\n");
             body.push_str(self.acceptance_md.trim());
+        }
+        if !self.risk_md.trim().is_empty() {
+            body.push_str("\n\n### Risk description\n\n");
+            body.push_str(self.risk_md.trim());
         }
         body.push_str(&format!(
             "\n\n---\nAzure DevOps: [{} {}]({}) · {} · {}",
@@ -682,7 +689,34 @@ pub(crate) fn field_str(fields: &serde_json::Map<String, serde_json::Value>, key
         .to_string()
 }
 
-pub(crate) fn work_item_from(org: &str, item: ApiWorkItem) -> WorkItem {
+/// The risk text: `preferred` if set (matched without regard to case), else a field with "risk"
+/// (or "risiko") in its name, preferring a custom description field over Azure's built-in pick list.
+fn risk_field(fields: &serde_json::Map<String, serde_json::Value>, preferred: &str) -> String {
+    let preferred = preferred.trim();
+    let text = |key: &str| field_str(fields, key);
+    if !preferred.is_empty() {
+        return fields
+            .keys()
+            .find(|k| k.eq_ignore_ascii_case(preferred))
+            .map(|k| text(k))
+            .unwrap_or_default();
+    }
+    let is_risk = |k: &&String| {
+        let name = k.rsplit('.').next().unwrap_or(k).to_lowercase();
+        (name.contains("risk") || name.contains("risiko"))
+            && fields.get(k.as_str()).is_some_and(|v| v.is_string())
+    };
+    let custom = fields
+        .keys()
+        .filter(is_risk)
+        .find(|k| !k.eq_ignore_ascii_case(BUILT_IN_RISK_FIELD));
+    custom
+        .or_else(|| fields.keys().find(is_risk))
+        .map(|k| text(k))
+        .unwrap_or_default()
+}
+
+pub(crate) fn work_item_from(org: &str, item: ApiWorkItem, risk: &str) -> WorkItem {
     let f = &item.fields;
     let description = match field_str(f, "System.Description") {
         d if d.trim().is_empty() => field_str(f, "Microsoft.VSTS.TCM.ReproSteps"),
@@ -706,6 +740,7 @@ pub(crate) fn work_item_from(org: &str, item: ApiWorkItem) -> WorkItem {
         title: field_str(f, "System.Title"),
         description_md: html_to_markdown(&description),
         acceptance_md: html_to_markdown(&field_str(f, "Microsoft.VSTS.Common.AcceptanceCriteria")),
+        risk_md: html_to_markdown(&risk_field(f, risk)),
         priority: f
             .get("Microsoft.VSTS.Common.Priority")
             .and_then(|v| v.as_i64()),
@@ -746,9 +781,14 @@ pub(crate) fn fetch_work_items(
         .take(MAX_WORK_ITEMS)
         .map(u64::to_string)
         .collect();
+    let fields = if fields.is_empty() {
+        String::new()
+    } else {
+        format!("&fields={fields}")
+    };
     let mut res = agent()
         .get(&format!(
-            "{HOST}/{}/_apis/wit/workitems?ids={}&fields={fields}&errorPolicy=omit&api-version={API_VERSION}",
+            "{HOST}/{}/_apis/wit/workitems?ids={}{fields}&errorPolicy=omit&api-version={API_VERSION}",
             encode(org),
             ids.join(",")
         ))
@@ -763,24 +803,25 @@ pub(crate) fn fetch_work_items(
 }
 
 /// Open work items assigned to you in one organization.
-pub fn assigned_work_items(org: &str, closed_days: u32) -> Result<Vec<WorkItem>> {
+/// `risk` names the field holding the risk description; empty finds one by name.
+pub fn assigned_work_items(org: &str, closed_days: u32, risk: &str) -> Result<Vec<WorkItem>> {
     let org = check_org(org)?;
     let (auth, _) = find_auth(org).ok_or_else(|| VcsError::NoAzureToken(org.to_string()))?;
     let ids = wiql_ids(org, &auth, &assigned_query(closed_days))?;
-    work_items_with_auth(org, &auth, &ids)
+    work_items_with_auth(org, &auth, &ids, risk)
 }
 
 /// Work items by id, with everything an import needs.
-pub fn work_items(org: &str, ids: &[u64]) -> Result<Vec<WorkItem>> {
+pub fn work_items(org: &str, ids: &[u64], risk: &str) -> Result<Vec<WorkItem>> {
     let org = check_org(org)?;
     let (auth, _) = find_auth(org).ok_or_else(|| VcsError::NoAzureToken(org.to_string()))?;
-    work_items_with_auth(org, &auth, ids)
+    work_items_with_auth(org, &auth, ids, risk)
 }
 
-fn work_items_with_auth(org: &str, auth: &Auth, ids: &[u64]) -> Result<Vec<WorkItem>> {
-    Ok(fetch_work_items(org, auth, ids, WORK_ITEM_FIELDS)?
+fn work_items_with_auth(org: &str, auth: &Auth, ids: &[u64], risk: &str) -> Result<Vec<WorkItem>> {
+    Ok(fetch_work_items(org, auth, ids, ALL_FIELDS)?
         .into_iter()
-        .map(|i| work_item_from(org, i))
+        .map(|i| work_item_from(org, i, risk))
         .collect())
 }
 
@@ -1126,6 +1167,23 @@ mod tests {
     }
 
     #[test]
+    fn risk_comes_from_the_named_field_or_one_called_risk() {
+        let fields: serde_json::Map<String, serde_json::Value> = serde_json::from_str(
+            r#"{"Microsoft.VSTS.Common.Risk":"1 - High","Custom.Risiko":"<p>Data loss</p>","Custom.Notes":"x"}"#,
+        )
+        .unwrap();
+        assert_eq!(risk_field(&fields, "custom.notes"), "x");
+        assert_eq!(risk_field(&fields, "Custom.Missing"), "");
+        assert_eq!(risk_field(&fields, ""), "<p>Data loss</p>");
+        let custom: serde_json::Map<String, serde_json::Value> = serde_json::from_str(
+            r#"{"Microsoft.VSTS.Common.Risk":"1 - High","Custom.RiskDescription":"Data loss"}"#,
+        )
+        .unwrap();
+        assert_eq!(risk_field(&custom, ""), "Data loss");
+        assert_eq!(risk_field(&serde_json::Map::new(), ""), "");
+    }
+
+    #[test]
     fn maps_work_items_from_the_documented_shape() {
         // Trimmed from the "Work Items - List" example response.
         let json = r#"{"count":1,"value":[{"id":297,"rev":4,"fields":{
@@ -1133,9 +1191,11 @@ mod tests {
             "System.WorkItemType":"Bug","System.State":"Active","System.Title":"Crash on login",
             "System.Description":"<div>App crashes</div>",
             "Microsoft.VSTS.Common.AcceptanceCriteria":"<ul><li>No crash</li></ul>",
+            "Microsoft.VSTS.Common.Risk":"2 - Medium","Custom.RiskDescription":"<div>Login is shared</div>",
             "Microsoft.VSTS.Common.Priority":1,"Microsoft.VSTS.Scheduling.DueDate":"2026-10-20T00:00:00Z","System.Parent":280}}]}"#;
         let list: List<ApiWorkItem> = serde_json::from_str(json).unwrap();
-        let wi = work_item_from("Contoso", list.value.into_iter().next().unwrap());
+        let wi = work_item_from("Contoso", list.value.into_iter().next().unwrap(), "");
+        assert_eq!(wi.risk_md, "Login is shared");
         assert_eq!(
             (wi.id, wi.rev, wi.kind.as_str(), wi.due.as_deref()),
             (297, 4, "Bug", Some("2026-10-20"))
@@ -1153,7 +1213,7 @@ mod tests {
         );
         assert!(
             item.body_md
-                .starts_with("App crashes\n\n### Acceptance criteria\n\n- No crash")
+                .starts_with("App crashes\n\n### Acceptance criteria\n\n- No crash\n\n### Risk description\n\nLogin is shared")
         );
         assert!(item.body_md.ends_with("Azure DevOps: [Bug 297](https://dev.azure.com/Contoso/Mobile%20App/_workitems/edit/297) · Active · Mobile App\\iOS"));
     }

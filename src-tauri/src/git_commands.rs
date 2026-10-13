@@ -275,7 +275,8 @@ pub async fn add_work_item_task(
     org: String,
     id: u64,
 ) -> CmdResult<Task> {
-    let item = off_thread(move || fjord_vcs::fetch_work_item(&org, id)).await?;
+    let risk = with_store(&state, |s| Ok(s.import_settings()?.risk_field))?;
+    let item = off_thread(move || fjord_vcs::fetch_work_item(&org, id, &risk)).await?;
     with_store(&state, |s| {
         fjord_vcs::add_work_item_task(s, project_id, &item)
     })

@@ -382,6 +382,16 @@ pub fn set_analysis_template(state: State<AppState>, template: String) -> CmdRes
     })
 }
 
+#[tauri::command]
+pub fn analysis_split_sections(state: State<AppState>) -> CmdResult<bool> {
+    with_store(&state, |s| s.analysis_split_sections())
+}
+
+#[tauri::command]
+pub fn set_analysis_split_sections(state: State<AppState>, on: bool) -> CmdResult<()> {
+    with_store(&state, |s| s.set_analysis_split_sections(on))
+}
+
 /// Opens the system print dialog for the window, where "Save as PDF" lives on every platform.
 #[tauri::command]
 pub fn print_page(webview: tauri::Webview) -> CmdResult<()> {

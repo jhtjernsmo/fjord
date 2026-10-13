@@ -74,6 +74,10 @@ pub struct ImportSettings {
     /// Also import finished items changed in the last N days (0 = open items only).
     #[serde(default = "default_closed_days")]
     pub closed_days: u32,
+    /// Azure field holding the risk description, e.g. `Custom.RiskDescription`.
+    /// Empty finds a field with "risk" in its name.
+    #[serde(default)]
+    pub risk_field: String,
 }
 
 impl Default for ImportSettings {
@@ -82,6 +86,7 @@ impl Default for ImportSettings {
             enabled: false,
             mappings: Vec::new(),
             closed_days: DEFAULT_CLOSED_DAYS,
+            risk_field: String::new(),
         }
     }
 }

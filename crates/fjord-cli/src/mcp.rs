@@ -175,7 +175,7 @@ fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "analyze_story",
-            "Start a user story analysis for a task: creates a note from the user's analysis template in the project's Analysis folder, linked to the task, and returns it. If the task already has one, returns that instead (created = false). Fill in the sections with update_note; keep the headings.",
+            "Start a user story analysis for a task: creates a note from the user's own analysis template in the project's Analysis folder, linked to the task, and returns it with the task's context (title, description, acceptance criteria, risk, work item URL). If the task already has one, returns that instead (created = false). Fill in each section from the context with update_note (body replaces the whole note): keep the user's headings, their order and the [[#id]] link, and write in the language the user writes in. Leave a section's placeholder line if there's nothing to say rather than inventing facts.",
             json!({ "task": { "type": "integer" } }),
             &["task"],
         ),
@@ -437,8 +437,23 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
         }
         "update_note" => serde_json::to_value(update_note(store, args)?)?,
         "analyze_story" => {
-            let (note, created) = store.create_story_analysis(int_arg(args, "task")?)?;
-            json!({ "note": note, "created": created })
+            let task_id = int_arg(args, "task")?;
+            let (note, created) = store.create_story_analysis(task_id)?;
+            let task = store.get_task(task_id)?;
+            let parts = fjord_core::split_story(&task.body_md);
+            let source = store.external_link_for_task(task_id)?.map(|l| l.url);
+            json!({
+                "note": note,
+                "created": created,
+                "task": {
+                    "id": task.id,
+                    "title": task.title,
+                    "description": parts.description,
+                    "acceptance_criteria": parts.acceptance,
+                    "risk": parts.risk,
+                    "work_item_url": source,
+                },
+            })
         }
         "list_new_imports" => serde_json::to_value(store.unanalyzed_imports()?)?,
         "mark_analyzed" => {
@@ -706,6 +721,8 @@ mod tests {
         let first = call(&mut s, 3, "analyze_story", json!({ "task": task_id }));
         let result = &first["structuredContent"]["result"];
         assert_eq!(result["created"], true);
+        assert_eq!(result["task"]["title"], "Split an expense");
+        assert_eq!(result["task"]["work_item_url"], Value::Null);
         assert_eq!(result["note"]["title"], "Analysis: Split an expense");
         assert_eq!(result["note"]["folder"], "Analysis");
         let again = call(&mut s, 4, "analyze_story", json!({ "task": task_id }));

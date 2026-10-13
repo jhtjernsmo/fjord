@@ -156,6 +156,8 @@ export interface ImportSettings {
   mappings: ImportMapping[]
   /** Also import finished items changed in the last N days (0 = open items only). */
   closed_days: number
+  /** Azure field with the risk description, e.g. Custom.RiskDescription; empty finds one named "risk". */
+  risk_field: string
 }
 
 export interface WorkItemComment {
@@ -389,6 +391,8 @@ export const api = {
   analysisTemplate: () => invoke<string>('analysis_template'),
   /** An empty template goes back to the built-in one; returns the template now in use. */
   setAnalysisTemplate: (template: string) => invoke<string>('set_analysis_template', { template }),
+  analysisSplitSections: () => invoke<boolean>('analysis_split_sections'),
+  setAnalysisSplitSections: (on: boolean) => invoke<void>('set_analysis_split_sections', { on }),
   /** The system print dialog, where "Save as PDF" lives. */
   printPage: () => invoke<void>('print_page'),
   renameNoteFolder: (projectId: number | null, from: string, to: string) => invoke<number>('rename_note_folder', { projectId, from, to }),

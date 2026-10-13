@@ -4,6 +4,12 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## Unreleased
+
+- **Acceptance criteria and risk in your analysis template:** `{{acceptance}}` and `{{risk}}` take those sections out of the task description and put them where your template says. Turn it off under Settings → Templates.
+- **Risk from Azure Boards:** imported work items now bring their risk field along as a *Risk description* section. Fjord finds a field with "risk" in its name, or you name it under Settings → Integrations (e.g. `Custom.RiskDescription`).
+- **`analyze_story` gives the agent the task's context** (description, acceptance criteria, risk, work item link), so it can fill in your template for a specific task.
+
 ## 0.2.21 — 2026-10-13
 
 - **User story analysis:** *Analyse* on a task (button, right-click, `u`, or `fjord task analyze <id>`) makes a note from your template in the project's *Analysis* folder, linked to the task and to its Azure work item. Running it again opens the same note. Edit the template under Settings → Templates.

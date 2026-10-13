@@ -491,7 +491,7 @@ pub fn fetch_import(settings: &ImportSettings, known: &[String]) -> Result<Impor
     let orgs = import_orgs(settings);
     let mut fetch = ImportFetch::default();
     for org in orgs {
-        let items = assigned_work_items(&org, settings.closed_days)?;
+        let items = assigned_work_items(&org, settings.closed_days, &settings.risk_field)?;
         let ids: std::collections::HashSet<u64> = items.iter().map(|i| i.id).collect();
         // Walk up from parents that aren't assigned to you, to find an ancestor that is.
         let mut seen = ids.clone();
@@ -572,8 +572,9 @@ pub fn fetch_github_mentions(since: &str) -> Result<Vec<GitHubMention>> {
 }
 
 /// Network only: the work item to turn into a task (see [`add_work_item_task`]).
-pub fn fetch_work_item(org: &str, id: u64) -> Result<WorkItem> {
-    azure::work_items(org, &[id])?
+/// `risk` names the field holding the risk description (see [`ImportSettings::risk_field`]).
+pub fn fetch_work_item(org: &str, id: u64, risk: &str) -> Result<WorkItem> {
+    azure::work_items(org, &[id], risk)?
         .into_iter()
         .next()
         .ok_or_else(|| VcsError::Azure(format!("work item {id} not found in «{org}»")))
@@ -997,6 +998,7 @@ mod tests {
             title: format!("Item {id}"),
             description_md: String::new(),
             acceptance_md: String::new(),
+            risk_md: String::new(),
             priority: Some(2),
             due: None,
             parent: None,
@@ -1043,6 +1045,7 @@ mod tests {
             title: format!("Item {id}"),
             description_md: String::new(),
             acceptance_md: String::new(),
+            risk_md: String::new(),
             priority: None,
             due: None,
             parent,
@@ -1256,6 +1259,7 @@ mod tests {
             title: "Crash".into(),
             description_md: String::new(),
             acceptance_md: String::new(),
+            risk_md: String::new(),
             priority: None,
             due: None,
             parent: None,
@@ -1364,6 +1368,7 @@ mod tests {
             title: "T".into(),
             description_md: String::new(),
             acceptance_md: String::new(),
+            risk_md: String::new(),
             priority: None,
             due: None,
             parent: None,
@@ -1449,6 +1454,7 @@ mod tests {
             title: format!("Item {id}"),
             description_md: String::new(),
             acceptance_md: String::new(),
+            risk_md: String::new(),
             priority: None,
             due: None,
             parent: None,
