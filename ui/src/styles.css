@@ -829,3 +829,16 @@ html[data-flair='p'] body::after { content: ''; position: fixed; inset: 0; z-ind
 /* ---------- images in task descriptions ---------- */
 .markdown .md-image { display: block; max-width: 100%; max-height: 420px; margin: 6px 0; border-radius: 6px; border: 1px solid var(--line); }
 .md-image-missing { display: inline-block; padding: 2px 8px; border: 1px dashed var(--line-2); border-radius: 6px; color: var(--muted); font-size: 12px; }
+
+/* ---------- send an analysis to Azure (beta) ---------- */
+.dialog.azure-update { width: min(760px, 94vw); }
+.azure-change { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: default; }
+.azure-change-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.azure-change-head .mono { font-size: 11px; margin-left: auto; }
+.azure-change-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.azure-change-cols > span { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.azure-change-label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.azure-change-old, .azure-change-new { display: block; padding: 8px 10px; border-radius: 8px; background: var(--bg-2); font-size: 12.5px; cursor: auto; }
+.azure-change-new { border-left: 2px solid var(--ok); }
+.azure-change-old { border-left: 2px solid var(--line-2); color: var(--muted); }
+.azure-update-error { color: var(--danger); font-size: 13px; }

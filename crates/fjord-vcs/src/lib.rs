@@ -5,6 +5,7 @@
 pub mod azure;
 pub mod azure_files;
 pub mod azure_mentions;
+pub mod azure_write;
 pub mod credentials;
 pub mod editor;
 pub mod git;
@@ -590,6 +591,48 @@ pub fn add_work_item_task(store: &mut Store, project_id: i64, item: &WorkItem) -
     Ok(task)
 }
 
+/// The Azure work item an analysis note is about, with the note's sections to send.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct AnalysisTarget {
+    pub task_id: i64,
+    pub org: String,
+    pub id: u64,
+    pub url: String,
+    pub acceptance_md: String,
+    pub risk_md: String,
+}
+
+/// Store only: the first task the note links to that came from Azure Boards, if any.
+pub fn analysis_target(store: &Store, note_id: i64) -> Result<Option<AnalysisTarget>> {
+    let note = store.get_note(note_id)?;
+    for text in fjord_core::parse_links(&note.body_md) {
+        let Some(target) = store.resolve_link(&text)? else {
+            continue;
+        };
+        if target.kind != "task" {
+            continue;
+        }
+        let Some(link) = store.external_link_for_task(target.id)? else {
+            continue;
+        };
+        let Some((org, id)) =
+            split_external_id(&link.external_id).filter(|_| link.source == "azure")
+        else {
+            continue;
+        };
+        let parts = fjord_core::split_story(&note.body_md);
+        return Ok(Some(AnalysisTarget {
+            task_id: target.id,
+            org,
+            id,
+            url: link.url,
+            acceptance_md: parts.acceptance,
+            risk_md: parts.risk,
+        }));
+    }
+    Ok(None)
+}
+
 /// Most files downloaded per import; the rest come with the next one.
 const MAX_FILES_PER_IMPORT: usize = 30;
 
@@ -1036,6 +1079,42 @@ mod tests {
             (Some("contoso"), Some("Mobile App"), Some("bokost"))
         );
         assert!(matches!(Forge::for_repo(&linked), Ok(Forge::Azure(_))));
+    }
+
+    #[test]
+    fn an_analysis_note_points_at_its_azure_work_item() {
+        let (mut s, _d) = store();
+        let p = s
+            .create_project(NewProject {
+                name: "Bokost".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let item = fjord_core::ExternalItem {
+            source: "azure".into(),
+            external_id: "contoso/42".into(),
+            url: "https://dev.azure.com/contoso/App/_workitems/edit/42".into(),
+            rev: 1,
+            title: "Widget".into(),
+            body_md: "As a user…".into(),
+            priority: 0,
+            due_at: None,
+        };
+        let (task, _) = s.upsert_imported_task(p, &item).unwrap();
+        let (note, _) = s.create_story_analysis(task.id).unwrap();
+        let body = note.body_md.replacen("- [ ]", "- [ ] Shows the balance", 1);
+        s.update_note(note.id, &note.title, &body).unwrap();
+
+        let target = analysis_target(&s, note.id).unwrap().unwrap();
+        assert_eq!(
+            (target.org.as_str(), target.id, target.task_id),
+            ("contoso", 42, task.id)
+        );
+        assert_eq!(target.acceptance_md, "- [ ] Shows the balance");
+
+        let plain = s.create_note(Some(p), "Plain", "No links").unwrap();
+        assert_eq!(analysis_target(&s, plain.id).unwrap(), None);
     }
 
     #[test]

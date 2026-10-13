@@ -81,6 +81,9 @@ pub struct ImportSettings {
     /// Download attachments and pasted images to the task.
     #[serde(default = "default_true")]
     pub download_files: bool,
+    /// Beta: send a user story analysis's acceptance criteria and risk back to the work item.
+    #[serde(default)]
+    pub write_back: bool,
 }
 
 fn default_true() -> bool {
@@ -95,6 +98,7 @@ impl Default for ImportSettings {
             closed_days: DEFAULT_CLOSED_DAYS,
             risk_field: String::new(),
             download_files: true,
+            write_back: false,
         }
     }
 }

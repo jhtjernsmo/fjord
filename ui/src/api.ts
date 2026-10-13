@@ -55,6 +55,33 @@ export interface Board {
   tasks: Task[]
 }
 
+/** The Azure work item an analysis note is about. */
+export interface AnalysisTarget {
+  task_id: number
+  org: string
+  id: number
+  url: string
+  acceptance_md: string
+  risk_md: string
+}
+
+export interface AzureFieldChange {
+  field: string
+  label: string
+  current_md: string
+  new_md: string
+}
+
+/** What sending an analysis to Azure would change; `rev` guards against overwriting newer edits. */
+export interface AzureUpdatePreview {
+  org: string
+  id: number
+  url: string
+  rev: number
+  changes: AzureFieldChange[]
+  skipped: string[]
+}
+
 /** A file the import downloaded from a work item (an Azure attachment or pasted image). */
 export interface ExternalFile {
   external_id: string
@@ -167,6 +194,8 @@ export interface ImportSettings {
   risk_field: string
   /** Download attachments and pasted images to the task. */
   download_files: boolean
+  /** Beta: send an analysis's acceptance criteria and risk to the work item. */
+  write_back: boolean
 }
 
 export interface WorkItemComment {
@@ -385,6 +414,9 @@ export const api = {
     invoke<AttachOutcome[]>('attach_files', { projectId, taskId, paths }),
   detachFile: (id: number) => invoke<void>('detach_file', { id }),
   openAttachment: (id: number) => invoke<void>('open_attachment', { id }),
+  analysisAzureTarget: (noteId: number) => invoke<AnalysisTarget | null>('analysis_azure_target', { noteId }),
+  azureUpdatePreview: (noteId: number) => invoke<AzureUpdatePreview>('azure_update_preview', { noteId }),
+  azureUpdateApply: (noteId: number, rev: number, changes: AzureFieldChange[]) => invoke<number>('azure_update_apply', { noteId, rev, changes }),
   externalFiles: (taskId: number) => invoke<ExternalFile[]>('external_files', { taskId }),
   previewAttachment: (id: number) => invoke<string | null>('preview_attachment', { id }),
   listNotes: (projectId: number) => invoke<Note[]>('list_notes', { projectId }),

@@ -101,36 +101,39 @@ enum Part {
     Risk,
 }
 
-/// Which part a markdown heading starts, if it's one we split out.
-fn heading_part(line: &str) -> Option<Part> {
+/// A markdown heading's level (number of `#`) and the part it starts, if it's one we split out.
+fn heading(line: &str) -> Option<(usize, Option<Part>)> {
     let text = line.trim_start();
-    if !text.starts_with('#') {
+    let level = text.chars().take_while(|c| *c == '#').count();
+    if level == 0 || !text[level..].starts_with([' ', '\t']) {
         return None;
     }
-    let name = text
-        .trim_start_matches('#')
-        .trim()
-        .trim_end_matches(':')
-        .to_lowercase();
-    if matches!(name.as_str(), "acceptance criteria" | "akseptansekriterier") {
+    let name = text[level..].trim().trim_end_matches(':').to_lowercase();
+    let part = if matches!(name.as_str(), "acceptance criteria" | "akseptansekriterier") {
         Some(Part::Acceptance)
     } else if name.starts_with("risk") || name.starts_with("risiko") {
         Some(Part::Risk)
     } else {
         None
-    }
+    };
+    Some((level, part))
 }
 
 /// Splits a description into its main text and its "Acceptance criteria" and "Risk…"
-/// sections, dropping the footer an Azure import adds.
+/// sections, dropping the footer an Azure import adds. A section runs until the next
+/// heading of the same or a higher level; what follows goes back to the main text.
 pub fn split_story(body: &str) -> StoryParts {
     let body = without_footer(body);
     let mut parts: [Vec<&str>; 3] = Default::default();
-    let mut current = Part::Description;
+    let mut current = (Part::Description, 0);
     for line in body.lines() {
-        match heading_part(line) {
-            Some(part) => current = part,
-            None => parts[current as usize].push(line),
+        match heading(line) {
+            Some((level, Some(part))) => current = (part, level),
+            Some((level, None)) if level <= current.1 => {
+                current = (Part::Description, 0);
+                parts[Part::Description as usize].push(line);
+            }
+            _ => parts[current.0 as usize].push(line),
         }
     }
     let [description, acceptance, risk] = parts.map(|lines| lines.join("\n").trim().to_string());
@@ -340,14 +343,20 @@ mod tests {
                 risk: "Login is shared".into(),
             }
         );
-        let written = "Intro\n\n## Akseptansekriterier:\n- [ ] A\n\n## Notes\nkept with the criteria\n\n# Risks\n- B";
+        let written = "Intro\n\n## Akseptansekriterier:\n- [ ] A\n\n### Edge\n- kept\n\n## Notes\nback to the text\n\n# Risks\n- B";
         let parts = split_story(written);
-        assert_eq!(parts.description, "Intro");
-        assert_eq!(
-            parts.acceptance,
-            "- [ ] A\n\n## Notes\nkept with the criteria"
-        );
+        assert_eq!(parts.description, "Intro\n\n## Notes\nback to the text");
+        assert_eq!(parts.acceptance, "- [ ] A\n\n### Edge\n- kept");
         assert_eq!(parts.risk, "- B");
+        // An analysis note made from the template: later sections don't run into the criteria.
+        let note = "**Story:** [[#1]]\n\n## Acceptance criteria\n\n- Works\n\n## Assumptions\n\n- None\n\n## Risks\n\n- Slow";
+        let parts = split_story(note);
+        assert_eq!(
+            (parts.acceptance.as_str(), parts.risk.as_str()),
+            ("- Works", "- Slow")
+        );
+        assert!(parts.description.contains("## Assumptions"));
+        assert_eq!(split_story("#hashtag").description, "#hashtag");
         assert_eq!(split_story("Just text").description, "Just text");
     }
 

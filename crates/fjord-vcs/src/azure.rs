@@ -614,6 +614,12 @@ pub(crate) struct ApiWorkItem {
     pub(crate) relations: Vec<crate::azure_files::ApiRelation>,
 }
 
+impl ApiWorkItem {
+    pub(crate) fn rev(&self) -> i64 {
+        self.rev
+    }
+}
+
 /// An Azure Boards work item, with HTML fields already turned into markdown.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct WorkItem {
@@ -694,6 +700,21 @@ pub(crate) fn field_str(fields: &serde_json::Map<String, serde_json::Value>, key
         .to_string()
 }
 
+/// Whether a field's reference name looks like a risk field (`Custom.RiskDescription`, `Custom.Risiko`).
+pub(crate) fn is_risk_name(reference: &str) -> bool {
+    let name = reference
+        .rsplit('.')
+        .next()
+        .unwrap_or(reference)
+        .to_lowercase();
+    name.contains("risk") || name.contains("risiko")
+}
+
+/// Azure's own pick list ("2 - Medium"), which takes no free text.
+pub(crate) fn is_built_in_risk(reference: &str) -> bool {
+    reference.eq_ignore_ascii_case(BUILT_IN_RISK_FIELD)
+}
+
 /// The risk text: `preferred` if set (matched without regard to case), else a field with "risk"
 /// (or "risiko") in its name, preferring a custom description field over Azure's built-in pick list.
 fn risk_field(fields: &serde_json::Map<String, serde_json::Value>, preferred: &str) -> String {
@@ -706,15 +727,9 @@ fn risk_field(fields: &serde_json::Map<String, serde_json::Value>, preferred: &s
             .map(|k| text(k))
             .unwrap_or_default();
     }
-    let is_risk = |k: &&String| {
-        let name = k.rsplit('.').next().unwrap_or(k).to_lowercase();
-        (name.contains("risk") || name.contains("risiko"))
-            && fields.get(k.as_str()).is_some_and(|v| v.is_string())
-    };
-    let custom = fields
-        .keys()
-        .filter(is_risk)
-        .find(|k| !k.eq_ignore_ascii_case(BUILT_IN_RISK_FIELD));
+    let is_risk =
+        |k: &&String| is_risk_name(k) && fields.get(k.as_str()).is_some_and(|v| v.is_string());
+    let custom = fields.keys().filter(is_risk).find(|k| !is_built_in_risk(k));
     custom
         .or_else(|| fields.keys().find(is_risk))
         .map(|k| text(k))

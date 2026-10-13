@@ -9,6 +9,7 @@ Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 - **Acceptance criteria and risk in your analysis template:** `{{acceptance}}` and `{{risk}}` take those sections out of the task description and put them where your template says. Turn it off under Settings → Templates.
 - **Risk from Azure Boards:** imported work items now bring their risk field along as a *Risk description* section. Fjord finds a field with "risk" in its name, or you name it under Settings → Integrations (e.g. `Custom.RiskDescription`).
 - **Screenshots and attachments from Azure Boards:** the import downloads a work item's attachments and the images pasted into it, once each, and attaches them to the task. Pasted images show inline in the task's description. Turn it off under Settings → Integrations.
+- **Send an analysis to Azure (beta, off by default):** *Send to Azure* on the analysis of an imported task writes its acceptance criteria and risk to the work item. You see each field as it is in Azure and as it will be, and pick what to send. If someone changed the work item after the preview, nothing is overwritten. Turn it on under Settings → Integrations; it needs permission to edit work items.
 - **`analyze_story` gives the agent the task's context** (description, acceptance criteria, risk, work item link), so it can fill in your template for a specific task.
 
 ## 0.2.21 — 2026-10-13

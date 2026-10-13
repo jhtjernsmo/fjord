@@ -1,6 +1,6 @@
 // One note: title, metadata, markdown editor with [[ autocomplete, live preview and backlinks.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { FileDown, FolderKanban, Lock, LockOpen, NotebookText, Pin, PinOff, Square, Trash2 } from 'lucide-react'
+import { CloudUpload, FileDown, FolderKanban, Lock, LockOpen, NotebookText, Pin, PinOff, Square, Trash2 } from 'lucide-react'
 import { api, relativeTime } from '../api'
 import type { LinkTarget, Note, ProjectSummary } from '../api'
 import { useActions, useApp, useLive } from '../data'
@@ -9,6 +9,7 @@ import type { MessageKey } from '../i18n'
 import { useEntityActions } from './actions'
 import { NoteMarkdown } from './NoteMarkdown'
 import { PdfPreview } from './PdfPreview'
+import { AzureUpdateDialog } from './AzureUpdateDialog'
 import { folderPaths } from '../notesTree'
 
 const AUTOSAVE_MS = 600
@@ -47,6 +48,16 @@ export function NoteEditor({ note, projects, folders = [], onDeleted }: { note: 
   const shownMode = note.locked ? 'preview' : mode
   const [suggest, setSuggest] = useState<{ query: string; items: LinkTarget[]; index: number } | null>(null)
   const [pdf, setPdf] = useState(false)
+  const [azureUpdate, setAzureUpdate] = useState(false)
+  const [importSettings] = useLive(() => api.getImportSettings().catch(() => null), [])
+  const [azureTarget] = useLive(() => api.analysisAzureTarget(note.id).catch(() => null), [note.id])
+  const canSendToAzure = !!importSettings?.write_back && !!azureTarget
+  const openAzureUpdate = async () => {
+    // The preview reads the saved note, so save what's typed first.
+    saved.current = { title: saved.current.title, body }
+    await run(api.updateNote(note.id, saved.current.title, body))
+    setAzureUpdate(true)
+  }
   const closePdf = useCallback(() => setPdf(false), [])
   const textRef = useRef<HTMLTextAreaElement>(null)
   const saved = useRef({ title: note.title, body: note.body_md })
@@ -129,6 +140,11 @@ export function NoteEditor({ note, projects, folders = [], onDeleted }: { note: 
         >
           {note.locked ? <Lock size={15} /> : <LockOpen size={15} />}
         </button>
+        {canSendToAzure && (
+          <button className="icon-btn" onClick={openAzureUpdate} title={t('azureUpdate.title')} aria-label={t('azureUpdate.title')}>
+            <CloudUpload size={15} />
+          </button>
+        )}
         <button className="icon-btn" onClick={() => setPdf(true)} title={t('pdf.open')} aria-label={t('pdf.open')}>
           <FileDown size={15} />
         </button>
@@ -223,6 +239,7 @@ export function NoteEditor({ note, projects, folders = [], onDeleted }: { note: 
         )}
       </div>
       <Backlinks kind="note" id={note.id} />
+      {azureUpdate && <AzureUpdateDialog noteId={note.id} onClose={() => setAzureUpdate(false)} />}
       {pdf && <PdfPreview note={{ ...note, title, body_md: body }} project={projects.find((p) => p.id === note.project_id)?.name ?? null} onClose={closePdf} />}
     </div>
   )

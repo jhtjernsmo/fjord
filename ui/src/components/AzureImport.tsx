@@ -82,7 +82,7 @@ export function AzureImportRunner() {
   return null
 }
 
-const EMPTY: ImportSettings = { enabled: false, mappings: [], closed_days: 30, risk_field: '', download_files: true }
+const EMPTY: ImportSettings = { enabled: false, mappings: [], closed_days: 30, risk_field: '', download_files: true, write_back: false }
 const CLOSED_DAY_CHOICES = [0, 7, 30, 90]
 
 export function AzureImportSettings() {
@@ -146,6 +146,11 @@ export function AzureImportSettings() {
         <input type="checkbox" checked={settings.download_files ?? true} onChange={(e) => save({ ...settings, download_files: e.target.checked })} />
         {t('import.downloadFiles')}
       </label>
+      <label className="toggle-label">
+        <input type="checkbox" checked={settings.write_back ?? false} onChange={(e) => save({ ...settings, write_back: e.target.checked })} />
+        {t('import.writeBack')} <span className="beta">beta</span>
+      </label>
+      {settings.write_back && <span className="hint">{t('import.writeBackHint')}</span>}
       <label className="inline-select">
         {t('import.riskField')}
         <input
