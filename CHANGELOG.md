@@ -4,6 +4,12 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## 0.2.25 — 2026-10-13
+
+- **Pop a task out into its own window:** the new button in the task panel (or `o`) opens the task in a window you can put beside the board or full screen on another monitor. It stays up to date, takes dropped files, and links in it open in the main window.
+- **Resize the task panel:** drag its left edge; Fjord remembers the width, and a double-click resets it.
+- The task panel's buttons no longer get pushed off the edge; a long name is shortened instead, and *Archive* is an icon.
+
 ## 0.2.24 — 2026-10-13
 
 - **Move a task to another project:** right-click a task → *Move to project…*, the ⇄ button in the task panel, or `m`. Subtasks, files and the story analysis go with it, and it lands in the column with the same name (or pick one). From the CLI: `fjord task move <id> --project <name>`; agents can pass `project` to `move_task`.
