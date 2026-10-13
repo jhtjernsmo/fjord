@@ -4,7 +4,7 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
-## Unreleased
+## 0.2.22 — 2026-10-13
 
 - **Acceptance criteria and risk in your analysis template:** `{{acceptance}}` and `{{risk}}` take those sections out of the task description and put them where your template says. Turn it off under Settings → Templates.
 - **Risk from Azure Boards:** imported work items now bring their risk field along as a *Risk description* section. Fjord finds a field with "risk" in its name, or you name it under Settings → Integrations (e.g. `Custom.RiskDescription`).
