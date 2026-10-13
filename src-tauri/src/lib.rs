@@ -3,6 +3,7 @@
 mod commands;
 mod distribution;
 mod git_commands;
+mod task_window;
 mod window_fit;
 
 use std::sync::{Arc, Mutex};
@@ -33,8 +34,15 @@ pub fn run() {
             window_fit::fit_main_window(app);
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+                task_window::close_task_windows(window.app_handle());
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             distribution::installed_from_store,
+            task_window::open_task_window,
+            task_window::navigate_main,
             commands::actor,
             commands::change_counter,
             commands::list_projects,
@@ -42,6 +50,7 @@ pub fn run() {
             commands::update_project,
             commands::archive_project,
             commands::get_board,
+            commands::get_task,
             commands::create_task,
             commands::update_task,
             commands::move_task,

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import { MARKDOWN_COMPONENTS, MARKDOWN_PLUGINS } from './NoteMarkdown'
 import { motion } from 'motion/react'
-import { Archive, ArrowRightLeft, CircleCheck, ClipboardList, Code2, ExternalLink, GitBranch, GitPullRequest, Link2, Trash2, Unlink, X, CornerUpLeft, CornerDownRight } from 'lucide-react'
+import { Archive, ArrowRightLeft, CircleCheck, PictureInPicture2, ClipboardList, Code2, ExternalLink, GitBranch, GitPullRequest, Link2, Trash2, Unlink, X, CornerUpLeft, CornerDownRight } from 'lucide-react'
 import { useContextMenus, useEntityActions, useStoryAnalysis } from './actions'
 import { api, formatBytes, relativeTime, remoteOf } from '../api'
 import type { Attachment, Status, Task, TaskPatch } from '../api'
@@ -116,9 +116,13 @@ interface Props {
   taskId: number
   statuses: Status[]
   onClose: () => void
+  /** Called when the task is no longer on the board (archived, deleted, moved); defaults to onClose. */
+  onGone?: () => void
+  /** Shown in its own window: fills it, with no pop-out or resize handle. */
+  detached?: boolean
 }
 
-export function TaskPanel({ taskId, statuses, onClose }: Props) {
+export function TaskPanel({ taskId, statuses, onClose, onGone = onClose, detached = false }: Props) {
   const { run, t, locale, toast } = useApp()
   const { deleteTask, moveToProject } = useEntityActions()
   const analyze = useStoryAnalysis()
@@ -145,8 +149,13 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
   }, [task?.id, task?.title, task?.body_md])
 
   useEffect(() => {
-    if (task === null) onClose()
-  }, [task, onClose])
+    if (task === null) onGone()
+  }, [task, onGone])
+
+  const popOut = (t: Task) => {
+    if (detached) return
+    run(api.openTaskWindow(t.id, t.title)).then(onClose)
+  }
 
   // Keys while a task is open (the board's keys are off then).
   const moveBy = (delta: number) => {
@@ -165,7 +174,8 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
           'panel.copyRef': () => copyTaskRef(task, toast, t),
           'panel.archive': () => run(api.archiveTask(task.id, true), t('toast.archivedTask', { name: task.title })),
           'panel.analyze': () => analyze(task),
-          'panel.moveProject': () => moveToProject(task, onClose),
+          'panel.moveProject': () => moveToProject(task, detached ? undefined : onClose),
+          'panel.popOut': () => popOut(task),
         }
       : {},
     'panel',
@@ -179,17 +189,17 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
 
   return (
     <>
-      <div className="scrim" onClick={onClose} />
+      {!detached && <div className="scrim" onClick={onClose} />}
       <motion.aside
         ref={panel.ref}
-        className={`panel${panel.dragging ? ' resizing' : ''}`}
-        style={panel.style}
-        initial={{ x: 60, opacity: 0 }}
+        className={`panel${panel.dragging ? ' resizing' : ''}${detached ? ' detached' : ''}`}
+        style={detached ? undefined : panel.style}
+        initial={detached ? false : { x: 60, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 420, damping: 36 }}
         aria-label={task.title}
       >
-        <div className="panel-resize" role="separator" aria-orientation="vertical" aria-label={t('task.resize')} title={t('task.resize')} {...panel.handle} />
+        {!detached && <div className="panel-resize" role="separator" aria-orientation="vertical" aria-label={t('task.resize')} title={t('task.resize')} {...panel.handle} />}
         <div className="panel-head">
           <span className="mono">#{task.id}</span>
           <span className="panel-meta">
@@ -199,17 +209,22 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
           <button className="btn ghost" onClick={() => analyze(task)} title={t('analysis.hint')}>
             <ClipboardList size={14} /> {analysis ? t('analysis.open') : t('analysis.short')}
           </button>
-          <button className="btn ghost" onClick={() => moveToProject(task, onClose)} title={t('moveProject.title')} aria-label={t('moveProject.title')}>
+          <button className="btn ghost" onClick={() => moveToProject(task, detached ? undefined : onClose)} title={t('moveProject.title')} aria-label={t('moveProject.title')}>
             <ArrowRightLeft size={14} />
           </button>
-          <button className="btn ghost" onClick={() => run(api.archiveTask(task.id, true), t('task.archived')).then(onClose)}>
-            <Archive size={14} /> {t('task.archive')}
+          {!detached && (
+            <button className="btn ghost" onClick={() => popOut(task)} title={t('task.popOut')} aria-label={t('task.popOut')}>
+              <PictureInPicture2 size={14} />
+            </button>
+          )}
+          <button className="btn ghost" onClick={() => run(api.archiveTask(task.id, true), t('task.archived')).then(onClose)} title={t('task.archive')} aria-label={t('task.archive')}>
+            <Archive size={14} />
           </button>
           <button className="btn danger-ghost" onClick={() => deleteTask(task, onClose)} title={t('menu.delete')} aria-label={t('menu.delete')}>
             <Trash2 size={14} />
           </button>
           <button className="btn ghost" onClick={onClose} aria-label={t('task.close')}>
-            <X size={14} /> <kbd>Esc</kbd>
+            <X size={14} /> {!detached && <kbd>Esc</kbd>}
           </button>
         </div>
         <div className="panel-body">

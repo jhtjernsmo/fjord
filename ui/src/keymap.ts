@@ -74,6 +74,7 @@ export const DEFAULT_ACTIONS: ActionDef[] = [
   { id: 'panel.archive', group: 'panel', scope: 'panel', keys: 'd d' },
   { id: 'panel.analyze', group: 'panel', scope: 'panel', keys: 'u' },
   { id: 'panel.moveProject', group: 'panel', scope: 'panel', keys: 'm' },
+  { id: 'panel.popOut', group: 'panel', scope: 'panel', keys: 'o' },
   { id: 'notes.new', group: 'notes', scope: 'notes', keys: 'n' },
   { id: 'notes.next', group: 'notes', scope: 'notes', keys: 'j' },
   { id: 'notes.prev', group: 'notes', scope: 'notes', keys: 'k' },
