@@ -4,6 +4,10 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## Unreleased
+
+- **Subtasks in the standup:** work on a subtask now shows up under its parent task instead of as a line of its own, with how many of its subtasks are done. Click the arrow to see which subtasks you worked on.
+
 ## 0.2.20 — 2026-10-12
 
 - **Git tab:** search branches, and see eight at a time with *Show all* (the branch you're on always stays in view).

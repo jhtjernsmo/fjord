@@ -28,11 +28,20 @@ export function previousStandup(today: Date, days: Weekday[]): Date {
   return new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7)
 }
 
+/** A top-level task in the standup. Subtasks don't get lines of their own; they sit under their parent. */
+export interface StandupEntry {
+  task: Task
+  /** The task's subtasks you worked on since the last standup. */
+  subtasks: { task: Task; done: boolean }[]
+  /** How many of all its subtasks are done; null for a task without subtasks. */
+  progress: { done: number; total: number } | null
+}
+
 export interface StandupDraft {
-  done: Task[]
-  workedOn: Task[]
+  done: StandupEntry[]
+  workedOn: StandupEntry[]
   /** In progress now. What's due is already in "Due this week". */
-  today: Task[]
+  today: StandupEntry[]
   /** Azure DevOps work items where someone @mentioned you since the last standup. */
   mentions: Mention[]
   /** GitHub issues and pull requests that @mention you, updated since the last standup. */
@@ -49,6 +58,7 @@ const WORK_ACTIONS = new Set(['task.create', 'task.move', 'task.update', 'task.b
 /**
  * Builds the draft from the activity log and the current boards.
  * Only `actor`'s own changes count, so tasks an agent moved don't end up in your standup.
+ * Work on a subtask shows up as work on its parent, with the subtask listed under it.
  */
 export function buildStandup(activity: Activity[], tasks: Task[], statuses: Status[], since: Date, actor: string): Pick<StandupDraft, 'done' | 'workedOn' | 'today'> {
   const doneStatus = new Set(statuses.filter((s) => s.is_done).map((s) => s.id))
@@ -60,12 +70,31 @@ export function buildStandup(activity: Activity[], tasks: Task[], statuses: Stat
     if (new Date(a.created_at) < since) continue
     touched.add(a.task_id)
   }
-  const recent = [...touched].map((id) => byId.get(id)).filter((t): t is Task => t !== undefined)
-  const done = recent.filter((t) => doneStatus.has(t.status_id))
-  const workedOn = recent.filter((t) => !doneStatus.has(t.status_id))
 
-  const inProgress = [...byId.values()].filter((t) => !doneStatus.has(t.status_id) && !firstStatus.has(t.status_id) && !t.parent_id)
-  return { done, workedOn, today: inProgress }
+  const parentOf = (t: Task) => (t.parent_id === null ? undefined : byId.get(t.parent_id))
+  const children = new Map<number, Task[]>()
+  for (const t of byId.values()) {
+    const parent = parentOf(t)
+    if (parent) children.set(parent.id, [...(children.get(parent.id) ?? []), t])
+  }
+  // A subtask whose parent is gone or archived stands on its own.
+  const tops = new Map<number, Task[]>()
+  for (const id of touched) {
+    const t = byId.get(id)
+    if (!t) continue
+    const top = parentOf(t) ?? t
+    const subtasks = tops.get(top.id) ?? []
+    tops.set(top.id, top === t ? subtasks : [...subtasks, t])
+  }
+
+  const isDone = (t: Task) => doneStatus.has(t.status_id)
+  const entry = (task: Task, subtasks: Task[] = []): StandupEntry => {
+    const all = children.get(task.id)
+    return { task, subtasks: subtasks.map((t) => ({ task: t, done: isDone(t) })), progress: all ? { done: all.filter(isDone).length, total: all.length } : null }
+  }
+  const recent = [...tops].map(([id, subtasks]) => entry(byId.get(id) as Task, subtasks))
+  const inProgress = [...byId.values()].filter((t) => !isDone(t) && !firstStatus.has(t.status_id) && !parentOf(t)).map((t) => entry(t))
+  return { done: recent.filter((e) => isDone(e.task)), workedOn: recent.filter((e) => !isDone(e.task)), today: inProgress }
 }
 
 /**
@@ -110,21 +139,23 @@ export interface StandupLabels {
   closed: string
   inReview: string
   mentioned: string
+  /** e.g. "2/5 subtasks done". */
+  subtasks: (done: number, total: number) => string
 }
 
 /** Plain text for pasting into Teams or Slack. */
 export function standupText(draft: StandupDraft, labels: StandupLabels): string {
-  const line = (t: Task, extra = '') => `- ${t.title} (#${t.id})${extra}`
+  const line = ({ task, progress }: StandupEntry, extra = '') => `- ${task.title} (#${task.id})${progress ? `, ${labels.subtasks(progress.done, progress.total)}` : ''}${extra}`
   const lines = [labels.since]
-  for (const t of draft.done) lines.push(line(t, ` – ${labels.done}`))
+  for (const e of draft.done) lines.push(line(e, ` – ${labels.done}`))
   const pr = (p: PullRequest, state: string) => `- PR #${p.number} ${p.title} – ${state}`
-  for (const t of draft.workedOn) lines.push(line(t))
+  for (const e of draft.workedOn) lines.push(line(e))
   for (const p of draft.closedPrs) lines.push(pr(p, p.state === 'merged' ? labels.merged : labels.closed))
   for (const m of draft.mentions) lines.push(`- ${labels.mentioned} #${m.id} ${m.title} (${m.by})`)
   for (const m of draft.githubMentions) lines.push(`- ${labels.mentioned} ${m.repo}#${m.number} ${m.title} (${m.by})`)
   if (draft.done.length + draft.workedOn.length + draft.closedPrs.length + draft.mentions.length + draft.githubMentions.length === 0) lines.push(`- ${labels.none}`)
   lines.push('', labels.today)
-  for (const t of draft.today) lines.push(line(t))
+  for (const e of draft.today) lines.push(line(e))
   for (const p of draft.openPrs) lines.push(pr(p, labels.inReview))
   if (draft.today.length + draft.openPrs.length === 0) lines.push(`- ${labels.none}`)
   lines.push('', labels.blockers, `- ${labels.none}`)
