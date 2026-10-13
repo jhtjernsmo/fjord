@@ -135,12 +135,18 @@ function AnalysisTemplateSection() {
   const { t, run, toast } = useApp()
   const [template, setTemplate] = useState<string | null>(null)
   const [saved, setSaved] = useState('')
+  const [split, setSplit] = useState(true)
   useEffect(() => {
     api.analysisTemplate().then((value) => {
       setTemplate(value)
       setSaved(value)
     })
+    api.analysisSplitSections().then(setSplit)
   }, [])
+  const toggleSplit = async (on: boolean) => {
+    setSplit(on)
+    await run(api.setAnalysisSplitSections(on))
+  }
   if (template === null) return null
   const save = async (next: string) => {
     const now = await run(api.setAnalysisTemplate(next))
@@ -154,8 +160,13 @@ function AnalysisTemplateSection() {
       {t('analysis.template')}
       <textarea className="md-editor template-editor" value={template} onChange={(e) => setTemplate(e.target.value)} spellCheck={false} aria-label={t('analysis.template')} />
       <span className="hint">
-        {t('analysis.templateHint')} <code className="mono">{'{{title}} {{link}} {{source}} {{description}} {{project}} {{date}} {{author}}'}</code>
+        {t('analysis.templateHint')} <code className="mono">{'{{title}} {{link}} {{source}} {{description}} {{acceptance}} {{risk}} {{project}} {{date}} {{author}}'}</code>
       </span>
+      <label className="toggle-label">
+        <input type="checkbox" checked={split} onChange={(e) => toggleSplit(e.target.checked)} />
+        {t('analysis.split')}
+      </label>
+      <span className="hint">{t('analysis.splitHint')}</span>
       <div className="template-actions">
         <button className="btn ghost" onClick={() => save('')}>
           {t('analysis.reset')}

@@ -1,6 +1,6 @@
 // Slide-in task details: title, status, priority, due date, markdown, files.
 import { editorLabel, openInEditor } from '../editor'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Markdown from 'react-markdown'
 import { MARKDOWN_COMPONENTS, MARKDOWN_PLUGINS } from './NoteMarkdown'
 import { motion } from 'motion/react'
@@ -10,6 +10,7 @@ import { api, formatBytes, relativeTime, remoteOf } from '../api'
 import type { Attachment, Status, Task, TaskPatch } from '../api'
 import { useActions, useApp, useLive } from '../data'
 import type { MessageKey } from '../i18n'
+import { azureAttachmentId, localCopies } from '../azureImages'
 import { AgentTag, FileTypeIcon } from './Icons'
 import { ChecksIcon, PrStateBadge, refreshPullRequests, usePullRequests } from './GitView'
 import { Backlinks } from './NoteEditor'
@@ -18,6 +19,28 @@ import { Subtasks } from './Subtasks'
 import { AzureDiscussion } from './AzureDiscussion'
 
 const PRIORITY_LEVELS = [0, 1, 2, 3]
+
+/** An image in the description; Azure images show the copy the import downloaded. */
+function DescriptionImage({ src, alt, local }: { src?: string; alt?: string; local: Map<string, number> }) {
+  const { t } = useApp()
+  const id = azureAttachmentId(src)
+  const attachment = id ? local.get(id) : undefined
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => {
+    if (attachment === undefined) return
+    let cancelled = false
+    api
+      .previewAttachment(attachment)
+      .then((u) => !cancelled && setUrl(u))
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [attachment])
+  if (!id) return <img className="md-image" src={src} alt={alt} />
+  if (url === null) return <span className="md-image-missing">{alt || t('task.imageNotDownloaded')}</span>
+  return <img className="md-image" src={url} alt={alt} />
+}
 
 export function FileTile({ file, onDetach }: { file: Attachment; onDetach?: () => void }) {
   const { run, t } = useApp()
@@ -72,6 +95,11 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
   const [task] = useLive(async () => (await api.getBoard(projectId)).tasks.find((x) => x.id === taskId) ?? null, [taskId])
   const [files] = useLive(() => api.listAttachments(projectId, taskId), [taskId])
   const [analysis] = useLive(() => api.storyAnalysis(taskId).catch(() => null), [taskId])
+  const [externalFiles] = useLive(() => api.externalFiles(taskId).catch(() => []), [taskId])
+  const descriptionComponents = useMemo(() => {
+    const local = localCopies(externalFiles ?? [])
+    return { ...MARKDOWN_COMPONENTS, img: ({ src, alt }: { src?: string; alt?: string }) => <DescriptionImage src={src} alt={alt} local={local} /> }
+  }, [externalFiles])
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [editing, setEditing] = useState(false)
@@ -212,7 +240,7 @@ export function TaskPanel({ taskId, statuses, onClose }: Props) {
               />
             ) : (
               <div className={`markdown ${task.body_md ? '' : 'empty'}`} onClick={() => setEditing(true)}>
-                {task.body_md ? <Markdown remarkPlugins={MARKDOWN_PLUGINS} components={MARKDOWN_COMPONENTS}>{task.body_md}</Markdown> : t('task.addDescription')}
+                {task.body_md ? <Markdown remarkPlugins={MARKDOWN_PLUGINS} components={descriptionComponents}>{task.body_md}</Markdown> : t('task.addDescription')}
               </div>
             )}
           </div>

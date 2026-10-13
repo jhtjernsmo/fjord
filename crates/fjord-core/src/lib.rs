@@ -16,7 +16,10 @@ mod statuses;
 mod store;
 mod tasks;
 
-pub use analysis::{ANALYSIS_FOLDER, AnalysisContext, DEFAULT_ANALYSIS_TEMPLATE, render_analysis};
+pub use analysis::{
+    ANALYSIS_FOLDER, AnalysisContext, DEFAULT_ANALYSIS_TEMPLATE, StoryParts, analysis_title,
+    render_analysis, split_story,
+};
 pub use error::{Error, Result};
 pub use imports::{
     DEFAULT_CLOSED_DAYS, ExternalItem, ExternalLink, ImportMapping, ImportOutcome, ImportSettings,

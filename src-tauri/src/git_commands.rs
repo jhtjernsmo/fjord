@@ -233,7 +233,20 @@ pub async fn run_azure_import(state: State<'_, AppState>) -> CmdResult<fjord_vcs
     })?;
     let fetch_settings = settings.clone();
     let fetch = off_thread(move || fjord_vcs::fetch_import(&fetch_settings, &known)).await?;
-    with_store(&state, |s| fjord_vcs::apply_import(s, &settings, &fetch))
+    let (mut report, pending) = with_store(&state, |s| {
+        let report = fjord_vcs::apply_import(s, &settings, &fetch)?;
+        let pending = if settings.download_files {
+            fjord_vcs::pending_files(s, &fetch)?
+        } else {
+            Vec::new()
+        };
+        Ok((report, pending))
+    })?;
+    if !pending.is_empty() {
+        let downloaded = off_thread(move || Ok(fjord_vcs::download_files(pending))).await?;
+        report.files = with_store(&state, |s| fjord_vcs::store_files(s, &downloaded))?;
+    }
+    Ok(report)
 }
 
 /// Azure Boards work items you were mentioned in but don't own (Overview).
@@ -275,9 +288,88 @@ pub async fn add_work_item_task(
     org: String,
     id: u64,
 ) -> CmdResult<Task> {
-    let item = off_thread(move || fjord_vcs::fetch_work_item(&org, id)).await?;
-    with_store(&state, |s| {
-        fjord_vcs::add_work_item_task(s, project_id, &item)
+    let settings = with_store(&state, |s| Ok(s.import_settings()?))?;
+    let risk = settings.risk_field.clone();
+    let item = off_thread(move || fjord_vcs::fetch_work_item(&org, id, &risk)).await?;
+    let fetch = fjord_vcs::ImportFetch {
+        items: vec![item],
+        ..Default::default()
+    };
+    let (task, pending) = with_store(&state, |s| {
+        let task = fjord_vcs::add_work_item_task(s, project_id, &fetch.items[0])?;
+        let pending = if settings.download_files {
+            fjord_vcs::pending_files(s, &fetch)?
+        } else {
+            Vec::new()
+        };
+        Ok((task, pending))
+    })?;
+    if !pending.is_empty() {
+        let downloaded = off_thread(move || Ok(fjord_vcs::download_files(pending))).await?;
+        with_store(&state, |s| fjord_vcs::store_files(s, &downloaded))?;
+    }
+    Ok(task)
+}
+
+/// The Azure work item an analysis note is about, if it was imported from Azure Boards.
+#[tauri::command]
+pub fn analysis_azure_target(
+    state: State<'_, AppState>,
+    note_id: i64,
+) -> CmdResult<Option<fjord_vcs::AnalysisTarget>> {
+    with_store(&state, |s| fjord_vcs::analysis_target(s, note_id))
+}
+
+/// Beta: what sending the analysis's acceptance criteria and risk to Azure would change.
+#[tauri::command]
+pub async fn azure_update_preview(
+    state: State<'_, AppState>,
+    note_id: i64,
+) -> CmdResult<fjord_vcs::azure_write::UpdatePreview> {
+    let (target, risk_field) = write_back_target(&state, note_id)?;
+    off_thread(move || {
+        fjord_vcs::azure_write::preview_update(
+            &target.org,
+            target.id,
+            &target.acceptance_md,
+            &target.risk_md,
+            &risk_field,
+        )
+    })
+    .await
+}
+
+/// Beta: writes the previewed changes, unless the work item changed since `rev`.
+#[tauri::command]
+pub async fn azure_update_apply(
+    state: State<'_, AppState>,
+    note_id: i64,
+    rev: i64,
+    changes: Vec<fjord_vcs::azure_write::FieldChange>,
+) -> CmdResult<i64> {
+    let (target, risk_field) = write_back_target(&state, note_id)?;
+    off_thread(move || {
+        fjord_vcs::azure_write::apply_update(&target.org, target.id, rev, &changes, &risk_field)
+    })
+    .await
+}
+
+/// The note's work item and the risk field setting; an error unless write-back is turned on.
+fn write_back_target(
+    state: &State<'_, AppState>,
+    note_id: i64,
+) -> CmdResult<(fjord_vcs::AnalysisTarget, String)> {
+    with_store(state, |s| {
+        let settings = s.import_settings()?;
+        if !settings.write_back {
+            return Err(fjord_vcs::VcsError::Azure(
+                "updating Azure is turned off (Settings → Integrations)".into(),
+            ));
+        }
+        let target = fjord_vcs::analysis_target(s, note_id)?.ok_or_else(|| {
+            fjord_vcs::VcsError::Azure("this note doesn't link to a task from Azure Boards".into())
+        })?;
+        Ok((target, settings.risk_field))
     })
 }
 
@@ -333,6 +425,31 @@ pub async fn azure_discussion(
         return Ok(None);
     };
     off_thread(move || fjord_vcs::work_item_comments(&org, &project, id).map(Some)).await
+}
+
+/// Beta: replies in the Discussion of an imported task's work item.
+#[tauri::command]
+pub async fn reply_azure_discussion(
+    state: State<'_, AppState>,
+    task_id: i64,
+    text: String,
+) -> CmdResult<fjord_vcs::WorkItemComment> {
+    let (enabled, link) = with_store(&state, |s| {
+        Ok((
+            s.import_settings()?.write_back,
+            s.external_link_for_task(task_id)?,
+        ))
+    })?;
+    if !enabled {
+        return Err("replying in Azure is turned off (Settings → Integrations)".into());
+    }
+    let Some((org, project, id)) = link
+        .filter(|l| l.source == "azure")
+        .and_then(|l| fjord_vcs::parse_work_item_url(&l.url))
+    else {
+        return Err("this task wasn't imported from Azure Boards".into());
+    };
+    off_thread(move || fjord_vcs::azure_write::post_comment(&org, &project, id, &text)).await
 }
 
 /// Where an imported task came from (to show its link), or None.

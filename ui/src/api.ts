@@ -55,6 +55,42 @@ export interface Board {
   tasks: Task[]
 }
 
+/** The Azure work item an analysis note is about. */
+export interface AnalysisTarget {
+  task_id: number
+  title: string
+  org: string
+  id: number
+  url: string
+  acceptance_md: string
+  risk_md: string
+}
+
+export interface AzureFieldChange {
+  field: string
+  label: string
+  current_md: string
+  new_md: string
+}
+
+/** What sending an analysis to Azure would change; `rev` guards against overwriting newer edits. */
+export interface AzureUpdatePreview {
+  org: string
+  id: number
+  title: string
+  url: string
+  rev: number
+  changes: AzureFieldChange[]
+  skipped: string[]
+}
+
+/** A file the import downloaded from a work item (an Azure attachment or pasted image). */
+export interface ExternalFile {
+  external_id: string
+  /** null once the file was removed from the task */
+  attachment_id: number | null
+}
+
 export interface Attachment {
   id: number
   project_id: number
@@ -156,6 +192,12 @@ export interface ImportSettings {
   mappings: ImportMapping[]
   /** Also import finished items changed in the last N days (0 = open items only). */
   closed_days: number
+  /** Azure field with the risk description, e.g. Custom.RiskDescription; empty finds one named "risk". */
+  risk_field: string
+  /** Download attachments and pasted images to the task. */
+  download_files: boolean
+  /** Beta: send an analysis's acceptance criteria and risk to the work item. */
+  write_back: boolean
 }
 
 export interface WorkItemComment {
@@ -181,6 +223,8 @@ export interface ImportReport {
   unmapped: number
   regrouped: number
   closed: number
+  /** Attachments and pasted images downloaded from the work items. */
+  files: number
 }
 
 export interface DeviceLogin {
@@ -372,6 +416,12 @@ export const api = {
     invoke<AttachOutcome[]>('attach_files', { projectId, taskId, paths }),
   detachFile: (id: number) => invoke<void>('detach_file', { id }),
   openAttachment: (id: number) => invoke<void>('open_attachment', { id }),
+  analysisAzureTarget: (noteId: number) => invoke<AnalysisTarget | null>('analysis_azure_target', { noteId }),
+  /** Beta: reply in the work item's Discussion; returns the comment as Azure saved it. */
+  replyAzureDiscussion: (taskId: number, text: string) => invoke<WorkItemComment>('reply_azure_discussion', { taskId, text }),
+  azureUpdatePreview: (noteId: number) => invoke<AzureUpdatePreview>('azure_update_preview', { noteId }),
+  azureUpdateApply: (noteId: number, rev: number, changes: AzureFieldChange[]) => invoke<number>('azure_update_apply', { noteId, rev, changes }),
+  externalFiles: (taskId: number) => invoke<ExternalFile[]>('external_files', { taskId }),
   previewAttachment: (id: number) => invoke<string | null>('preview_attachment', { id }),
   listNotes: (projectId: number) => invoke<Note[]>('list_notes', { projectId }),
   addNote: (projectId: number, title: string, bodyMd: string) => invoke<Note>('add_note', { projectId, title, bodyMd }),
@@ -389,6 +439,8 @@ export const api = {
   analysisTemplate: () => invoke<string>('analysis_template'),
   /** An empty template goes back to the built-in one; returns the template now in use. */
   setAnalysisTemplate: (template: string) => invoke<string>('set_analysis_template', { template }),
+  analysisSplitSections: () => invoke<boolean>('analysis_split_sections'),
+  setAnalysisSplitSections: (on: boolean) => invoke<void>('set_analysis_split_sections', { on }),
   /** The system print dialog, where "Save as PDF" lives. */
   printPage: () => invoke<void>('print_page'),
   renameNoteFolder: (projectId: number | null, from: string, to: string) => invoke<number>('rename_note_folder', { projectId, from, to }),

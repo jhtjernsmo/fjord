@@ -6,7 +6,7 @@ use rusqlite::{OptionalExtension, Row, params};
 use sha2::{Digest, Sha256};
 
 use crate::error::{Error, Result};
-use crate::models::Attachment;
+use crate::models::{Attachment, ExternalFile};
 use crate::store::Store;
 
 const ATTACHMENT_SELECT: &str =
@@ -154,6 +154,82 @@ impl Store {
         )?;
         Ok(())
     }
+
+    /// Which of an imported item's files (by their id in the other system) the task
+    /// hasn't got yet. Files fetched once, even if removed since, don't count as missing.
+    pub fn missing_external_files(&self, task_id: i64, ids: &[String]) -> Result<Vec<String>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT 1 FROM external_files WHERE task_id = ?1 AND external_id = ?2")?;
+        let mut missing = Vec::new();
+        for id in ids {
+            if !stmt.exists(params![task_id, id])? && !missing.contains(id) {
+                missing.push(id.clone());
+            }
+        }
+        Ok(missing)
+    }
+
+    /// Attaches a file downloaded from an imported item to its task and remembers it.
+    pub fn attach_external_file(
+        &mut self,
+        task_id: i64,
+        external_id: &str,
+        name: &str,
+        bytes: &[u8],
+    ) -> Result<Attachment> {
+        let task = self.get_task(task_id)?;
+        let name: String = name
+            .chars()
+            .map(|c| {
+                if matches!(c, '/' | '\\' | ':' | '\0') {
+                    '_'
+                } else {
+                    c
+                }
+            })
+            .collect();
+        let name = match name.trim().trim_matches('.') {
+            "" => "file".to_string(),
+            n => n.to_string(),
+        };
+        // attach_file copies from a path, so stage the bytes under the file's own name.
+        let dir: String = external_id
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
+            .collect();
+        let staging = self
+            .files_dir
+            .join(".incoming")
+            .join(format!("{task_id}-{dir}"));
+        fs::create_dir_all(&staging)?;
+        let path = staging.join(&name);
+        fs::write(&path, bytes)?;
+        let attached = self.attach_file(task.project_id, Some(task_id), &path);
+        let _ = fs::remove_dir_all(&staging);
+        let attachment = attached?;
+        self.conn.execute(
+            "INSERT INTO external_files (task_id, external_id, attachment_id) VALUES (?1, ?2, ?3)
+             ON CONFLICT(task_id, external_id) DO UPDATE SET attachment_id = ?3",
+            params![task_id, external_id, attachment.id],
+        )?;
+        Ok(attachment)
+    }
+
+    /// The task's downloaded files: their id in the other system and the attachment
+    /// they became (None once removed), so inline images can point at local copies.
+    pub fn external_files(&self, task_id: i64) -> Result<Vec<ExternalFile>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT external_id, attachment_id FROM external_files WHERE task_id = ?1 ORDER BY rowid",
+        )?;
+        let rows = stmt.query_map([task_id], |r| {
+            Ok(ExternalFile {
+                external_id: r.get(0)?,
+                attachment_id: r.get(1)?,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
 }
 
 #[cfg(test)]
@@ -169,6 +245,42 @@ mod tests {
         })
         .unwrap()
         .id
+    }
+
+    #[test]
+    fn external_files_are_fetched_once_even_after_removal() {
+        let (mut s, _dir) = store();
+        let p = project(&mut s, "P");
+        let task = s
+            .create_task(NewTask {
+                project_id: p,
+                title: "Bug".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        let ids = vec!["a1".to_string(), "b2".to_string(), "a1".to_string()];
+        assert_eq!(
+            s.missing_external_files(task.id, &ids).unwrap(),
+            ["a1", "b2"]
+        );
+
+        let a = s
+            .attach_external_file(task.id, "a1", "../screen:shot.png", b"png")
+            .unwrap();
+        assert_eq!(a.original_name, "_screen_shot.png");
+        assert_eq!(a.task_id, Some(task.id));
+        assert_eq!(s.missing_external_files(task.id, &ids).unwrap(), ["b2"]);
+        assert_eq!(
+            s.external_files(task.id).unwrap(),
+            [ExternalFile {
+                external_id: "a1".into(),
+                attachment_id: Some(a.id)
+            }]
+        );
+
+        s.detach_file(a.id).unwrap();
+        assert_eq!(s.external_files(task.id).unwrap()[0].attachment_id, None);
+        assert_eq!(s.missing_external_files(task.id, &ids).unwrap(), ["b2"]);
     }
 
     #[test]

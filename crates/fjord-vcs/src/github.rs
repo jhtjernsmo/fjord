@@ -4,7 +4,8 @@
 //! public repositories can also be read without a token.
 
 use std::collections::HashMap;
-use std::time::Duration;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -227,12 +228,36 @@ fn find_token_with_source() -> Option<(String, TokenSource)> {
     if let Some(t) = credentials::get(credentials::GITHUB) {
         return Some((t, TokenSource::Saved));
     }
-    let out = crate::process::tool("gh")
+    gh_cli_token().map(|t| (t, TokenSource::GhCli))
+}
+
+/// How long `gh auth token`'s answer is reused instead of starting `gh` again.
+const GH_TOKEN_TTL: Duration = Duration::from_secs(5 * 60);
+const GH_MISS_TTL: Duration = Duration::from_secs(30);
+
+static GH_TOKEN: Mutex<Option<(Instant, Option<String>)>> = Mutex::new(None);
+
+fn gh_cli_token() -> Option<String> {
+    let mut cached = GH_TOKEN.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((at, token)) = cached.as_ref() {
+        let ttl = if token.is_some() {
+            GH_TOKEN_TTL
+        } else {
+            GH_MISS_TTL
+        };
+        if at.elapsed() < ttl {
+            return token.clone();
+        }
+    }
+    let token = crate::process::tool("gh")
         .args(["auth", "token"])
         .output()
-        .ok()?;
-    let token = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    (out.status.success() && !token.is_empty()).then_some((token, TokenSource::GhCli))
+        .ok()
+        .filter(|out| out.status.success())
+        .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+        .filter(|t| !t.is_empty());
+    *cached = Some((Instant::now(), token.clone()));
+    token
 }
 
 /// The signed-in GitHub user, as shown in Settings.

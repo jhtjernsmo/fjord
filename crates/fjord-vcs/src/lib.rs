@@ -3,7 +3,9 @@
 //! tasks along the board as their PRs get merged.
 
 pub mod azure;
+pub mod azure_files;
 pub mod azure_mentions;
+pub mod azure_write;
 pub mod credentials;
 pub mod editor;
 pub mod git;
@@ -464,6 +466,8 @@ pub struct ImportReport {
     pub regrouped: usize,
     /// Imported tasks moved to done because their work item was closed in Azure.
     pub closed: usize,
+    /// Attachments and pasted images downloaded from the work items.
+    pub files: usize,
 }
 
 /// Everything the import needs from Azure, fetched without touching the store.
@@ -491,7 +495,7 @@ pub fn fetch_import(settings: &ImportSettings, known: &[String]) -> Result<Impor
     let orgs = import_orgs(settings);
     let mut fetch = ImportFetch::default();
     for org in orgs {
-        let items = assigned_work_items(&org, settings.closed_days)?;
+        let items = assigned_work_items(&org, settings.closed_days, &settings.risk_field)?;
         let ids: std::collections::HashSet<u64> = items.iter().map(|i| i.id).collect();
         // Walk up from parents that aren't assigned to you, to find an ancestor that is.
         let mut seen = ids.clone();
@@ -572,8 +576,9 @@ pub fn fetch_github_mentions(since: &str) -> Result<Vec<GitHubMention>> {
 }
 
 /// Network only: the work item to turn into a task (see [`add_work_item_task`]).
-pub fn fetch_work_item(org: &str, id: u64) -> Result<WorkItem> {
-    azure::work_items(org, &[id])?
+/// `risk` names the field holding the risk description (see [`ImportSettings::risk_field`]).
+pub fn fetch_work_item(org: &str, id: u64, risk: &str) -> Result<WorkItem> {
+    azure::work_items(org, &[id], risk)?
         .into_iter()
         .next()
         .ok_or_else(|| VcsError::Azure(format!("work item {id} not found in «{org}»")))
@@ -584,6 +589,139 @@ pub fn fetch_work_item(org: &str, id: u64) -> Result<WorkItem> {
 pub fn add_work_item_task(store: &mut Store, project_id: i64, item: &WorkItem) -> Result<Task> {
     let (task, _) = store.upsert_imported_task(project_id, &item.to_external_item())?;
     Ok(task)
+}
+
+/// The Azure work item an analysis note is about, with the note's sections to send.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct AnalysisTarget {
+    pub task_id: i64,
+    /// The task's title, shown so the user can see which work item gets the update.
+    pub title: String,
+    pub org: String,
+    pub id: u64,
+    pub url: String,
+    pub acceptance_md: String,
+    pub risk_md: String,
+}
+
+/// Store only: the work item behind an analysis note. That's the task the analysis was
+/// made for (the one whose analysis this note is), else the first linked task that came
+/// from Azure Boards. Other tasks the note mentions are never the target.
+pub fn analysis_target(store: &Store, note_id: i64) -> Result<Option<AnalysisTarget>> {
+    let note = store.get_note(note_id)?;
+    let mut imported = Vec::new();
+    for text in fjord_core::parse_links(&note.body_md) {
+        let Some(target) = store.resolve_link(&text)?.filter(|t| t.kind == "task") else {
+            continue;
+        };
+        let Some(link) = store.external_link_for_task(target.id)? else {
+            continue;
+        };
+        let Some((org, id)) =
+            split_external_id(&link.external_id).filter(|_| link.source == "azure")
+        else {
+            continue;
+        };
+        // How sure we are this is the task the analysis was made for.
+        let score = if note.title == fjord_core::analysis_title(&target.label) {
+            2
+        } else if store
+            .story_analysis(target.id)?
+            .is_some_and(|n| n.id == note_id)
+        {
+            1
+        } else {
+            0
+        };
+        imported.push((score, target, org, id, link.url));
+    }
+    // The best match wins; on a tie, the one linked first (the template's Story line).
+    let Some(best) = imported.iter().map(|(score, ..)| *score).max() else {
+        return Ok(None);
+    };
+    let i = imported
+        .iter()
+        .position(|(score, ..)| *score == best)
+        .expect("a best score exists");
+    let chosen = imported.swap_remove(i);
+    let (_, task, org, id, url) = chosen;
+    let parts = fjord_core::split_story(&note.body_md);
+    Ok(Some(AnalysisTarget {
+        task_id: task.id,
+        title: task.label,
+        org,
+        id,
+        url,
+        acceptance_md: parts.acceptance,
+        risk_md: parts.risk,
+    }))
+}
+
+/// Most files downloaded per import; the rest come with the next one.
+const MAX_FILES_PER_IMPORT: usize = 30;
+
+/// A work item file the task doesn't have yet.
+#[derive(Debug, Clone)]
+pub struct PendingFile {
+    pub task_id: i64,
+    pub org: String,
+    pub file: azure_files::AzureFile,
+}
+
+/// Store only: files on the fetched work items that their tasks haven't got yet.
+pub fn pending_files(store: &Store, fetch: &ImportFetch) -> Result<Vec<PendingFile>> {
+    let tasks: HashMap<String, i64> = store.external_ids("azure")?.into_iter().collect();
+    let mut pending = Vec::new();
+    for item in fetch.items.iter().filter(|i| !i.files.is_empty()) {
+        let key = format!("{}/{}", item.org.to_lowercase(), item.id);
+        let Some(&task_id) = tasks.get(&key) else {
+            continue;
+        };
+        let ids: Vec<String> = item.files.iter().map(|f| f.id.clone()).collect();
+        let missing = store.missing_external_files(task_id, &ids)?;
+        pending.extend(
+            item.files
+                .iter()
+                .filter(|f| missing.contains(&f.id))
+                .map(|f| PendingFile {
+                    task_id,
+                    org: item.org.clone(),
+                    file: f.clone(),
+                }),
+        );
+        if pending.len() >= MAX_FILES_PER_IMPORT {
+            break;
+        }
+    }
+    pending.truncate(MAX_FILES_PER_IMPORT);
+    Ok(pending)
+}
+
+/// Network only: downloads the pending files. A file that fails is left out and
+/// tried again on the next import.
+pub fn download_files(pending: Vec<PendingFile>) -> Vec<(PendingFile, Vec<u8>)> {
+    pending
+        .into_iter()
+        .filter_map(|p| {
+            let bytes = azure_files::download_file(&p.org, &p.file).ok()?;
+            Some((p, bytes))
+        })
+        .collect()
+}
+
+/// Store only: attaches downloaded files to their tasks. Returns how many were added.
+pub fn store_files(store: &mut Store, downloaded: &[(PendingFile, Vec<u8>)]) -> Result<usize> {
+    for (p, bytes) in downloaded {
+        store.attach_external_file(p.task_id, &p.file.id, &p.file.name, bytes)?;
+    }
+    Ok(downloaded.len())
+}
+
+/// For the CLI and agents, which don't mind holding the store: pending files,
+/// downloaded and attached in one go.
+pub fn import_files(store: &mut Store, fetch: &ImportFetch) -> Result<usize> {
+    let pending = pending_files(store, fetch)?;
+    store_files(store, &download_files(pending))
 }
 
 /// Network only, without hierarchy: open work items assigned to you.
@@ -968,6 +1106,42 @@ mod tests {
     }
 
     #[test]
+    fn an_analysis_note_points_at_its_azure_work_item() {
+        let (mut s, _d) = store();
+        let p = s
+            .create_project(NewProject {
+                name: "Bokost".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let item = fjord_core::ExternalItem {
+            source: "azure".into(),
+            external_id: "contoso/42".into(),
+            url: "https://dev.azure.com/contoso/App/_workitems/edit/42".into(),
+            rev: 1,
+            title: "Widget".into(),
+            body_md: "As a user…".into(),
+            priority: 0,
+            due_at: None,
+        };
+        let (task, _) = s.upsert_imported_task(p, &item).unwrap();
+        let (note, _) = s.create_story_analysis(task.id).unwrap();
+        let body = note.body_md.replacen("- [ ]", "- [ ] Shows the balance", 1);
+        s.update_note(note.id, &note.title, &body).unwrap();
+
+        let target = analysis_target(&s, note.id).unwrap().unwrap();
+        assert_eq!(
+            (target.org.as_str(), target.id, target.task_id),
+            ("contoso", 42, task.id)
+        );
+        assert_eq!(target.acceptance_md, "- [ ] Shows the balance");
+
+        let plain = s.create_note(Some(p), "Plain", "No links").unwrap();
+        assert_eq!(analysis_target(&s, plain.id).unwrap(), None);
+    }
+
+    #[test]
     fn imports_only_mapped_work_items() {
         let (mut s, _d) = store();
         let p = s
@@ -997,6 +1171,8 @@ mod tests {
             title: format!("Item {id}"),
             description_md: String::new(),
             acceptance_md: String::new(),
+            risk_md: String::new(),
+            files: Vec::new(),
             priority: Some(2),
             due: None,
             parent: None,
@@ -1011,6 +1187,31 @@ mod tests {
         assert_eq!(report.created[0].title, "Item 1");
         let again = apply_import(&mut s, &settings, &fetch).unwrap();
         assert_eq!((again.created.len(), again.unchanged), (0, 1));
+
+        // Files on the mapped item are pending once; after storing, nothing is.
+        let file = |id: &str, name: &str| azure_files::AzureFile {
+            id: id.into(),
+            name: name.into(),
+            url: format!("https://dev.azure.com/contoso/_apis/wit/attachments/{id}"),
+        };
+        let mut with_files = items.to_vec();
+        with_files[0].files = vec![file("a1", "log.txt"), file("b2", "image.png")];
+        with_files[1].files = vec![file("c3", "unmapped.png")];
+        let fetch = ImportFetch {
+            items: with_files,
+            ..Default::default()
+        };
+        let pending = pending_files(&s, &fetch).unwrap();
+        let names: Vec<&str> = pending.iter().map(|p| p.file.name.as_str()).collect();
+        assert_eq!(names, ["log.txt", "image.png"]);
+        let downloaded: Vec<_> = pending
+            .into_iter()
+            .map(|p| (p, b"bytes".to_vec()))
+            .collect();
+        assert_eq!(store_files(&mut s, &downloaded).unwrap(), 2);
+        let task = report.created[0].id;
+        assert_eq!(s.list_attachments(p, Some(task)).unwrap().len(), 2);
+        assert!(pending_files(&s, &fetch).unwrap().is_empty());
     }
 
     #[test]
@@ -1043,6 +1244,8 @@ mod tests {
             title: format!("Item {id}"),
             description_md: String::new(),
             acceptance_md: String::new(),
+            risk_md: String::new(),
+            files: Vec::new(),
             priority: None,
             due: None,
             parent,
@@ -1256,6 +1459,8 @@ mod tests {
             title: "Crash".into(),
             description_md: String::new(),
             acceptance_md: String::new(),
+            risk_md: String::new(),
+            files: Vec::new(),
             priority: None,
             due: None,
             parent: None,
@@ -1364,6 +1569,8 @@ mod tests {
             title: "T".into(),
             description_md: String::new(),
             acceptance_md: String::new(),
+            risk_md: String::new(),
+            files: Vec::new(),
             priority: None,
             due: None,
             parent: None,
@@ -1449,6 +1656,8 @@ mod tests {
             title: format!("Item {id}"),
             description_md: String::new(),
             acceptance_md: String::new(),
+            risk_md: String::new(),
+            files: Vec::new(),
             priority: None,
             due: None,
             parent: None,

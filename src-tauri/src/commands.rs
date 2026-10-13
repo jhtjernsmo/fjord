@@ -349,6 +349,15 @@ pub fn set_note_locked(state: State<AppState>, id: i64, locked: bool) -> CmdResu
     with_store(&state, |s| s.set_note_locked(id, locked))
 }
 
+/// Files downloaded from the task's work item, for showing pasted images inline.
+#[tauri::command]
+pub fn external_files(
+    state: State<AppState>,
+    task_id: i64,
+) -> CmdResult<Vec<fjord_core::ExternalFile>> {
+    with_store(&state, |s| s.external_files(task_id))
+}
+
 #[derive(Serialize)]
 pub struct StoryAnalysis {
     note: Note,
@@ -380,6 +389,16 @@ pub fn set_analysis_template(state: State<AppState>, template: String) -> CmdRes
         s.set_analysis_template(&template)?;
         s.analysis_template()
     })
+}
+
+#[tauri::command]
+pub fn analysis_split_sections(state: State<AppState>) -> CmdResult<bool> {
+    with_store(&state, |s| s.analysis_split_sections())
+}
+
+#[tauri::command]
+pub fn set_analysis_split_sections(state: State<AppState>, on: bool) -> CmdResult<()> {
+    with_store(&state, |s| s.set_analysis_split_sections(on))
 }
 
 /// Opens the system print dialog for the window, where "Save as PDF" lives on every platform.

@@ -74,6 +74,20 @@ pub struct ImportSettings {
     /// Also import finished items changed in the last N days (0 = open items only).
     #[serde(default = "default_closed_days")]
     pub closed_days: u32,
+    /// Azure field holding the risk description, e.g. `Custom.RiskDescription`.
+    /// Empty finds a field with "risk" in its name.
+    #[serde(default)]
+    pub risk_field: String,
+    /// Download attachments and pasted images to the task.
+    #[serde(default = "default_true")]
+    pub download_files: bool,
+    /// Beta: send a user story analysis's acceptance criteria and risk back to the work item.
+    #[serde(default)]
+    pub write_back: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for ImportSettings {
@@ -82,6 +96,9 @@ impl Default for ImportSettings {
             enabled: false,
             mappings: Vec::new(),
             closed_days: DEFAULT_CLOSED_DAYS,
+            risk_field: String::new(),
+            download_files: true,
+            write_back: false,
         }
     }
 }
@@ -353,6 +370,17 @@ mod tests {
             s.external_link("azure", "contoso/42").unwrap().is_none(),
             "link goes with the task"
         );
+    }
+
+    #[test]
+    fn writing_to_azure_is_off_unless_turned_on() {
+        assert!(!ImportSettings::default().write_back);
+        // Settings saved by older versions don't have the field.
+        let old: ImportSettings =
+            serde_json::from_str(r#"{"enabled":true,"mappings":[]}"#).unwrap();
+        assert!(!old.write_back);
+        assert!(old.download_files);
+        assert_eq!(old.risk_field, "");
     }
 
     #[test]

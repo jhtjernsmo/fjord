@@ -171,6 +171,9 @@ impl Printer {
         for t in &r.created {
             println!("  + #{}  {}", t.id, t.title);
         }
+        if r.files > 0 {
+            println!("{} files downloaded from the work items", r.files);
+        }
         if r.unmapped > 0 {
             println!(
                 "{} work items are in Azure projects without a Fjord project",

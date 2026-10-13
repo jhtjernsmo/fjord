@@ -1,15 +1,59 @@
 // Task panel: the Azure DevOps Discussion of an imported work item, collapsed
-// until opened, then fetched (read-only).
+// until opened, then fetched. With the Azure write-back beta on, you can reply.
 import { useEffect, useState } from 'react'
-import { ChevronRight, ExternalLink, MessagesSquare } from 'lucide-react'
+import { ChevronRight, ExternalLink, MessagesSquare, Send } from 'lucide-react'
 import { api, errorMessage, relativeTime } from '../api'
 import type { WorkItemComment } from '../api'
 import { useApp, useLive } from '../data'
 import { NoteMarkdown } from './NoteMarkdown'
 
+/** Beta: a reply box that posts to the work item's Discussion. */
+function ReplyBox({ taskId, workItem, onSent }: { taskId: number; workItem: string; onSent: (c: WorkItemComment) => void }) {
+  const { t, run } = useApp()
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  useEffect(() => setText(''), [taskId])
+  const send = async () => {
+    if (!text.trim() || busy) return
+    setBusy(true)
+    const saved = await run(api.replyAzureDiscussion(taskId, text), t('discussion.sent'))
+    setBusy(false)
+    if (!saved) return
+    setText('')
+    onSent(saved)
+  }
+  return (
+    <div className="discussion-reply">
+      <textarea
+        className="md-editor"
+        value={text}
+        placeholder={t('discussion.replyPlaceholder')}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault()
+            send()
+          }
+          if (e.key === 'Escape') e.stopPropagation()
+        }}
+        aria-label={t('discussion.reply')}
+      />
+      <div className="discussion-reply-bar">
+        <span className="hint">
+          {t('discussion.replyTo', { item: workItem })} <span className="beta">beta</span>
+        </span>
+        <button className="btn primary" disabled={!text.trim() || busy} onClick={send}>
+          <Send size={13} /> {t('discussion.reply')} <kbd>Ctrl+Enter</kbd>
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function AzureDiscussion({ taskId }: { taskId: number }) {
   const { t, locale } = useApp()
   const [link] = useLive(() => api.taskExternalLink(taskId), [taskId])
+  const [settings] = useLive(() => api.getImportSettings().catch(() => null), [])
   const [open, setOpen] = useState(false)
   const [comments, setComments] = useState<WorkItemComment[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -56,6 +100,7 @@ export function AzureDiscussion({ taskId }: { taskId: number }) {
               </div>
             </div>
           ))}
+          {settings?.write_back && comments !== null && <ReplyBox taskId={taskId} workItem={`#${link.external_id.split('/').pop()}`} onSent={(c) => setComments((list) => [...(list ?? []), c])} />}
         </div>
       )}
     </div>
