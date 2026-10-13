@@ -1,12 +1,13 @@
 import { editorLabel, openInEditor } from './editor'
 import { useProjectSort } from './projectSort'
 import { useSidebarCollapsed } from './sidebarPref'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
+import { listen } from '@tauri-apps/api/event'
 import { Ellipsis, Paperclip } from 'lucide-react'
 import { useContextMenus } from './components/actions'
 import { api, errorMessage } from './api'
-import type { SearchHit, Project } from './api'
+import type { MainNav, SearchHit, Project } from './api'
 import { useActions, useApp, useLive } from './data'
 import { NavContext } from './nav'
 import type { Nav } from './nav'
@@ -219,6 +220,22 @@ export default function App() {
       if (note) nav.openNote(note.id, null)
     },
   }
+
+  // Links clicked in a popped-out task window open here.
+  const navRef = useRef(nav)
+  useEffect(() => {
+    navRef.current = nav
+  })
+  useEffect(() => {
+    const unlisten = listen<MainNav>('fjord-nav', ({ payload: n }) => {
+      if (n.kind === 'note') navRef.current.openNote(n.id, n.project_id)
+      else if (n.kind === 'task') navRef.current.openTask(n.project_id, n.task_id)
+      else navRef.current.openProject(n.id)
+    }).catch(() => undefined)
+    return () => {
+      unlisten.then((fn) => fn?.())
+    }
+  }, [])
 
   const openHit = (hit: SearchHit) => {
     if (hit.kind === 'note') nav.openNote(hit.ref_id, hit.project_id)

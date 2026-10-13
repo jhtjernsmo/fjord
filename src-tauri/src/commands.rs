@@ -75,6 +75,11 @@ pub fn archive_project(state: State<AppState>, id: i64, archived: bool) -> CmdRe
 }
 
 #[tauri::command]
+pub fn get_task(state: State<AppState>, id: i64) -> CmdResult<Task> {
+    with_store(&state, |s| s.get_task(id))
+}
+
+#[tauri::command]
 pub fn get_board(state: State<AppState>, project_id: i64) -> CmdResult<Board> {
     with_store(&state, |s| {
         Ok(Board {

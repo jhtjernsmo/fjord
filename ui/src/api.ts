@@ -362,6 +362,12 @@ export interface StartedBranch {
   created: boolean
 }
 
+/** What a task window asks the main window to show. */
+export type MainNav =
+  | { kind: 'note'; id: number; project_id: number | null }
+  | { kind: 'task'; project_id: number; task_id: number }
+  | { kind: 'project'; id: number }
+
 export interface NewProject {
   name: string
   locale?: string
@@ -386,6 +392,9 @@ export const api = {
   updateProject: (id: number, patch: Partial<NewProject>) => invoke<Project>('update_project', { id, patch }),
   archiveProject: (id: number, archived: boolean) => invoke<Project>('archive_project', { id, archived }),
   getBoard: (projectId: number) => invoke<Board>('get_board', { projectId }),
+  getTask: (id: number) => invoke<Task>('get_task', { id }),
+  openTaskWindow: (taskId: number, title: string) => invoke<void>('open_task_window', { taskId, title }),
+  navigateMain: (nav: MainNav) => invoke<void>('navigate_main', { nav }),
   createTask: (input: { project_id: number; title: string; status_id?: number; priority?: number; due_at?: string; parent_id?: number }) =>
     invoke<Task>('create_task', { input }),
   updateTask: (id: number, patch: TaskPatch) => invoke<Task>('update_task', { id, patch }),
