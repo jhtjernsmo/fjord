@@ -2,6 +2,7 @@
 
 mod mcp;
 mod output;
+mod skill;
 
 use std::path::PathBuf;
 
@@ -48,6 +49,11 @@ enum Command {
     Azure(AzureCmd),
     /// Run as an MCP server on stdio (for AI agents; actor defaults to "claude")
     Mcp,
+    /// Print the Agent Skill that teaches AI agents to use Fjord, or install it
+    Skill {
+        #[command(subcommand)]
+        action: Option<SkillCmd>,
+    },
     /// Attach a file to a project (optionally to a task)
     Attach {
         project: String,
@@ -94,6 +100,16 @@ const MOO: &str = r"
                 ||----w |
                 ||     ||
 ";
+
+#[derive(Subcommand)]
+enum SkillCmd {
+    /// Install the skill for Claude Code and Cursor (~/.claude/skills/fjord)
+    Install {
+        /// Skills folder to install into instead, e.g. .claude/skills in a repository
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
+}
 
 #[derive(Subcommand)]
 enum ProjectCmd {
@@ -357,6 +373,24 @@ fn confirm(question: &str) -> Result<bool> {
     ))
 }
 
+fn skill_cmd(action: Option<&SkillCmd>) -> Result<()> {
+    let Some(SkillCmd::Install { dir }) = action else {
+        print!("{}", skill::SKILL_MD);
+        return Ok(());
+    };
+    let root = match dir {
+        Some(dir) => dir.clone(),
+        None => skill::default_root()?,
+    };
+    let file = skill::install(&root)?;
+    println!("Installed the Fjord skill at {}", file.display());
+    println!(
+        "Claude Code and Cursor pick it up in new sessions. Add the MCP server too if you haven't:"
+    );
+    println!("  claude mcp add fjord -- fjord mcp");
+    Ok(())
+}
+
 fn main() {
     if let Err(err) = run(Cli::parse()) {
         eprintln!("fjord: {err:#}");
@@ -365,6 +399,10 @@ fn main() {
 }
 
 fn run(cli: Cli) -> Result<()> {
+    // The skill doesn't touch the database.
+    if let Command::Skill { action } = &cli.command {
+        return skill_cmd(action.as_ref());
+    }
     let dir = cli.data_dir.clone().unwrap_or_else(Store::default_dir);
     let is_mcp = matches!(cli.command, Command::Mcp);
     let actor = cli.actor.clone().unwrap_or_else(|| {
@@ -393,6 +431,7 @@ fn run(cli: Cli) -> Result<()> {
         Command::Git(cmd) => git(&mut store, &out, cmd),
         Command::Azure(cmd) => azure(&mut store, &out, cmd),
         Command::Mcp => mcp::serve(&mut store),
+        Command::Skill { .. } => unreachable!("handled before the store opens"),
         Command::Moo => {
             print!("{}", MOO.trim_start_matches('\n'));
             Ok(())
