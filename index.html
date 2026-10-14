@@ -38,7 +38,7 @@
   "isAccessibleForFree": true,
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "inLanguage": ["en", "nb"],
-  "featureList": ["Kanban boards with custom columns, priorities, due dates and subtasks", "Due this week overview across all projects", "Markdown notes with [[wiki links]], backlinks, tables, Mermaid diagrams and PDF export", "User story analysis notes from a template", "Files attached to projects and tasks", "Keyboard-first: leader key, which-key menu, command palette, remappable keys", "Git branches per task, pull requests and CI status for GitHub and Azure DevOps", "Azure Boards import and @mentions", "MCP server and command line tool for AI agents", "Local-first: one SQLite file, no account, no telemetry", "Themes, English and Norwegian"],
+  "featureList": ["Kanban boards with custom columns, priorities, due dates and subtasks", "Due this week overview across all projects", "Markdown notes with [[wiki links]], backlinks, tables, Mermaid diagrams and PDF export", "User story analysis notes from a template", "Files attached to projects and tasks", "Keyboard-first: leader key, which-key menu, command palette, remappable keys", "Git branches per task, pull requests and CI status for GitHub and Azure DevOps", "Azure Boards import and @mentions", "MCP server, Agent Skill and command line tool for AI agents", "Local-first: one SQLite file, no account, no telemetry", "Themes, English and Norwegian"],
   "author": { "@type": "Person", "name": "Jonas Hollund Tjernsmo", "url": "https://github.com/jhtjernsmo", "address": { "@type": "PostalAddress", "addressLocality": "Oslo", "addressCountry": "NO" } },
   "sameAs": ["https://github.com/jhtjernsmo/fjord"]
 }
@@ -85,7 +85,7 @@
    "name": "Can an AI agent use it?",
    "acceptedAnswer": {
     "@type": "Answer",
-    "text": "Yes. Fjord comes with an MCP server, so Claude and other MCP clients can read and update your boards and notes. It can't delete anything. See AI agents."
+    "text": "Yes. Fjord comes with an MCP server and an Agent Skill, so Claude Code, Cursor and other MCP clients can read and update your boards and notes. It can't delete anything. See AI agents."
    }
   },
   {
@@ -282,9 +282,11 @@
   </figure>
 
   <h2 id="ai-agents">AI agents</h2>
-  <p>Fjord includes an MCP server, so an agent like Claude can read your boards and notes, add and move tasks, write notes and open pull requests. It can't delete anything, and every change it makes is marked with who made it.</p>
+  <p>Fjord includes an MCP server, so an agent in Claude Code, Cursor or another MCP client can read your boards and notes, add and move tasks, write notes and open pull requests. It can't delete anything, and every change it makes is marked with who made it.</p>
   <p>For example, new work items from Azure Boards can land in Fjord, and an agent can go through them on a schedule, write a short summary and split the bigger ones into subtasks.</p>
 <pre>$ claude mcp add fjord -- fjord mcp</pre>
+  <p>There's also an <a href="https://github.com/jhtjernsmo/fjord/tree/main/skills/fjord">Agent Skill</a> that teaches the agent how to work in Fjord: look at the board before changing it, keep what you wrote, plan work into tasks, and take a task from branch to pull request. Claude Code and Cursor both read it from <code>~/.claude/skills</code>. Copy the folder there, or from 0.2.27 run:</p>
+<pre>$ fjord skill install</pre>
   <p>There's also a plain command line tool, <code>fjord</code>, if you'd rather script it yourself.</p>
 
   <h2 id="download">Download</h2>
@@ -294,6 +296,7 @@
     <tr data-os="linux"><td>Linux</td><td><a data-asset=".AppImage" href="https://github.com/jhtjernsmo/fjord/releases/latest">AppImage</a>, <a data-asset=".deb" href="https://github.com/jhtjernsmo/fjord/releases/latest">.deb</a> or <a data-asset=".rpm" href="https://github.com/jhtjernsmo/fjord/releases/latest">.rpm</a></td></tr>
   </table>
   <p>On a Mac you can also use Homebrew: <code>brew install --cask jhtjernsmo/fjord/fjord</code>. The command line tool is <code>brew install jhtjernsmo/fjord/fjord-cli</code>.</p>
+  <p>The <code>fjord</code> command line tool, which AI agents use too, is a separate download for every system on the <a href="https://github.com/jhtjernsmo/fjord/releases/latest">latest release</a> (<code>fjord-cli-…</code>). Put it somewhere on your PATH.</p>
   <p class="muted">The macOS app is signed and notarized by Apple, so it opens like any other app. The Windows builds aren't code-signed yet: if SmartScreen warns you, click "More info" and then "Run anyway". Older versions are on the <a href="https://github.com/jhtjernsmo/fjord/releases">releases page</a>. See the <a href="#code-signing">code signing policy</a>.</p>
 
   <h2 id="faq">Questions</h2>
@@ -307,7 +310,7 @@
     <dt>Is it trying to replace my other tools?</dt>
     <dd>No. Git stays Git, and your code stays in your editor. Fjord links tasks to branches and pull requests, and uses <code>git</code>, <code>gh</code> and <code>az</code> if you have them. Your data is a plain SQLite file, and the <code>fjord</code> command line tool prints JSON with <code>--json</code>, so you can script it or pipe it into other tools. The MCP server lets AI agents use it the same way.</dd>
     <dt>Can an AI agent use it?</dt>
-    <dd>Yes. Fjord comes with an MCP server, so Claude and other MCP clients can read and update your boards and notes. It can't delete anything. See <a href="#ai-agents">AI agents</a>.</dd>
+    <dd>Yes. Fjord comes with an MCP server and an Agent Skill, so Claude Code, Cursor and other MCP clients can read and update your boards and notes. It can't delete anything. See <a href="#ai-agents">AI agents</a>.</dd>
     <dt>Where is my data?</dt>
     <dd>In one folder: <code>~/.local/share/fjord</code> on Linux, <code>%APPDATA%\fjord</code> on Windows and <code>~/Library/Application Support/fjord</code> on macOS. Copy it to back up.</dd>
     <dt>Does it send anything anywhere?</dt>
