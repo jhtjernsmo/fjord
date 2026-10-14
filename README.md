@@ -25,7 +25,7 @@ the same projects, and you can always see who did what.
 ## Features
 
 - **Projects & kanban boards** — drag and drop, or move tasks with `H`/`L`. Rename, recolor, reorder and add columns, and mark one or more as done columns (e.g. Resolved and Done). Right-click a project to change its icon and colour.
-- **Tasks** — markdown descriptions, priority, due dates, overdue warnings, archive & restore. The Overview lists everything due this week across your projects, overdue first.
+- **Tasks** — markdown descriptions, priority, due dates, overdue warnings, archive & restore. Move a task to another project with its subtasks and files, or pop it out into its own window to keep beside the board or on another monitor. The Overview lists everything due this week across your projects, overdue first.
 - **Standup and Waiting on you (beta)** — on your standup days the Overview drafts the standup for one project (done, in progress, your PRs, where you were mentioned) to copy as text, and lists pull requests waiting for your review or with failed checks. Both are off by default; turn them on in **Settings → Overview**, where every Overview section can be switched on or off.
 - **Files** — drop files onto the window to attach them to a project or task. Stored content-addressed (deduplicated) with image previews.
 - **Themes** — five built-in themes (Fjord Dark/Light, Nord, Solarized Light, High Contrast), follow the OS with separate light/dark picks, or build your own with live preview: colours, text size, rounding and density; share themes as JSON. `Space T` cycles themes.
@@ -34,9 +34,9 @@ the same projects, and you can always see who did what.
 - **Full-text search** across tasks, notes and file names (`Space f`).
 - **Keyboard-first** — a leader key with a which-key popup, vim motions on the board, a `Ctrl+K` command palette, and every binding configurable. The mouse works for everything too.
 - **Git, GitHub & Azure DevOps** — link a project to a repo, start a branch with a conventional name from any task (`B`, e.g. `feat/12-add-login`) or link an existing one, see pull requests with CI status, open PRs from a task, and let merged PRs move tasks to done.
-- **Azure Boards import** — work items assigned to you show up as tasks in the project you choose, with their state mapped to your columns, child items as subtasks, and the discussion readable in the task. Work items where someone @mentions you show up in the Overview.
+- **Azure Boards import** — work items assigned to you show up as tasks in the project you choose, with their state mapped to your columns, child items as subtasks, attachments and screenshots, and the discussion readable in the task. Optional (beta): send a story analysis's acceptance criteria and risk back to the work item, and reply in its discussion. Work items where someone @mentions you show up in the Overview.
 - **VS Code extension** — [Fjord for VS Code](https://github.com/jhtjernsmo/fjord-vscode) shows the board next to your code and the current branch's task in the status bar. See [VS Code](#vs-code).
-- **AI-agent ready** — `fjord mcp` exposes 27 tools to MCP clients such as Claude. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
+- **AI-agent ready** — `fjord mcp` exposes 27 tools to MCP clients such as Claude Code and Cursor, and an [Agent Skill](#agent-skill) teaches agents how to use them. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
 - **Activity log** — what changed, when, and by whom (you or an agent).
 - **Live updates** — changes from the CLI or an agent appear in the open app within a second or two.
 - **English and Norwegian** — English by default; adding a language is one file.
@@ -143,7 +143,8 @@ mention as a task and `x` dismisses it. `Space G` creates a GitHub repository fo
 `Ctrl+B` collapses the sidebar to icons, like in VS Code.
 
 In an open task: `[` / `]` move it to the previous/next column, `e` edits, `A` adds a subtask, `B`
-starts a branch, `L` links an existing one and `P` opens a pull request.
+starts a branch, `L` links an existing one, `P` opens a pull request, `m` moves it to another project and
+`o` pops it out into its own window.
 
 On macOS, `Ctrl` shortcuts use `⌘` instead. Remap anything in `keymap.json` (see [Data](#data) for where it lives):
 
@@ -259,13 +260,13 @@ It needs the `fjord` CLI 0.2.18 or later and talks to the same local database as
 `fjord mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server on stdio. Changes it
 makes are recorded as `claude` (override with `--actor`) and shown with an **AI** tag in the app.
 
-With Claude Code:
+It needs the `fjord` command-line tool on your PATH (see [Install](#install)). With Claude Code:
 
 ```sh
 claude mcp add fjord -- fjord mcp
 ```
 
-Other clients:
+Cursor (`~/.cursor/mcp.json`) and other clients:
 
 ```json
 { "mcpServers": { "fjord": { "command": "fjord", "args": ["mcp"] } } }
@@ -273,7 +274,7 @@ Other clients:
 
 Tools: `list_projects`, `get_board`, `create_project`, `create_task`, `get_task`, `update_task`, `move_task`,
 `complete_task`, `archive_task`, `add_note`, `attach_file`, `search`, `recent_activity`, `link_repo`,
-`git_status`, `start_branch`, `link_branch`, `list_pull_requests`, `open_pull_request`, `list_notes`, `get_note`, `update_note`, `backlinks`, `import_azure`, `list_new_imports`, `mark_analyzed`. There is deliberately no
+`git_status`, `start_branch`, `link_branch`, `list_pull_requests`, `open_pull_request`, `list_notes`, `get_note`, `update_note`, `backlinks`, `analyze_story`, `import_azure`, `list_new_imports`, `mark_analyzed`. There is deliberately no
 delete tool.
 
 ### Agent Skill
@@ -288,6 +289,7 @@ fjord skill install
 ```
 
 `fjord skill install --dir .claude/skills` puts it in a repository instead, and `fjord skill` prints it.
+With a CLI older than 0.2.27, copy the [`skills/fjord`](skills/fjord) folder into `~/.claude/skills/` by hand.
 
 ## Data
 
