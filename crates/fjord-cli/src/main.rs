@@ -205,6 +205,10 @@ enum TaskCmd {
         #[arg(long, short)]
         project: Option<String>,
     },
+    /// Make a task a subtask of another task in the same project
+    Nest { id: i64, parent: i64 },
+    /// Make a subtask a regular task again
+    Unnest { id: i64 },
     /// Move a task to the project's done column
     Done { id: i64 },
     /// Start a user story analysis: a note from the template, linked to the task (or show the one it has)
@@ -591,6 +595,8 @@ fn task(store: &mut Store, out: &output::Printer, cmd: TaskCmd) -> Result<()> {
             status.as_deref(),
             project.as_deref(),
         )?),
+        TaskCmd::Nest { id, parent } => out.task(&store.set_task_parent(id, Some(parent))?),
+        TaskCmd::Unnest { id } => out.task(&store.set_task_parent(id, None)?),
         TaskCmd::Done { id } => {
             let t = store.get_task(id)?;
             let done = store

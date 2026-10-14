@@ -305,3 +305,20 @@ fn delete_requires_confirmation_or_yes() {
             .is_empty()
     );
 }
+
+#[test]
+fn tasks_nest_under_another_and_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok_json(d, &["project", "add", "Bokost"]);
+    let story = ok_json(d, &["task", "add", "bokost", "Story"])["id"].clone();
+    let task = ok_json(d, &["task", "add", "bokost", "Task"])["id"].clone();
+    let (story, task) = (story.to_string(), task.to_string());
+
+    let nested = ok_json(d, &["task", "nest", &task, &story]);
+    assert_eq!(nested["parent_id"].to_string(), story);
+    let refused = fjord(d, &["task", "nest", &story, &task]);
+    assert!(!refused.status.success());
+    let freed = ok_json(d, &["task", "unnest", &task]);
+    assert_eq!(freed["parent_id"], Value::Null);
+}

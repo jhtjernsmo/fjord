@@ -29,7 +29,7 @@ the same projects, and you can always see who did what.
 - **Standup and Waiting on you (beta)** — on your standup days the Overview drafts the standup for one project (done, in progress, your PRs, where you were mentioned) to copy as text, and lists pull requests waiting for your review or with failed checks. Both are off by default; turn them on in **Settings → Overview**, where every Overview section can be switched on or off.
 - **Files** — drop files onto the window to attach them to a project or task. Stored content-addressed (deduplicated) with image previews.
 - **Themes** — five built-in themes (Fjord Dark/Light, Nord, Solarized Light, High Contrast), follow the OS with separate light/dark picks, or build your own with live preview: colours, text size, rounding and density; share themes as JSON. `Space T` cycles themes.
-- **Subtasks** — break a task into subtasks (one level) with their own status, priority and branch; cards show progress (2/5), the task panel lists them with check-off, drag to reorder and `A` to add.
+- **Subtasks** — break a task into subtasks (one level) with their own status, priority and branch, or make an existing task a subtask of another (and back); cards show progress (2/5), the task panel lists them with check-off, drag to reorder and `A` to add.
 - **Notespace** — Obsidian-style markdown notes, inside a project or free-floating, in folders and subfolders (drag a note onto a folder, sort by name or date), with pins and notes you can lock to read-only. Link anything with `[[Project]]`, `[[#12]]` (a task) or `[[Another note]]` — type `[[` for autocomplete — and see backlinks (“mentioned in”) on tasks, projects and notes. Tables, task lists and [Mermaid](https://mermaid.js.org) diagrams render in notes and task descriptions; web links open in your browser.
 - **Full-text search** across tasks, notes and file names (`Space f`).
 - **Keyboard-first** — a leader key with a which-key popup, vim motions on the board, a `Ctrl+K` command palette, and every binding configurable. The mouse works for everything too.
@@ -143,8 +143,8 @@ mention as a task and `x` dismisses it. `Space G` creates a GitHub repository fo
 `Ctrl+B` collapses the sidebar to icons, like in VS Code.
 
 In an open task: `[` / `]` move it to the previous/next column, `e` edits, `A` adds a subtask, `B`
-starts a branch, `L` links an existing one, `P` opens a pull request, `m` moves it to another project and
-`o` pops it out into its own window.
+starts a branch, `L` links an existing one, `P` opens a pull request, `m` moves it to another project,
+`o` pops it out into its own window and `N` makes it a subtask of another task (or a regular task again).
 
 On macOS, `Ctrl` shortcuts use `⌘` instead. Remap anything in `keymap.json` (see [Data](#data) for where it lives):
 
@@ -168,6 +168,7 @@ fjord task add bokost "Fix push notifications" -p 3 --due 2026-10-10
 fjord column add bokost Review
 fjord task move 1 review
 fjord task done 1
+fjord task nest 3 1                # make #3 a subtask of #1 (unnest to undo)
 fjord project show bokost          # board in the terminal
 fjord search push
 fjord log bokost                   # activity

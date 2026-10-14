@@ -14,7 +14,7 @@ pub mod new_repo;
 mod process;
 pub mod waiting;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use fjord_core::{ImportOutcome, ImportSettings, Project, ProjectRepo, RemoteHost, Store, Task};
@@ -852,6 +852,7 @@ pub fn apply_import(
         .filter(|i| task_of.contains_key(&(i.org.to_lowercase(), i.id)))
         .map(|i| ((i.org.to_lowercase(), i.id), i))
         .collect();
+    let imported_ids: HashSet<i64> = task_of.values().map(|t| t.id).collect();
     let mut wanted: Vec<(i64, Option<i64>)> = Vec::new();
     for (key, item) in &imported {
         let task = &task_of[key];
@@ -859,7 +860,10 @@ pub fn apply_import(
             .and_then(|root| task_of.get(&(key.0.clone(), root)))
             .filter(|p| p.project_id == task.project_id)
             .map(|p| p.id);
-        if task.parent_id != parent_task {
+        // A task the user put under one of their own tasks stays there.
+        let nested_by_user =
+            parent_task.is_none() && task.parent_id.is_some_and(|p| !imported_ids.contains(&p));
+        if task.parent_id != parent_task && !nested_by_user {
             wanted.push((task.id, parent_task));
         }
     }
@@ -1297,6 +1301,22 @@ mod tests {
             (Some(epic.id), Some(epic.id))
         );
         assert_eq!(report.regrouped, 2);
+
+        // Item 5 has no parent in Azure, but the user put it under a task of their own:
+        // a re-import leaves it there.
+        let mine = s
+            .create_task(fjord_core::NewTask {
+                project_id: p,
+                title: "Mine".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        s.set_task_parent(task(&s, 5).id, Some(mine.id)).unwrap();
+        let report = apply_import(&mut s, &settings, &tree).unwrap();
+        assert_eq!(
+            (report.regrouped, task(&s, 5).parent_id),
+            (0, Some(mine.id))
+        );
 
         // Item 5 was closed in Azure: it drops out of "assigned to me" and is checked off.
         let mut later = ImportFetch {

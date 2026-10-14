@@ -143,6 +143,15 @@ impl Store {
     }
 
     /// A task's subtasks (archived ones excluded), in their own order.
+    /// Whether the task has subtasks, archived ones included.
+    fn has_any_subtasks(&self, id: i64) -> Result<bool> {
+        Ok(self.conn.query_row(
+            "SELECT EXISTS (SELECT 1 FROM tasks WHERE parent_id = ?1)",
+            [id],
+            |r| r.get(0),
+        )?)
+    }
+
     pub fn list_subtasks(&self, parent_id: i64) -> Result<Vec<Task>> {
         let mut stmt = self.conn.prepare(&format!(
             "SELECT {TASK_COLS} FROM tasks
@@ -157,7 +166,10 @@ impl Store {
     /// Same rules as creating one: same project, one level deep.
     pub fn set_task_parent(&mut self, id: i64, parent: Option<i64>) -> Result<Task> {
         let task = self.get_task(id)?;
-        let child_order = match parent {
+        if task.parent_id == parent {
+            return Ok(task);
+        }
+        let (child_order, parent_title) = match parent {
             Some(parent_id) => {
                 let p = self.get_task(parent_id)?;
                 if p.id == task.id || p.project_id != task.project_id {
@@ -170,24 +182,40 @@ impl Store {
                         "subtasks can't have subtasks of their own".into(),
                     ));
                 }
-                if !self.list_subtasks(task.id)?.is_empty() {
+                if p.archived_at.is_some() {
+                    return Err(Error::Invalid("an archived task can't get subtasks".into()));
+                }
+                if self.has_any_subtasks(task.id)? {
                     return Err(Error::Invalid(
                         "a task with subtasks can't become a subtask".into(),
                     ));
                 }
-                self.conn.query_row(
+                let order = self.conn.query_row(
                     "SELECT coalesce(max(child_order), 0) + 1 FROM tasks WHERE parent_id = ?1",
                     [parent_id],
                     |r| r.get::<_, f64>(0),
-                )?
+                )?;
+                (order, Some(p.title))
             }
-            None => 0.0,
+            None => (0.0, None),
         };
         self.conn.execute(
             "UPDATE tasks SET parent_id = ?1, child_order = ?2,
                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
              WHERE id = ?3",
             params![parent, child_order, id],
+        )?;
+        let action = if parent.is_some() {
+            "task.nest"
+        } else {
+            "task.unnest"
+        };
+        self.log(
+            Some(task.project_id),
+            Some(id),
+            action,
+            &task.title,
+            parent_title.as_deref(),
         )?;
         self.touch_project(task.project_id)?;
         self.get_task(id)
@@ -747,5 +775,35 @@ mod tests {
             "itself"
         );
         assert_eq!(s.set_task_parent(task.id, None).unwrap().parent_id, None);
+
+        // An archived subtask still counts, so nesting never makes two levels.
+        s.set_task_parent(task.id, Some(story.id)).unwrap();
+        s.set_task_archived(task.id, true).unwrap();
+        let other = s
+            .create_task(NewTask {
+                project_id: p,
+                title: "Other story".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(s.set_task_parent(story.id, Some(other.id)).is_err());
+        s.set_task_archived(other.id, true).unwrap();
+        let loose = s
+            .create_task(NewTask {
+                project_id: p,
+                title: "Loose".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(
+            s.set_task_parent(loose.id, Some(other.id)).is_err(),
+            "archived parent"
+        );
+
+        let log = s.recent_activity(Some(p), 10).unwrap();
+        let actions: Vec<&str> = log.iter().map(|a| a.action.as_str()).collect();
+        assert!(actions.contains(&"task.nest") && actions.contains(&"task.unnest"));
+        let nest = log.iter().find(|a| a.action == "task.nest").unwrap();
+        assert_eq!(nest.detail.as_deref(), Some("Story"));
     }
 }

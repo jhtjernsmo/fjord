@@ -36,7 +36,9 @@ works when MCP doesn't.
 - **Bodies are markdown.** `update_task` with `body` replaces the whole description, so read the task
   first with `get_task` and keep what the user wrote. `update_note` has `append` for adding
   to the end without rewriting.
-- **Subtasks**: `create_task` with `parent`. A subtask can't have subtasks of its own.
+- **Subtasks**: `create_task` with `parent`. To put an existing task under another, `update_task` with
+  `parent` (same project); `parent: null` makes it a regular task again. A subtask can't have
+  subtasks of its own, and a task with subtasks can't become one.
 - Write in the language the user writes in. Keep task titles short and imperative ("Fix login on
   Safari"), and put detail in the body.
 - Don't invent facts in tasks, notes or analyses. Leave a gap or ask.

@@ -5,11 +5,12 @@ import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from 
 import type { DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { CornerLeftUp, GripVertical, Plus } from 'lucide-react'
+import { CornerDownRight, CornerLeftUp, GripVertical, Plus } from 'lucide-react'
 import { api } from '../api'
 import type { Status, Task } from '../api'
 import { useActions, useApp, useLive } from '../data'
 import { useNav } from '../nav'
+import { useEntityActions } from './actions'
 
 const DRAG_ACTIVATION_PX = 4
 
@@ -44,7 +45,15 @@ export function Subtasks({ task, statuses }: { task: Task; statuses: Status[] })
   const doneColumn = statuses.find((s) => s.is_done)
   const firstColumn = statuses[0]
 
-  useActions(task.parent_id ? {} : { 'task.addSubtask': () => inputRef.current?.focus() }, 'panel')
+  const { nestTask, unnestTask } = useEntityActions()
+  const canNest = !task.parent_id && subtasks !== undefined && subtasks.length === 0
+  useActions(
+    {
+      ...(task.parent_id ? {} : { 'task.addSubtask': () => inputRef.current?.focus() }),
+      'panel.nest': () => (task.parent_id ? unnestTask(task) : canNest && nestTask(task)),
+    },
+    'panel',
+  )
   useEffect(() => {
     if (!focusSubtaskOnOpen.current || task.parent_id) return
     focusSubtaskOnOpen.current = false
@@ -54,9 +63,14 @@ export function Subtasks({ task, statuses }: { task: Task; statuses: Status[] })
   // A subtask shows where it belongs instead of its own list.
   if (task.parent_id) {
     return parent ? (
-      <button className="parent-link" onClick={() => nav.openTask(task.project_id, parent.id)}>
-        <CornerLeftUp size={13} /> {t('subtasks.of', { title: parent.title })}
-      </button>
+      <div className="parent-row">
+        <button className="parent-link" onClick={() => nav.openTask(task.project_id, parent.id)}>
+          <CornerLeftUp size={13} /> {t('subtasks.of', { title: parent.title })}
+        </button>
+        <button className="btn ghost" onClick={() => unnestTask(task)}>
+          {t('unnest.menu')} <kbd>N</kbd>
+        </button>
+      </div>
     ) : null
   }
 
@@ -93,6 +107,11 @@ export function Subtasks({ task, statuses }: { task: Task; statuses: Status[] })
             </span>
             {doneCount}/{items.length}
           </span>
+        )}
+        {canNest && (
+          <button onClick={() => nestTask(task)}>
+            <CornerDownRight size={12} /> {t('nest.menu')}
+          </button>
         )}
       </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
