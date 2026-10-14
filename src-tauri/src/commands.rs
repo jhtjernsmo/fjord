@@ -111,6 +111,11 @@ pub fn move_task(
 }
 
 #[tauri::command]
+pub fn set_task_parent(state: State<AppState>, id: i64, parent_id: Option<i64>) -> CmdResult<Task> {
+    with_store(&state, |s| s.set_task_parent(id, parent_id))
+}
+
+#[tauri::command]
 pub fn move_task_to_project(
     state: State<AppState>,
     id: i64,

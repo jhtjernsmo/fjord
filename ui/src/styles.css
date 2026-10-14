@@ -236,6 +236,7 @@ kbd {
 /* subtasks (task panel + board cards) */
 .subtasks { display: flex; flex-direction: column; gap: 4px; }
 .subtasks .section-title { display: flex; align-items: center; justify-content: space-between; }
+.subtasks .section-title button { display: inline-flex; align-items: center; gap: 4px; }
 .subtask-progress { display: inline-flex; align-items: center; gap: 8px; font: 500 11px var(--mono); color: var(--muted); text-transform: none; letter-spacing: 0; }
 .subtask-progress .bar { width: 70px; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .subtask-progress .bar span { display: block; height: 100%; background: var(--ok); transition: width .2s; }
@@ -251,6 +252,10 @@ kbd {
 .subtask-add input { flex: 1; background: none; border: 0; outline: none; color: var(--text); font: inherit; font-size: 13px; }
 .subtask-hint { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--ok); padding: 6px 8px; border: 1px dashed color-mix(in oklab, var(--ok) 50%, transparent); border-radius: 8px; }
 .parent-link { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; font-size: 12.5px; color: var(--accent); }
+.parent-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.nest-list { height: auto; padding: 4px; }
+.nest-list option { padding: 4px 6px; border-radius: 4px; }
+.nest-list option:checked { background: color-mix(in oklab, var(--accent) 28%, transparent); color: var(--text); }
 .card-parent { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--dim); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .subtask-chip.complete { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 45%, transparent); }
 .title-input { font-size: 20px; font-weight: 650; background: none; border: none; outline: none; width: 100%; letter-spacing: -0.01em; }

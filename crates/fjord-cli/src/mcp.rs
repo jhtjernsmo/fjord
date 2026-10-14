@@ -137,10 +137,12 @@ fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "update_task",
-            "Edit a task. Pass due: null to clear the due date.",
+            "Edit a task. Pass due: null to clear the due date. parent: a task id in the same project \
+             makes it a subtask of that task (it can't have subtasks of its own); null makes it a regular task.",
             json!({ "id": { "type": "integer" }, "title": { "type": "string" }, "body": { "type": "string" },
                     "priority": { "type": "integer", "minimum": 0, "maximum": 3 },
-                    "due": { "type": ["string", "null"] } }),
+                    "due": { "type": ["string", "null"] },
+                    "parent": { "type": ["integer", "null"], "description": "Parent task id, or null for a regular task" } }),
             &["id"],
         ),
         tool(
@@ -416,7 +418,16 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
                 priority: args.get("priority").and_then(Value::as_i64),
                 due_at,
             };
-            serde_json::to_value(store.update_task(int_arg(args, "id")?, patch)?)?
+            let id = int_arg(args, "id")?;
+            let mut task = store.update_task(id, patch)?;
+            if let Some(parent) = args.get("parent") {
+                let parent = match parent {
+                    Value::Null => None,
+                    v => Some(v.as_i64().context("parent must be a task id or null")?),
+                };
+                task = store.set_task_parent(id, parent)?;
+            }
+            serde_json::to_value(task)?
         }
         "move_task" => serde_json::to_value(move_task_to(
             store,
@@ -652,6 +663,51 @@ mod tests {
         assert_eq!(result["files"].as_array().unwrap().len(), 1);
         let missing = call(&mut s, 6, "get_task", json!({ "id": 999 }));
         assert_eq!(missing["isError"], true);
+    }
+
+    #[test]
+    fn update_task_nests_and_unnests() {
+        let (mut s, _d) = store();
+        call(&mut s, 1, "create_project", json!({ "name": "Bokost" }));
+        let id = |v: Value| v["structuredContent"]["result"]["id"].as_i64().unwrap();
+        let story = id(call(
+            &mut s,
+            2,
+            "create_task",
+            json!({ "project": "bokost", "title": "Story" }),
+        ));
+        let task = id(call(
+            &mut s,
+            3,
+            "create_task",
+            json!({ "project": "bokost", "title": "Task" }),
+        ));
+
+        let nested = call(
+            &mut s,
+            4,
+            "update_task",
+            json!({ "id": task, "parent": story }),
+        );
+        assert_eq!(nested["structuredContent"]["result"]["parent_id"], story);
+        let refused = call(
+            &mut s,
+            5,
+            "update_task",
+            json!({ "id": story, "parent": task }),
+        );
+        assert_eq!(refused["isError"], true);
+        let freed = call(
+            &mut s,
+            6,
+            "update_task",
+            json!({ "id": task, "parent": null, "priority": 2 }),
+        );
+        assert_eq!(
+            freed["structuredContent"]["result"]["parent_id"],
+            Value::Null
+        );
+        assert_eq!(freed["structuredContent"]["result"]["priority"], 2);
     }
 
     #[test]

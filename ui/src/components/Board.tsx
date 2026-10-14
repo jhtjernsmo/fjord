@@ -348,7 +348,7 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
             over={ci === overCol}
             cursorTaskId={ci === col ? (current?.id ?? null) : null}
             onOpen={onOpenTask}
-            onMenu={(task) => taskMenu(task, statuses, { onOpen: () => onOpenTask(task.id), hasRepo: !!repo })}
+            onMenu={(task) => taskMenu(task, statuses, { onOpen: () => onOpenTask(task.id), hasRepo: !!repo, hasSubtasks: subtaskInfo.progress.has(task.id) })}
             quickAddRef={(el) => (el ? quickAdd.current.set(c.status.id, el) : quickAdd.current.delete(c.status.id))}
             onAdd={(title) => run(api.createTask({ project_id: board.project.id, title, status_id: c.status.id }))}
           />
