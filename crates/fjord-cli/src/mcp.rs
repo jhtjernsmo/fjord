@@ -65,6 +65,16 @@ fn error_reply(id: Value, code: i64, message: &str) -> Value {
     json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } })
 }
 
+/// Sent to every client on connect; the fuller guide is the Agent Skill (`fjord skill`).
+const INSTRUCTIONS: &str = "Fjord is the user's local project manager: projects with kanban columns, \
+tasks with one level of subtasks, and markdown notes. The desktop app shows your changes live. \
+Projects are referenced by id or slug, tasks and notes by id; write a task as #12 in text. \
+Call get_board before creating or moving tasks, to use the project's real column names and avoid duplicates; \
+use search when you don't know an id. update_task's body replaces the whole description, so read the task \
+with get_task first and keep what the user wrote. Priority is 0 none to 3 high; dates are YYYY-MM-DD. \
+Nothing can be deleted: archive instead, and never say you deleted something. \
+Write in the user's language and don't invent facts.";
+
 fn initialize(params: &Value) -> Value {
     let version = params
         .get("protocolVersion")
@@ -74,8 +84,7 @@ fn initialize(params: &Value) -> Value {
         "protocolVersion": version,
         "capabilities": { "tools": {} },
         "serverInfo": { "name": "fjord", "version": env!("CARGO_PKG_VERSION") },
-        "instructions": "Fjord is the user's local project manager. Projects are referenced by id or slug. \
-            Prefer get_board before changing tasks. Nothing can be hard-deleted; archive instead."
+        "instructions": INSTRUCTIONS
     })
 }
 
@@ -119,6 +128,12 @@ fn tool_definitions() -> Vec<Value> {
                     "due": { "type": "string", "description": "YYYY-MM-DD" },
                     "status": { "type": "string", "description": "Column name or id (default: first)" } }),
             &["project", "title"],
+        ),
+        tool(
+            "get_task",
+            "Read one task: its fields and markdown body, its subtasks and attached files.",
+            json!({ "id": { "type": "integer" } }),
+            &["id"],
         ),
         tool(
             "update_task",
@@ -418,6 +433,11 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
                 .context("project has no done column")?;
             serde_json::to_value(store.move_task(task.id, done.id, None)?)?
         }
+        "get_task" => {
+            let task = store.get_task(int_arg(args, "id")?)?;
+            json!({ "task": task, "subtasks": store.list_subtasks(task.id)?,
+                    "files": store.list_attachments(task.project_id, Some(task.id))? })
+        }
         "archive_task" => {
             serde_json::to_value(store.set_task_archived(int_arg(args, "id")?, true)?)?
         }
@@ -590,11 +610,48 @@ mod tests {
         );
         let tools =
             handle_line(&mut s, r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#).unwrap();
-        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 26);
+        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 27);
         let unknown = handle_line(&mut s, r#"{"jsonrpc":"2.0","id":3,"method":"nope"}"#).unwrap();
         assert_eq!(unknown["error"]["code"], -32601);
         let bad = handle_line(&mut s, "{not json").unwrap();
         assert_eq!(bad["error"]["code"], -32700);
+    }
+
+    #[test]
+    fn get_task_returns_body_subtasks_and_files() {
+        let (mut s, d) = store();
+        call(&mut s, 1, "create_project", json!({ "name": "Bokost" }));
+        let parent = call(
+            &mut s,
+            2,
+            "create_task",
+            json!({ "project": "bokost", "title": "Login", "body": "Use **OAuth**" }),
+        );
+        let id = parent["structuredContent"]["result"]["id"]
+            .as_i64()
+            .unwrap();
+        call(
+            &mut s,
+            3,
+            "create_task",
+            json!({ "project": "bokost", "title": "Add button", "parent": id }),
+        );
+        let file = d.path().join("spec.txt");
+        std::fs::write(&file, "spec").unwrap();
+        call(
+            &mut s,
+            4,
+            "attach_file",
+            json!({ "project": "bokost", "path": file, "task": id }),
+        );
+
+        let got = call(&mut s, 5, "get_task", json!({ "id": id }));
+        let result = &got["structuredContent"]["result"];
+        assert_eq!(result["task"]["body_md"], "Use **OAuth**");
+        assert_eq!(result["subtasks"][0]["title"], "Add button");
+        assert_eq!(result["files"].as_array().unwrap().len(), 1);
+        let missing = call(&mut s, 6, "get_task", json!({ "id": 999 }));
+        assert_eq!(missing["isError"], true);
     }
 
     #[test]

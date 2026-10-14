@@ -36,7 +36,7 @@ the same projects, and you can always see who did what.
 - **Git, GitHub & Azure DevOps** — link a project to a repo, start a branch with a conventional name from any task (`B`, e.g. `feat/12-add-login`) or link an existing one, see pull requests with CI status, open PRs from a task, and let merged PRs move tasks to done.
 - **Azure Boards import** — work items assigned to you show up as tasks in the project you choose, with their state mapped to your columns, child items as subtasks, and the discussion readable in the task. Work items where someone @mentions you show up in the Overview.
 - **VS Code extension** — [Fjord for VS Code](https://github.com/jhtjernsmo/fjord-vscode) shows the board next to your code and the current branch's task in the status bar. See [VS Code](#vs-code).
-- **AI-agent ready** — `fjord mcp` exposes 26 tools to MCP clients such as Claude. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
+- **AI-agent ready** — `fjord mcp` exposes 27 tools to MCP clients such as Claude. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
 - **Activity log** — what changed, when, and by whom (you or an agent).
 - **Live updates** — changes from the CLI or an agent appear in the open app within a second or two.
 - **English and Norwegian** — English by default; adding a language is one file.
@@ -271,10 +271,23 @@ Other clients:
 { "mcpServers": { "fjord": { "command": "fjord", "args": ["mcp"] } } }
 ```
 
-Tools: `list_projects`, `get_board`, `create_project`, `create_task`, `update_task`, `move_task`,
+Tools: `list_projects`, `get_board`, `create_project`, `create_task`, `get_task`, `update_task`, `move_task`,
 `complete_task`, `archive_task`, `add_note`, `attach_file`, `search`, `recent_activity`, `link_repo`,
 `git_status`, `start_branch`, `link_branch`, `list_pull_requests`, `open_pull_request`, `list_notes`, `get_note`, `update_note`, `backlinks`, `import_azure`, `list_new_imports`, `mark_analyzed`. There is deliberately no
 delete tool.
+
+### Agent Skill
+
+The MCP tools say what each one does; the [Fjord skill](skills/fjord/SKILL.md) teaches an agent how
+to use them together: look at the board before changing it, keep what you wrote in a description,
+plan work into tasks, take a task from branch to pull request, analyse a story, triage Azure imports.
+Install it for Claude Code and Cursor (both read `~/.claude/skills`):
+
+```sh
+fjord skill install
+```
+
+`fjord skill install --dir .claude/skills` puts it in a repository instead, and `fjord skill` prints it.
 
 ## Data
 

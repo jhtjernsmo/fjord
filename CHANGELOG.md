@@ -4,6 +4,12 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## Unreleased
+
+- **Agent Skill for Claude Code and Cursor:** `fjord skill install` adds a guide that teaches AI agents how to work in Fjord through the MCP server: check the board first, keep your text when editing, plan work, go from branch to pull request, analyse stories and triage Azure imports.
+- **Agents can read a single task:** the new MCP tool `get_task` returns a task with its description, subtasks and files.
+- The MCP server tells agents more about how Fjord works when they connect.
+
 ## 0.2.26 — 2026-10-13
 
 - **Fixed: the pop-out task window stayed blank and couldn't be closed on Windows.** It now opens centred and inside the screen.

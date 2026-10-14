@@ -1281,6 +1281,7 @@ version = "0.2.26"
 dependencies = [
  "anyhow",
  "clap",
+ "dirs",
  "fjord-core",
  "fjord-vcs",
  "serde",
