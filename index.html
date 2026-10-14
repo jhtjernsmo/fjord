@@ -30,7 +30,7 @@
   "applicationCategory": "BusinessApplication",
   "applicationSubCategory": "Project management",
   "operatingSystem": "Linux, Windows, macOS",
-  "softwareVersion": "0.2.26",
+  "softwareVersion": "0.2.27",
   "downloadUrl": "https://github.com/jhtjernsmo/fjord/releases/latest",
   "installUrl": "https://jhtjernsmo.github.io/fjord/#download",
   "releaseNotes": "https://github.com/jhtjernsmo/fjord/blob/main/CHANGELOG.md",
@@ -207,8 +207,9 @@
     <li>English and Norwegian.</li>
   </ul>
 
-  <h2 id="new">New in 0.2.18 to 0.2.26</h2>
+  <h2 id="new">New in 0.2.18 to 0.2.27</h2>
   <ul>
+    <li>Make a task a subtask of another, or a subtask a regular task again. AI agents get a <a href="#ai-agents">skill</a> that shows them how to work in Fjord.</li>
     <li>Pop a task out into its own window, to keep beside the board or full screen on another monitor. The task panel can be resized.</li>
     <li>Move a task to another project, with its subtasks, files and analysis. It lands in the column with the same name.</li>
     <li><strong>Azure Boards:</strong> screenshots and attachments come along with imported work items, and the risk field fills its own section. Analyses can fill in acceptance criteria and risk from the work item.</li>
@@ -285,7 +286,7 @@
   <p>Fjord includes an MCP server, so an agent in Claude Code, Cursor or another MCP client can read your boards and notes, add and move tasks, write notes and open pull requests. It can't delete anything, and every change it makes is marked with who made it.</p>
   <p>For example, new work items from Azure Boards can land in Fjord, and an agent can go through them on a schedule, write a short summary and split the bigger ones into subtasks.</p>
 <pre>$ claude mcp add fjord -- fjord mcp</pre>
-  <p>There's also an <a href="https://github.com/jhtjernsmo/fjord/tree/main/skills/fjord">Agent Skill</a> that teaches the agent how to work in Fjord: look at the board before changing it, keep what you wrote, plan work into tasks, and take a task from branch to pull request. Claude Code and Cursor both read it from <code>~/.claude/skills</code>. Copy the folder there, or from 0.2.27 run:</p>
+  <p>There's also an <a href="https://github.com/jhtjernsmo/fjord/tree/main/skills/fjord">Agent Skill</a> that teaches the agent how to work in Fjord: look at the board before changing it, keep what you wrote, plan work into tasks, and take a task from branch to pull request. Claude Code and Cursor both read it from <code>~/.claude/skills</code>. Run this, or copy the folder there by hand:</p>
 <pre>$ fjord skill install</pre>
   <p>There's also a plain command line tool, <code>fjord</code>, if you'd rather script it yourself.</p>
 
