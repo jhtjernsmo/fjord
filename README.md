@@ -11,6 +11,7 @@
 [![CI](https://github.com/jhtjernsmo/fjord/actions/workflows/ci.yml/badge.svg)](https://github.com/jhtjernsmo/fjord/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-informational)
+[![AppImageHub](https://img.shields.io/badge/AppImageHub-Fjord-0a7bbb)](https://appimage.github.io/Fjord/)
 ![Status](https://img.shields.io/badge/status-early%20preview-orange)
 
 ![Fjord used with the keyboard only: jump to a project, move and add tasks, search, open the Git tab and notes](docs/screenshots/keyboard.gif)
