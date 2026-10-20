@@ -79,7 +79,7 @@ impl Store {
         let tx = self.conn.transaction()?;
         tx.execute(
             "INSERT INTO projects (name, slug, description, color, icon)
-             VALUES (?1, ?2, ?3, coalesce(?4, '#7c9cff'), coalesce(?5, ?6))",
+             VALUES (?1, ?2, ?3, coalesce(?4, '#7aa6b8'), coalesce(?5, ?6))",
             params![
                 name,
                 slug,
