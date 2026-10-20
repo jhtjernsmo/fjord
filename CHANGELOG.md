@@ -4,6 +4,11 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## 0.2.28 — 2026-10-20
+
+- **Plainer look:** smaller corners that follow the theme everywhere, a muted fjord-blue accent in Fjord Dark and Fjord Light, calmer project and column colours, no glow on buttons, and plain overdue counts in the sidebar. Nord and Solarized Light get the smaller corners too; custom themes keep their own.
+- Long task titles in the standup no longer push the overview sideways; they are shortened instead.
+
 ## 0.2.27 — 2026-10-14
 
 - **Make a task a subtask of another, or a subtask a regular task again:** right-click a task → *Make subtask of…* (pick the parent, searchable), or *Make a regular task* on a subtask. Both are in the task panel too, with `N`. From the CLI: `fjord task nest <id> <parent>` and `fjord task unnest <id>`; agents pass `parent` to `update_task`. The Azure Boards import leaves a task where you put it if Azure has no parent for it.
