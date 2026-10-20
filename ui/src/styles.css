@@ -770,7 +770,8 @@ html[data-flair='p'] body::after { content: ''; position: fixed; inset: 0; z-ind
 .standup-name { font-weight: 600; font-size: 13px; color: var(--text); }
 .standup-summary { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .standup-loading { font-size: 12px; color: var(--dim); white-space: nowrap; }
-.standup-body { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 4px 16px 14px 34px; border-top: 1px solid var(--line); }
+.standup-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; padding: 4px 16px 14px 34px; border-top: 1px solid var(--line); }
+.standup-col { min-width: 0; }
 .standup-col-title { font-size: 12px; font-weight: 600; color: var(--muted); padding: 10px 0 4px; }
 .standup-col ul { list-style: none; margin: 0; padding: 0; }
 .standup-col li { font-size: 13.5px; }
