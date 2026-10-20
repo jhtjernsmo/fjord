@@ -42,7 +42,7 @@ export interface ThemePrefs {
   projectAccent: boolean
 }
 
-const base = { fontScale: 1, radius: 12, density: 'cozy' as Density, builtin: true }
+const base = { fontScale: 1, radius: 6, density: 'cozy' as Density, builtin: true }
 
 export const BUILTIN_THEMES: ThemeDef[] = [
   {
@@ -50,14 +50,14 @@ export const BUILTIN_THEMES: ThemeDef[] = [
     id: 'fjord-dark',
     name: 'Fjord Dark',
     dark: true,
-    colors: { bg: '#0b0d12', bg2: '#10131a', panel: '#151922', panel2: '#1b202b', line: '#1f232b', line2: '#2b3039', text: '#e8eaf0', muted: '#9097a6', dim: '#5e6575', accent: '#7c9cff', ok: '#3fb950', warn: '#f5a524', danger: '#ff6b6b' },
+    colors: { bg: '#0b0d12', bg2: '#10131a', panel: '#151922', panel2: '#1b202b', line: '#1f232b', line2: '#2b3039', text: '#e8eaf0', muted: '#9097a6', dim: '#5e6575', accent: '#7aa6b8', ok: '#3fb950', warn: '#f5a524', danger: '#ff6b6b' },
   },
   {
     ...base,
     id: 'fjord-light',
     name: 'Fjord Light',
     dark: false,
-    colors: { bg: '#f5f6f8', bg2: '#eef0f4', panel: '#ffffff', panel2: '#f7f8fa', line: '#e3e5e9', line2: '#d0d3d9', text: '#161a22', muted: '#5b6270', dim: '#8b919d', accent: '#4c6ef5', ok: '#1f8a3b', warn: '#b7791f', danger: '#d64545' },
+    colors: { bg: '#f5f6f8', bg2: '#eef0f4', panel: '#ffffff', panel2: '#f7f8fa', line: '#e3e5e9', line2: '#d0d3d9', text: '#161a22', muted: '#5b6270', dim: '#8b919d', accent: '#2f6f8a', ok: '#1f8a3b', warn: '#b7791f', danger: '#d64545' },
   },
   {
     ...base,
@@ -190,7 +190,7 @@ export function parseTheme(json: string): Omit<ThemeDef, 'id' | 'builtin'> | nul
       dark: !!t.dark,
       colors,
       fontScale: clamp(Number(t.fontScale) || 1, 0.85, 1.25),
-      radius: clamp(Number(t.radius ?? 12), 0, 18),
+      radius: clamp(Number(t.radius ?? 6), 0, 18),
       density: t.density === 'compact' || t.density === 'comfortable' ? t.density : 'cozy',
     }
   } catch {

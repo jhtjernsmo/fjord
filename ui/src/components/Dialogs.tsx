@@ -7,7 +7,7 @@ import { NewRepoFields } from './NewRepoFields'
 import type { RepoDraft } from './NewRepoFields'
 import { appVersion, installedFromStore, setUpdateCheckEnabled, updateCheckEnabled, useUpdater } from './Updater'
 
-const COLORS = ['#7c9cff', '#00d4b0', '#3fb950', '#f5a524', '#ff7a1a', '#ff6b6b', '#e86bff', '#a78bfa']
+const COLORS = ['#7aa6b8', '#6fb39b', '#8bb174', '#d4a656', '#d98a5f', '#d97474', '#b58ac9', '#a78bfa']
 
 interface Props {
   onCancel: () => void
