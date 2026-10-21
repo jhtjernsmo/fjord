@@ -9,6 +9,7 @@ import { AgentTag, ProjectGlyph } from './Icons'
 import { useContextMenus } from './actions'
 import { MentionsSection } from './Mentions'
 import { DueThisWeek } from './DueThisWeek'
+import { PendingTasks } from './PendingTasks'
 import { Standup } from './Standup'
 import { WaitingOnYou } from './WaitingOnYou'
 import { useOverviewSections } from '../overviewSections'
@@ -130,6 +131,8 @@ export function Home({ projects, onOpen, onNewProject, keysEnabled }: Props) {
       {sections.standup && isStandupDay(today, standupDays) && <Standup projects={projects} days={standupDays} projectId={standupProject} />}
 
       {sections.due && <DueThisWeek projects={projects} />}
+
+      {sections.pending && <PendingTasks projects={projects} />}
 
       {sections.waiting && <WaitingOnYou />}
 

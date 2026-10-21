@@ -30,6 +30,7 @@ the same projects, and you can always see who did what.
 - **Standup and Waiting on you (beta)** — on your standup days the Overview drafts the standup for one project (done, in progress, your PRs, where you were mentioned) to copy as text, and lists pull requests waiting for your review or with failed checks. Both are off by default; turn them on in **Settings → Overview**, where every Overview section can be switched on or off.
 - **Files** — drop files onto the window to attach them to a project or task. Stored content-addressed (deduplicated) with image previews.
 - **Themes** — five built-in themes (Fjord Dark/Light, Nord, Solarized Light, High Contrast), follow the OS with separate light/dark picks, or build your own with live preview: colours, text size, rounding and density; share themes as JSON. `Space T` cycles themes.
+- **Pending** — mark a task as waiting on someone else, such as a reply from the client (`w`, right-click, or the task panel). It stays in its column with a “pending 3d” badge, can be filtered on, is listed on the Overview with the longest waiting first, and shows up as a blocker in the standup. Tasks from Azure Boards follow their work item both ways: a work item set to *Pending* in Azure becomes pending in Fjord, and marking it pending in Fjord moves the work item there (and back when you clear it).
 - **Subtasks** — break a task into subtasks (one level) with their own status, priority and branch, or make an existing task a subtask of another (and back); cards show progress (2/5), the task panel lists them with check-off, drag to reorder and `A` to add.
 - **Notespace** — Obsidian-style markdown notes, inside a project or free-floating, in folders and subfolders (drag a note onto a folder, sort by name or date), with pins and notes you can lock to read-only. Link anything with `[[Project]]`, `[[#12]]` (a task) or `[[Another note]]` — type `[[` for autocomplete — and see backlinks (“mentioned in”) on tasks, projects and notes. Tables, task lists and [Mermaid](https://mermaid.js.org) diagrams render in notes and task descriptions; web links open in your browser.
 - **Full-text search** across tasks, notes and file names (`Space f`).
@@ -37,7 +38,7 @@ the same projects, and you can always see who did what.
 - **Git, GitHub & Azure DevOps** — link a project to a repo, start a branch with a conventional name from any task (`B`, e.g. `feat/12-add-login`) or link an existing one, see pull requests with CI status, open PRs from a task, and let merged PRs move tasks to done.
 - **Azure Boards import** — work items assigned to you show up as tasks in the project you choose, with their state mapped to your columns, child items as subtasks, attachments and screenshots, and the discussion readable in the task. Optional (beta): send a story analysis's acceptance criteria and risk back to the work item, and reply in its discussion. Work items where someone @mentions you show up in the Overview.
 - **VS Code extension** — [Fjord for VS Code](https://github.com/jhtjernsmo/fjord-vscode) shows the board next to your code and the current branch's task in the status bar. See [VS Code](#vs-code).
-- **AI-agent ready** — `fjord mcp` exposes 27 tools to MCP clients such as Claude Code and Cursor, and an [Agent Skill](#agent-skill) teaches agents how to use them. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
+- **AI-agent ready** — `fjord mcp` exposes 28 tools to MCP clients such as Claude Code and Cursor, and an [Agent Skill](#agent-skill) teaches agents how to use them. Agents can create, edit, move and archive but never hard-delete, and every change is tagged with its author.
 - **Activity log** — what changed, when, and by whom (you or an agent).
 - **Live updates** — changes from the CLI or an agent appear in the open app within a second or two.
 - **English and Norwegian** — English by default; adding a language is one file.
@@ -136,6 +137,7 @@ what comes next.
 | `Space r` | Sync pull requests | `a` | Add subtask to task |
 | `Space i` | Import from Azure Boards | `S` | Show or hide subtasks |
 | `Space T` | Cycle themes | `y` | Copy task reference (`[[#12]]`) |
+| | | `w` | Pending on/off (waiting on the client) |
 | `Space ?` | Report a bug | `g g` / `G` | First / last task |
 | `Esc` | Close | `Delete` | Delete task |
 
@@ -218,6 +220,13 @@ was added or changed. The task panel shows the work item's discussion. An AI age
 server (`import_azure`, `list_new_imports`, `mark_analyzed`). Setup, a ready-made triage prompt and
 how to schedule it: [docs/azure-boards-triage.md](docs/azure-boards-triage.md).
 
+**Pending.** A work item in the state named in **Settings → Integrations → Pending state**
+(*Pending* by default) is pending in Fjord. Marking an imported task pending in Fjord moves its work
+item to that state, and clearing it moves the work item back to the state it had before. The state
+has to exist for the work item type in your Azure process, and writing it needs permission to edit
+work items (your `az login`, or a token with Work Items Read & Write). If Azure refuses, the task is
+still marked in Fjord and Fjord tells you why. Leave the setting empty to keep pending local.
+
 **Mentions.** When someone @mentions you in a work item that isn't assigned to you, the Overview
 shows it under **Mentioned**: the item, who mentioned you and what they wrote. Open it in Azure, add
 it to a project as a task, or dismiss it. New mentions also get a notification. This uses Azure
@@ -275,7 +284,7 @@ Cursor (`~/.cursor/mcp.json`) and other clients:
 ```
 
 Tools: `list_projects`, `get_board`, `create_project`, `create_task`, `get_task`, `update_task`, `move_task`,
-`complete_task`, `archive_task`, `add_note`, `attach_file`, `search`, `recent_activity`, `link_repo`,
+`complete_task`, `set_task_pending`, `archive_task`, `add_note`, `attach_file`, `search`, `recent_activity`, `link_repo`,
 `git_status`, `start_branch`, `link_branch`, `list_pull_requests`, `open_pull_request`, `list_notes`, `get_note`, `update_note`, `backlinks`, `analyze_story`, `import_azure`, `list_new_imports`, `mark_analyzed`. There is deliberately no
 delete tool.
 

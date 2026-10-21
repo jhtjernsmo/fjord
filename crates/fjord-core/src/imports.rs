@@ -84,6 +84,25 @@ pub struct ImportSettings {
     /// Beta: send a user story analysis's acceptance criteria and risk back to the work item.
     #[serde(default)]
     pub write_back: bool,
+    /// The Azure state that means pending (waiting on the client). Work items in it are
+    /// pending in Fjord, and marking a task pending in Fjord moves its work item there.
+    /// Empty turns the sync off.
+    #[serde(default = "default_pending_state")]
+    pub pending_state: String,
+}
+
+pub const DEFAULT_PENDING_STATE: &str = "Pending";
+
+fn default_pending_state() -> String {
+    DEFAULT_PENDING_STATE.to_string()
+}
+
+impl ImportSettings {
+    /// Whether `state` is the Azure state that means pending.
+    pub fn is_pending_state(&self, state: &str) -> bool {
+        let name = self.pending_state.trim();
+        !name.is_empty() && state.trim().eq_ignore_ascii_case(name)
+    }
 }
 
 fn default_true() -> bool {
@@ -99,6 +118,7 @@ impl Default for ImportSettings {
             risk_field: String::new(),
             download_files: true,
             write_back: false,
+            pending_state: default_pending_state(),
         }
     }
 }
@@ -204,6 +224,40 @@ impl Store {
             params![state, task_id],
         )?;
         Ok(previous)
+    }
+
+    /// The state the external item had when it was last imported or written.
+    pub fn external_state(&self, task_id: i64) -> Result<Option<String>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT state FROM external_links WHERE task_id = ?1",
+                [task_id],
+                |r| r.get(0),
+            )
+            .optional()?
+            .flatten())
+    }
+
+    /// The state to give the external item back when the task stops pending.
+    pub fn resume_state(&self, task_id: i64) -> Result<Option<String>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT resume_state FROM external_links WHERE task_id = ?1",
+                [task_id],
+                |r| r.get(0),
+            )
+            .optional()?
+            .flatten())
+    }
+
+    pub fn set_resume_state(&mut self, task_id: i64, state: Option<&str>) -> Result<()> {
+        self.conn.execute(
+            "UPDATE external_links SET resume_state = ?1 WHERE task_id = ?2",
+            params![state, task_id],
+        )?;
+        Ok(())
     }
 
     /// Where an imported task came from, if it was imported.

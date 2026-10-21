@@ -42,6 +42,8 @@ export interface StandupDraft {
   workedOn: StandupEntry[]
   /** In progress now. What's due is already in "Due this week". */
   today: StandupEntry[]
+  /** Waiting on someone else (e.g. the client), the longest waiting first: the blockers. */
+  pending: StandupEntry[]
   /** Azure DevOps work items where someone @mentioned you since the last standup. */
   mentions: Mention[]
   /** GitHub issues and pull requests that @mention you, updated since the last standup. */
@@ -60,7 +62,7 @@ const WORK_ACTIONS = new Set(['task.create', 'task.move', 'task.update', 'task.b
  * Only `actor`'s own changes count, so tasks an agent moved don't end up in your standup.
  * Work on a subtask shows up as work on its parent, with the subtask listed under it.
  */
-export function buildStandup(activity: Activity[], tasks: Task[], statuses: Status[], since: Date, actor: string): Pick<StandupDraft, 'done' | 'workedOn' | 'today'> {
+export function buildStandup(activity: Activity[], tasks: Task[], statuses: Status[], since: Date, actor: string): Pick<StandupDraft, 'done' | 'workedOn' | 'today' | 'pending'> {
   const doneStatus = new Set(statuses.filter((s) => s.is_done).map((s) => s.id))
   const firstStatus = new Set(firstColumns(statuses))
   const byId = new Map(tasks.filter((t) => !t.archived_at).map((t) => [t.id, t]))
@@ -93,8 +95,13 @@ export function buildStandup(activity: Activity[], tasks: Task[], statuses: Stat
     return { task, subtasks: subtasks.map((t) => ({ task: t, done: isDone(t) })), progress: all ? { done: all.filter(isDone).length, total: all.length } : null }
   }
   const recent = [...tops].map(([id, subtasks]) => entry(byId.get(id) as Task, subtasks))
-  const inProgress = [...byId.values()].filter((t) => !isDone(t) && !firstStatus.has(t.status_id) && !parentOf(t)).map((t) => entry(t))
-  return { done: recent.filter((e) => isDone(e.task)), workedOn: recent.filter((e) => !isDone(e.task)), today: inProgress }
+  const open = [...byId.values()].filter((t) => !isDone(t) && !parentOf(t))
+  const pending = open
+    .filter((t) => t.pending_since)
+    .sort((a, b) => (a.pending_since ?? '').localeCompare(b.pending_since ?? ''))
+    .map((t) => entry(t))
+  const inProgress = open.filter((t) => !t.pending_since && !firstStatus.has(t.status_id)).map((t) => entry(t))
+  return { done: recent.filter((e) => isDone(e.task)), workedOn: recent.filter((e) => !isDone(e.task)), today: inProgress, pending }
 }
 
 /**
@@ -141,6 +148,8 @@ export interface StandupLabels {
   mentioned: string
   /** e.g. "2/5 subtasks done". */
   subtasks: (done: number, total: number) => string
+  /** e.g. "pending 3d", from when the task started waiting. */
+  pendingFor?: (since: string) => string
 }
 
 /** Plain text for pasting into Teams or Slack. */
@@ -158,7 +167,10 @@ export function standupText(draft: StandupDraft, labels: StandupLabels): string 
   for (const e of draft.today) lines.push(line(e))
   for (const p of draft.openPrs) lines.push(pr(p, labels.inReview))
   if (draft.today.length + draft.openPrs.length === 0) lines.push(`- ${labels.none}`)
-  lines.push('', labels.blockers, `- ${labels.none}`)
+  lines.push('', labels.blockers)
+  const pending = draft.pending ?? []
+  for (const e of pending) lines.push(line(e, e.task.pending_since && labels.pendingFor ? `, ${labels.pendingFor(e.task.pending_since)}` : ''))
+  if (pending.length === 0) lines.push(`- ${labels.none}`)
   return lines.join('\n')
 }
 

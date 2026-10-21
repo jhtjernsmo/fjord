@@ -78,6 +78,9 @@ pub struct Task {
     pub parent_id: Option<i64>,
     /// Order among the parent's subtasks.
     pub child_order: f64,
+    /// When the task started waiting on someone else (e.g. a reply from the client).
+    /// The task stays in its column; None when it isn't pending.
+    pub pending_since: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

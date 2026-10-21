@@ -1,6 +1,6 @@
 // Column header with an options menu, the "add column" control and the board filter bar.
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, CircleCheck, Ellipsis, ListTree, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CircleCheck, Ellipsis, Hourglass, ListTree, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { api } from '../api'
 import type { Status } from '../api'
 import { useApp } from '../data'
@@ -146,14 +146,16 @@ export interface BoardFilter {
   text: string
   minPriority: number
   agentOnly: boolean
+  /** Only tasks waiting on someone else. */
+  pendingOnly: boolean
   /** Show subtasks as their own cards (a view option, not a filter). */
   subtasks: boolean
 }
 
-export const EMPTY_FILTER: BoardFilter = { text: '', minPriority: 0, agentOnly: false, subtasks: false }
+export const EMPTY_FILTER: BoardFilter = { text: '', minPriority: 0, agentOnly: false, pendingOnly: false, subtasks: false }
 
 export function isFiltering(f: BoardFilter): boolean {
-  return f.text.trim() !== '' || f.minPriority > 0 || f.agentOnly
+  return f.text.trim() !== '' || f.minPriority > 0 || f.agentOnly || f.pendingOnly
 }
 
 interface FilterProps {
@@ -197,6 +199,9 @@ export function FilterBar({ filter, onChange, shown, total, inputRef }: FilterPr
       </select>
       <button className={`toggle ${filter.agentOnly ? 'on' : ''}`} onClick={() => onChange({ ...filter, agentOnly: !filter.agentOnly })} aria-pressed={filter.agentOnly}>
         <span className="agent-tag">AI</span> {t('filter.agentOnly')}
+      </button>
+      <button className={`toggle ${filter.pendingOnly ? 'on' : ''}`} onClick={() => onChange({ ...filter, pendingOnly: !filter.pendingOnly })} aria-pressed={filter.pendingOnly}>
+        <Hourglass size={13} /> {t('filter.pendingOnly')}
       </button>
       <button className={`toggle ${filter.subtasks ? 'on' : ''}`} onClick={() => onChange({ ...filter, subtasks: !filter.subtasks })} aria-pressed={filter.subtasks}>
         <ListTree size={13} /> {t('filter.subtasks')}

@@ -1,5 +1,5 @@
 // Shared entity actions (rename, delete, archive …) and the right-click menus built from them.
-import { Archive, ArchiveRestore, ArrowRight, ArrowRightLeft, ClipboardList, CornerDownRight, CornerLeftUp, ExternalLink, Flag, FolderOpen, GitBranch, Lock, Palette, Pencil, Pin, Trash2, X } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowRight, ArrowRightLeft, ClipboardList, CornerDownRight, CornerLeftUp, ExternalLink, Flag, FolderOpen, GitBranch, Hourglass, Lock, Palette, Pencil, Pin, Trash2, X } from 'lucide-react'
 import { api } from '../api'
 import type { Attachment, Note, Project, Status, Task } from '../api'
 import { useApp } from '../data'
@@ -13,7 +13,7 @@ import type { MenuItem } from './Menus'
 const ICON = 14
 
 export function useEntityActions() {
-  const { run, t } = useApp()
+  const { run, t, toast } = useApp()
   const { confirm, prompt, openDialog } = useMenus()
 
   const renameTask = async (task: Task) => {
@@ -37,6 +37,13 @@ export function useEntityActions() {
   const nestTask = (task: Task) => openDialog((close) => <NestTaskDialog task={task} onClose={close} />)
 
   const unnestTask = (task: Task) => run(api.setTaskParent(task.id, null), t('unnest.done'))
+
+  /** Pending on or off. A task from Azure moves its work item too; if that fails, say why. */
+  const togglePending = async (task: Task) => {
+    const pending = !task.pending_since
+    const result = await run(api.setTaskPending(task.id, pending), t(pending ? 'pending.marked' : 'pending.cleared', { name: task.title }))
+    if (result?.azure_warning) toast(result.azure_warning, 'error')
+  }
 
   const renameProject = async (project: Project) => {
     const name = await prompt({ title: t('menu.renameProject'), label: t('dialog.name'), initial: project.name, confirmLabel: t('menu.rename') })
@@ -68,7 +75,7 @@ export function useEntityActions() {
     if (ok) await run(api.deleteNote(note.id), t('toast.deleted', { name: note.title }))
   }
 
-  return { renameTask, deleteTask, moveToProject, nestTask, unnestTask, renameProject, archiveProject, deleteProject, renameNote, deleteNote }
+  return { renameTask, deleteTask, moveToProject, nestTask, unnestTask, togglePending, renameProject, archiveProject, deleteProject, renameNote, deleteNote }
 }
 
 /** Opens the task's user story analysis, making it from the template the first time. */
@@ -112,7 +119,8 @@ export function useContextMenus() {
         })),
     ]
     items.push(
-      { label: t('moveProject.menu'), icon: <ArrowRightLeft size={ICON} />, separator: true, onSelect: () => actions.moveToProject(task) },
+      { label: t(task.pending_since ? 'pending.unmark' : 'pending.mark'), icon: <Hourglass size={ICON} />, separator: true, onSelect: () => actions.togglePending(task) },
+      { label: t('moveProject.menu'), icon: <ArrowRightLeft size={ICON} />, onSelect: () => actions.moveToProject(task) },
     )
     if (task.parent_id) items.push({ label: t('unnest.menu'), icon: <CornerLeftUp size={ICON} />, onSelect: () => actions.unnestTask(task) })
     else if (!opts.hasSubtasks) items.push({ label: t('nest.menu'), icon: <CornerDownRight size={ICON} />, onSelect: () => actions.nestTask(task) })

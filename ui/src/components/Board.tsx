@@ -14,14 +14,16 @@ import type { CollisionDetection, DragEndEvent, DragOverEvent, DragStartEvent } 
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import confetti from 'canvas-confetti'
-import { AlignLeft, CalendarDays, CornerLeftUp, GitBranch, ListChecks } from 'lucide-react'
+import { AlignLeft, CalendarDays, CornerLeftUp, GitBranch, Hourglass, ListChecks } from 'lucide-react'
 import { api, isOverdue } from '../api'
 import { cardTitle, lateLine } from '../flair'
 import type { Board as BoardData, Status, Task } from '../api'
 import { useActions, useApp } from '../data'
+import { dateLocale } from '../i18n'
 import type { MessageKey } from '../i18n'
 import { AgentTag } from './Icons'
 import { focusSubtaskOnOpen } from './Subtasks'
+import { pendingChip } from '../pending'
 import { copyTaskRef } from './taskRef'
 import { AddColumn, ColumnHeader, EMPTY_FILTER, FilterBar, isFiltering } from './Columns'
 import { useContextMenus, useEntityActions, useStoryAnalysis } from './actions'
@@ -85,7 +87,7 @@ function TaskCard({ task, statuses, cursor, onOpen, onMenu }: { task: Task; stat
 }
 
 function CardBody({ task, statuses, className = '' }: { task: Task; statuses: Status[]; className?: string }) {
-  const { t } = useApp()
+  const { t, locale } = useApp()
   const done = statuses.find((s) => s.id === task.status_id)?.is_done
   const priority = t(`priority.${task.priority}` as MessageKey)
   const { progress, titles } = useContext(SubtaskInfo)
@@ -115,6 +117,14 @@ function CardBody({ task, statuses, className = '' }: { task: Task; statuses: St
         {task.priority > 0 && (
           <span className={`prio-${task.priority}`} title={`${t('task.priority')}: ${priority}`}>
             {PRIORITY_ICON[task.priority]} {priority}
+          </span>
+        )}
+        {task.pending_since && !done && (
+          <span
+            className="chip pending-chip"
+            title={t('pending.since', { date: new Date(task.pending_since).toLocaleDateString(dateLocale(locale), { day: 'numeric', month: 'short' }) })}
+          >
+            <Hourglass size={11} strokeWidth={1.8} /> {pendingChip(task.pending_since, t)}
           </span>
         )}
         {task.due_at && (
@@ -189,7 +199,7 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
   const { run, t, toast } = useApp()
   const { taskMenu } = useContextMenus()
   const analyze = useStoryAnalysis()
-  const { deleteTask } = useEntityActions()
+  const { deleteTask, togglePending } = useEntityActions()
   const [repo] = useLive(() => api.getProjectRepo(board.project.id), [board.project.id])
   const { statuses, tasks: allTasks } = board
   const [filter, setFilter] = useState<BoardFilter>(EMPTY_FILTER)
@@ -213,6 +223,7 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
       (t) =>
         t.priority >= filter.minPriority &&
         (!filter.agentOnly || t.created_by === 'claude') &&
+        (!filter.pendingOnly || !!t.pending_since) &&
         (!needle || t.title.toLowerCase().includes(needle) || t.body_md.toLowerCase().includes(needle)),
     )
   }, [visible, filter])
@@ -303,6 +314,7 @@ export function Board({ board, selectedTaskId, onOpenTask, quickAddSignal, keysE
       'board.toggleSubtasks': () => setFilter((f) => ({ ...f, subtasks: !f.subtasks })),
       'task.copyRef': () => current && copyTaskRef(current, toast, t),
       'task.analyze': () => current && analyze(current),
+      'task.pending': () => current && togglePending(current),
       'task.addSubtaskHere': () => {
         if (!current) return
         focusSubtaskOnOpen.current = true

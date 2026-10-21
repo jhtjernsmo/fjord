@@ -11,6 +11,7 @@ pub mod editor;
 pub mod git;
 pub mod github;
 pub mod new_repo;
+pub mod pending;
 mod process;
 pub mod waiting;
 
@@ -833,12 +834,13 @@ pub fn apply_import(
         let previous = store.swap_external_state(task.id, &item.state)?;
         let task = if previous.as_deref() != Some(item.state.as_str()) {
             let columns = store.list_statuses(task.project_id)?;
-            match column_for_state(&columns, &item.state) {
+            let task = match column_for_state(&columns, &item.state) {
                 Some(column) if column.id != task.status_id => {
                     store.move_task(task.id, column.id, None)?
                 }
                 _ => task,
-            }
+            };
+            pending::follow_azure(store, settings, task, previous.as_deref(), &item.state)?
         } else {
             task
         };
@@ -1556,6 +1558,127 @@ mod tests {
         assert!(report.completed.is_empty());
         assert_eq!(s.get_task(t.id).unwrap().status_id, resolved.id);
         assert_ne!(resolved.id, done.id);
+    }
+
+    #[test]
+    fn pending_follows_azure_and_fjord_works_out_the_state_to_send() {
+        let (mut s, _d) = store();
+        let p = s
+            .create_project(NewProject {
+                name: "Demo".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let settings = ImportSettings {
+            enabled: true,
+            mappings: vec![fjord_core::ImportMapping {
+                org: "contoso".into(),
+                project: "App".into(),
+                fjord_project_id: p,
+            }],
+            ..Default::default()
+        };
+        s.set_import_settings(&settings).unwrap();
+        let wi = |rev: i64, state: &str| WorkItem {
+            org: "contoso".into(),
+            id: 9,
+            rev,
+            project: "App".into(),
+            kind: "User Story".into(),
+            state: state.into(),
+            area: "App".into(),
+            title: "Ask the client about logos".into(),
+            description_md: String::new(),
+            acceptance_md: String::new(),
+            risk_md: String::new(),
+            files: Vec::new(),
+            priority: None,
+            due: None,
+            parent: None,
+        };
+        let import = |s: &mut Store, item: WorkItem| {
+            apply_import(
+                s,
+                &settings,
+                &ImportFetch {
+                    items: vec![item],
+                    ..Default::default()
+                },
+            )
+            .unwrap()
+        };
+        let id = |s: &Store| {
+            s.external_link("azure", "contoso/9")
+                .unwrap()
+                .unwrap()
+                .task_id
+        };
+
+        import(&mut s, wi(1, "Active"));
+        assert!(s.get_task(id(&s)).unwrap().pending_since.is_none());
+
+        // Pending in Azure (any case) marks the task pending and remembers where it was.
+        import(&mut s, wi(2, "pending"));
+        let t = id(&s);
+        assert!(s.get_task(t).unwrap().pending_since.is_some());
+        assert_eq!(s.resume_state(t).unwrap().as_deref(), Some("Active"));
+        // An unchanged state doesn't undo a change made in Fjord.
+        s.set_task_pending(t, false).unwrap();
+        import(&mut s, wi(3, "pending"));
+        assert!(s.get_task(t).unwrap().pending_since.is_none());
+        s.set_task_pending(t, true).unwrap();
+        // Leaving Pending in Azure clears it.
+        import(&mut s, wi(4, "Resolved"));
+        assert!(s.get_task(t).unwrap().pending_since.is_none());
+        assert_eq!(s.resume_state(t).unwrap(), None);
+
+        // Marking pending in Fjord: send "Pending", and remember "Resolved" to go back to.
+        let (task, sync) = pending::mark_pending(&mut s, t, true).unwrap();
+        assert!(task.pending_since.is_some());
+        let push = match sync {
+            pending::PendingSync::Push(push) => push,
+            other => panic!("expected a push, got {other:?}"),
+        };
+        assert_eq!(
+            (
+                push.org.as_str(),
+                push.id,
+                push.state.as_str(),
+                push.resuming
+            ),
+            ("contoso", 9, "Pending", false)
+        );
+        pending::record_pushed(&mut s, &push).unwrap();
+        // Unmarking sends the remembered state back.
+        let (_, sync) = pending::mark_pending(&mut s, t, false).unwrap();
+        match sync {
+            pending::PendingSync::Push(push) => {
+                assert_eq!((push.state.as_str(), push.resuming), ("Resolved", true))
+            }
+            other => panic!("expected a push, got {other:?}"),
+        }
+
+        // Without a pending state the sync is off both ways.
+        let off = ImportSettings {
+            pending_state: String::new(),
+            ..settings.clone()
+        };
+        s.set_import_settings(&off).unwrap();
+        let (_, sync) = pending::mark_pending(&mut s, t, true).unwrap();
+        assert_eq!(sync, pending::PendingSync::Nothing);
+
+        // A task that isn't from Azure never pushes.
+        let own = s
+            .create_task(fjord_core::NewTask {
+                project_id: p,
+                title: "Own".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        s.set_import_settings(&settings).unwrap();
+        let (_, sync) = pending::mark_pending(&mut s, own.id, true).unwrap();
+        assert_eq!(sync, pending::PendingSync::Nothing);
     }
 
     #[test]

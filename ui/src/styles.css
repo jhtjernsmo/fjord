@@ -258,6 +258,11 @@ kbd {
 .nest-list option:checked { background: color-mix(in oklab, var(--accent) 28%, transparent); color: var(--text); }
 .card-parent { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--dim); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .subtask-chip.complete { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 45%, transparent); }
+/* Pending: waiting on someone else, e.g. the client. Amber, quieter than overdue. */
+.pending-chip { color: var(--warn); }
+.pending-row .due-when { display: inline-flex; align-items: center; gap: 5px; color: var(--warn); text-transform: none; }
+.pending-field { gap: 10px; flex-wrap: wrap; }
+.pending-since { display: inline-flex; align-items: center; gap: 6px; color: var(--warn); font-size: 13px; }
 .title-input { font-size: 20px; font-weight: 650; background: none; border: none; outline: none; width: 100%; letter-spacing: -0.01em; }
 .fields { display: grid; grid-template-columns: 90px 1fr; gap: 10px 12px; align-items: center; font-size: 13px; }
 .fields label { color: var(--muted); }

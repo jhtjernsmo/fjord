@@ -10,6 +10,7 @@ import { localIso } from '../dueWeek'
 import { memo } from '../memo'
 import { buildStandup, mentionsSince, myPullRequests, previousStandup, standupText } from '../standup'
 import { useMentions } from '../mentions'
+import { pendingChip } from '../pending'
 import type { StandupDraft, StandupEntry, Weekday } from '../standup'
 
 /** Enough history for a week between standups. */
@@ -53,7 +54,7 @@ async function azureScope(projectId: number | null): Promise<{ org: string; proj
   return (settings?.mappings ?? []).filter((m) => m.fjord_project_id === projectId)
 }
 
-type LocalDraft = Pick<StandupDraft, 'done' | 'workedOn' | 'today'>
+type LocalDraft = Pick<StandupDraft, 'done' | 'workedOn' | 'today' | 'pending'>
 type NetworkDraft = Pick<StandupDraft, 'closedPrs' | 'openPrs' | 'githubMentions'>
 
 /** Your tasks: read from the local database, so it's quick and always current. */
@@ -98,6 +99,7 @@ function EntryItem({ entry, isDone }: { entry: StandupEntry; isDone: boolean }) 
         <button data-home-item data-home-action="open" onClick={() => open_(task)}>
           <span className="mono dim">#{task.id}</span> {task.title}
           {progress && <span className="standup-state"> {t('standup.subtasks', { done: progress.done, total: progress.total })}</span>}
+          {!isDone && task.pending_since && <span className="standup-state"> {pendingChip(task.pending_since, t)}</span>}
           {isDone && <span className="standup-done"> {t('standup.done')}</span>}
         </button>
       </div>
@@ -177,7 +179,7 @@ export function Standup({ projects, days, projectId }: { projects: ProjectSummar
   const sinceLabel = t('standup.since', { day: since.toLocaleDateString(dateLocale(locale), { weekday: 'long' }) })
   const copy = () =>
     navigator.clipboard
-      ?.writeText(standupText(draft, { since: sinceLabel, done: t('standup.done'), today: t('standup.today'), blockers: t('standup.blockers'), none: t('standup.none'), merged: t('standup.merged'), closed: t('standup.closed'), inReview: t('standup.inReview'), mentioned: t('standup.mentioned'), subtasks: (done, total) => t('standup.subtasks', { done, total }) }))
+      ?.writeText(standupText(draft, { since: sinceLabel, done: t('standup.done'), today: t('standup.today'), blockers: t('standup.blockers'), none: t('standup.none'), merged: t('standup.merged'), closed: t('standup.closed'), inReview: t('standup.inReview'), mentioned: t('standup.mentioned'), subtasks: (done, total) => t('standup.subtasks', { done, total }), pendingFor: (since) => pendingChip(since, t) }))
       .then(() => toast(t('standup.copied'), 'success'))
   const summary = t('standup.summary', { done: draft.done.length, worked: draft.workedOn.length, prs: loadingNetwork ? '…' : draft.closedPrs.length + draft.openPrs.length, mentions: loadingNetwork ? '…' : draft.mentions.length + draft.githubMentions.length, today: draft.today.length })
   const projectName = projectId === null ? null : scope[0]?.name
@@ -199,6 +201,7 @@ export function Standup({ projects, days, projectId }: { projects: ProjectSummar
         <div className="standup-body">
           <StandupList title={sinceLabel} done={draft.done} tasks={draft.workedOn} prs={draft.closedPrs} mentions={draft.mentions} githubMentions={draft.githubMentions} />
           <StandupList title={t('standup.today')} tasks={draft.today} prs={draft.openPrs} />
+          {draft.pending.length > 0 && <StandupList title={t('standup.blockers')} tasks={draft.pending} />}
         </div>
       )}
     </div>

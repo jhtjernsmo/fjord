@@ -217,6 +217,12 @@ const MIGRATIONS: &[&str] = &[
         PRIMARY KEY (task_id, external_id)
     );
     "#,
+    // v11: pending tasks (waiting on someone else, e.g. a reply from the client), and the
+    // Azure state to go back to when a task stops pending
+    r#"
+    ALTER TABLE tasks ADD COLUMN pending_since TEXT;
+    ALTER TABLE external_links ADD COLUMN resume_state TEXT;
+    "#,
 ];
 
 pub fn configure(conn: &Connection) -> Result<()> {

@@ -47,6 +47,14 @@ export interface Task {
   /** Set for subtasks (one level deep). */
   parent_id: number | null
   child_order: number
+  /** When the task started waiting on someone else (e.g. the client); null when it isn't pending. */
+  pending_since: string | null
+}
+
+export interface PendingResult {
+  task: Task
+  /** Why the Azure work item didn't follow, if it didn't. The task is marked anyway. */
+  azure_warning: string | null
 }
 
 export interface Board {
@@ -198,6 +206,8 @@ export interface ImportSettings {
   download_files: boolean
   /** Beta: send an analysis's acceptance criteria and risk to the work item. */
   write_back: boolean
+  /** The Azure state that means pending; empty turns the sync off. */
+  pending_state: string
 }
 
 export interface WorkItemComment {
@@ -411,6 +421,8 @@ export const api = {
   renameUser: (name: string, rewriteHistory: boolean) => invoke<string>('rename_user', { name, rewriteHistory }),
   listArchivedTasks: (projectId: number) => invoke<Task[]>('list_archived_tasks', { projectId }),
   listDueTasks: (until: string) => invoke<Task[]>('list_due_tasks', { until }),
+  listPendingTasks: () => invoke<Task[]>('list_pending_tasks'),
+  setTaskPending: (id: number, pending: boolean) => invoke<PendingResult>('set_task_pending', { id, pending }),
   listSubtasks: (taskId: number) => invoke<Task[]>('list_subtasks', { taskId }),
   listBranches: (projectId: number) => invoke<string[]>('list_branches', { projectId }),
   linkTaskBranch: (taskId: number, branch: string | null) => invoke<Task>('link_task_branch', { taskId, branch }),

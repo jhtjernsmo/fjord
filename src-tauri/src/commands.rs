@@ -153,6 +153,11 @@ pub fn list_due_tasks(state: State<AppState>, until: String) -> CmdResult<Vec<Ta
 }
 
 #[tauri::command]
+pub fn list_pending_tasks(state: State<AppState>) -> CmdResult<Vec<Task>> {
+    with_store(&state, |s| s.list_pending_tasks())
+}
+
+#[tauri::command]
 pub fn create_status(
     state: State<AppState>,
     project_id: i64,
