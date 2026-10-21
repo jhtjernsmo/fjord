@@ -4,7 +4,7 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
-## Unreleased
+## 0.2.29 — 2026-10-21
 
 - **Pending tasks:** mark a task as waiting on someone else, such as a reply from the client, with `w`, right-click → *Mark pending*, or the task panel. It stays in its column with a “pending 3d” badge, the board filter has a *Pending* toggle, the Overview lists pending tasks with the longest waiting first, and the standup lists them as blockers. Tasks from Azure Boards follow their work item both ways: a work item set to *Pending* in Azure becomes pending in Fjord, and marking it pending in Fjord moves the work item to *Pending* (and back to its previous state when you clear it). The state name is in **Settings → Integrations**. From the CLI: `fjord task pending <id>` and `--off`; agents use the new MCP tool `set_task_pending`.
 
