@@ -4,12 +4,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import { MARKDOWN_COMPONENTS, MARKDOWN_PLUGINS } from './NoteMarkdown'
 import { motion } from 'motion/react'
-import { Archive, ArrowRightLeft, CircleCheck, PictureInPicture2, ClipboardList, Code2, ExternalLink, GitBranch, GitPullRequest, Link2, Trash2, Unlink, X, CornerUpLeft, CornerDownRight } from 'lucide-react'
+import { Archive, ArrowRightLeft, CircleCheck, Hourglass, PictureInPicture2, ClipboardList, Code2, ExternalLink, GitBranch, GitPullRequest, Link2, Trash2, Unlink, X, CornerUpLeft, CornerDownRight } from 'lucide-react'
 import { useContextMenus, useEntityActions, useStoryAnalysis } from './actions'
 import { api, formatBytes, relativeTime, remoteOf } from '../api'
 import type { Attachment, Status, Task, TaskPatch } from '../api'
 import { useActions, useApp, useLive } from '../data'
+import { dateLocale } from '../i18n'
 import type { MessageKey } from '../i18n'
+import { waitedFor } from '../pending'
 import { azureAttachmentId, localCopies } from '../azureImages'
 import { AgentTag, FileTypeIcon } from './Icons'
 import { ChecksIcon, PrStateBadge, refreshPullRequests, usePullRequests } from './GitView'
@@ -124,7 +126,7 @@ interface Props {
 
 export function TaskPanel({ taskId, statuses, onClose, onGone = onClose, detached = false }: Props) {
   const { run, t, locale, toast } = useApp()
-  const { deleteTask, moveToProject } = useEntityActions()
+  const { deleteTask, moveToProject, togglePending } = useEntityActions()
   const analyze = useStoryAnalysis()
   const projectId = statuses[0].project_id
   // undefined while loading, null if the task disappeared (e.g. archived elsewhere).
@@ -176,6 +178,7 @@ export function TaskPanel({ taskId, statuses, onClose, onGone = onClose, detache
           'panel.analyze': () => analyze(task),
           'panel.moveProject': () => moveToProject(task, detached ? undefined : onClose),
           'panel.popOut': () => popOut(task),
+          'panel.pending': () => togglePending(task),
         }
       : {},
     'panel',
@@ -268,6 +271,27 @@ export function TaskPanel({ taskId, statuses, onClose, onGone = onClose, detache
               {task.due_at && (
                 <button className="btn ghost" onClick={() => save({ due_at: null })}>
                   {t('task.clear')}
+                </button>
+              )}
+            </div>
+
+            <label>{t('pending.title')}</label>
+            <div className="row-inline pending-field">
+              {task.pending_since ? (
+                <>
+                  <span className="pending-since">
+                    <Hourglass size={13} />{' '}
+                    {t('pending.since', { date: new Date(task.pending_since).toLocaleDateString(dateLocale(locale), { day: 'numeric', month: 'long' }) })}
+                    {' · '}
+                    {waitedFor(task.pending_since, t)}
+                  </span>
+                  <button className="btn ghost" onClick={() => togglePending(task)}>
+                    {t('task.clear')}
+                  </button>
+                </>
+              ) : (
+                <button className="btn ghost" onClick={() => togglePending(task)} title={t('pending.hint')}>
+                  <Hourglass size={13} /> {t('pending.mark')}
                 </button>
               )}
             </div>

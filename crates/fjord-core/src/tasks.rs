@@ -5,7 +5,7 @@ use crate::models::{NewTask, Task, TaskPatch};
 use crate::store::{Store, require_text};
 
 const TASK_COLS: &str = "id, project_id, status_id, title, body_md, priority, due_at, position,
-    created_by, created_at, updated_at, archived_at, branch, parent_id, child_order";
+    created_by, created_at, updated_at, archived_at, branch, parent_id, child_order, pending_since";
 
 fn task_from_row(row: &Row) -> rusqlite::Result<Task> {
     Ok(Task {
@@ -24,6 +24,7 @@ fn task_from_row(row: &Row) -> rusqlite::Result<Task> {
         branch: row.get(12)?,
         parent_id: row.get(13)?,
         child_order: row.get(14)?,
+        pending_since: row.get(15)?,
     })
 }
 
@@ -277,6 +278,25 @@ impl Store {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// Open pending tasks in active projects, the longest waiting first.
+    pub fn list_pending_tasks(&self) -> Result<Vec<Task>> {
+        let cols = TASK_COLS
+            .split(',')
+            .map(|c| format!("t.{}", c.trim()))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {cols} FROM tasks t
+             JOIN statuses s ON s.id = t.status_id
+             JOIN projects p ON p.id = t.project_id
+             WHERE t.archived_at IS NULL AND p.archived_at IS NULL AND NOT s.is_done
+               AND t.pending_since IS NOT NULL
+             ORDER BY t.pending_since, t.id"
+        ))?;
+        let rows = stmt.query_map([], task_from_row)?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
     pub fn update_task(&mut self, id: i64, patch: TaskPatch) -> Result<Task> {
         let current = self.get_task(id)?;
         let title = match &patch.title {
@@ -343,6 +363,29 @@ impl Store {
             &task.title,
             Some(&status),
         )?;
+        self.get_task(id)
+    }
+
+    /// Marks a task as pending (waiting on someone else) or not. Marking an already
+    /// pending task keeps the time it started waiting. Logs only real changes.
+    pub fn set_task_pending(&mut self, id: i64, pending: bool) -> Result<Task> {
+        let task = self.get_task(id)?;
+        if task.pending_since.is_some() == pending {
+            return Ok(task);
+        }
+        self.conn.execute(
+            "UPDATE tasks SET pending_since = CASE WHEN ?1 THEN strftime('%Y-%m-%dT%H:%M:%fZ','now') END,
+                updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+             WHERE id = ?2",
+            params![pending, id],
+        )?;
+        let action = if pending {
+            "task.pending"
+        } else {
+            "task.unpending"
+        };
+        self.touch_project(task.project_id)?;
+        self.log(Some(task.project_id), Some(id), action, &task.title, None)?;
         self.get_task(id)
     }
 
@@ -437,6 +480,63 @@ mod tests {
             .into_iter()
             .map(|t| t.title)
             .collect()
+    }
+
+    #[test]
+    fn pending_keeps_column_and_start_time_and_logs_changes_once() {
+        let (mut s, _dir) = store();
+        let p = project(&mut s);
+        let t = task(&mut s, p, "Waiting on client");
+        assert!(t.pending_since.is_none());
+        let pending = s.set_task_pending(t.id, true).unwrap();
+        let since = pending.pending_since.clone().expect("pending");
+        assert_eq!(pending.status_id, t.status_id);
+        assert_eq!(
+            s.set_task_pending(t.id, true).unwrap().pending_since,
+            Some(since)
+        );
+        assert!(
+            s.set_task_pending(t.id, false)
+                .unwrap()
+                .pending_since
+                .is_none()
+        );
+        let logged: Vec<String> = s
+            .recent_activity(Some(p), 10)
+            .unwrap()
+            .into_iter()
+            .map(|a| a.action)
+            .filter(|a| a.contains("pending"))
+            .collect();
+        assert_eq!(logged, ["task.unpending", "task.pending"]);
+    }
+
+    #[test]
+    fn pending_list_skips_done_and_archived_and_starts_with_the_longest_waiting() {
+        let (mut s, _dir) = store();
+        let p = project(&mut s);
+        let first = task(&mut s, p, "First");
+        let second = task(&mut s, p, "Second");
+        let done = task(&mut s, p, "Done");
+        let archived = task(&mut s, p, "Archived");
+        for t in [&first, &second, &done, &archived] {
+            s.set_task_pending(t.id, true).unwrap();
+        }
+        let done_col = s
+            .list_statuses(p)
+            .unwrap()
+            .into_iter()
+            .find(|c| c.is_done)
+            .unwrap();
+        s.move_task(done.id, done_col.id, None).unwrap();
+        s.set_task_archived(archived.id, true).unwrap();
+        let ids: Vec<i64> = s
+            .list_pending_tasks()
+            .unwrap()
+            .iter()
+            .map(|t| t.id)
+            .collect();
+        assert_eq!(ids, [first.id, second.id]);
     }
 
     #[test]

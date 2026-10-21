@@ -213,6 +213,14 @@ enum TaskCmd {
     Done { id: i64 },
     /// Start a user story analysis: a note from the template, linked to the task (or show the one it has)
     Analyze { id: i64 },
+    /// Mark a task pending: waiting on someone else, e.g. a reply from the client.
+    /// A task from Azure Boards moves its work item to the pending state too.
+    Pending {
+        id: i64,
+        /// Stop pending instead
+        #[arg(long)]
+        off: bool,
+    },
     /// Archive a task (reversible)
     Archive { id: i64 },
     /// Restore an archived task
@@ -605,6 +613,13 @@ fn task(store: &mut Store, out: &output::Printer, cmd: TaskCmd) -> Result<()> {
                 .find(|s| s.is_done)
                 .context("project has no done column")?;
             out.task(&store.move_task(id, done.id, None)?)
+        }
+        TaskCmd::Pending { id, off } => {
+            let (task, warning) = fjord_vcs::pending::set_pending(store, id, !off)?;
+            if let Some(warning) = warning {
+                eprintln!("warning: {warning}");
+            }
+            out.task(&task)
         }
         TaskCmd::Archive { id } => out.task(&store.set_task_archived(id, true)?),
         TaskCmd::Restore { id } => out.task(&store.set_task_archived(id, false)?),

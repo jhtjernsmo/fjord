@@ -33,6 +33,12 @@ fn task_line(t: &Task) -> String {
     if let Some(due) = &t.due_at {
         line.push_str(&format!("  due {due}"));
     }
+    if let Some(since) = &t.pending_since {
+        line.push_str(&format!(
+            "  pending since {}",
+            &since[..since.len().min(10)]
+        ));
+    }
     line
 }
 
@@ -50,6 +56,8 @@ fn describe(a: &Activity) -> String {
         "task.move" => format!("moved “{subject}” to {detail}"),
         "task.archive" => format!("archived “{subject}”"),
         "task.restore" => format!("restored “{subject}”"),
+        "task.pending" => format!("marked “{subject}” pending"),
+        "task.unpending" => format!("“{subject}” is no longer pending"),
         "file.attach" => format!("attached “{subject}”"),
         "file.detach" => format!("removed file “{subject}”"),
         "note.create" => format!("wrote note “{subject}”"),

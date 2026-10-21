@@ -322,3 +322,18 @@ fn tasks_nest_under_another_and_back() {
     let freed = ok_json(d, &["task", "unnest", &task]);
     assert_eq!(freed["parent_id"], Value::Null);
 }
+
+#[test]
+fn tasks_can_be_marked_pending_and_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    ok_json(d, &["project", "add", "Kunde"]);
+    let task = ok_json(d, &["task", "add", "kunde", "Ask about logo"])["id"].to_string();
+
+    let pending = ok_json(d, &["task", "pending", &task]);
+    assert!(pending["pending_since"].is_string());
+    let text = fjord(d, &["task", "show", &task]);
+    assert!(String::from_utf8_lossy(&text.stdout).contains("pending since"));
+    let back = ok_json(d, &["task", "pending", &task, "--off"]);
+    assert_eq!(back["pending_since"], Value::Null);
+}

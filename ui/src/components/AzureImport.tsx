@@ -83,7 +83,7 @@ export function AzureImportRunner() {
   return null
 }
 
-const EMPTY: ImportSettings = { enabled: false, mappings: [], closed_days: 30, risk_field: '', download_files: true, write_back: false }
+const EMPTY: ImportSettings = { enabled: false, mappings: [], closed_days: 30, risk_field: '', download_files: true, write_back: false, pending_state: 'Pending' }
 const CLOSED_DAY_CHOICES = [0, 7, 30, 90]
 
 export function AzureImportSettings() {
@@ -176,6 +176,19 @@ export function AzureImportSettings() {
           aria-label={t('import.riskField')}
         />
       </label>
+      <label className="inline-select">
+        {t('import.pendingState')}
+        <input
+          className="input"
+          value={settings.pending_state ?? 'Pending'}
+          placeholder="Pending"
+          onChange={(e) => setSettings({ ...settings, pending_state: e.target.value })}
+          onBlur={() => save(settings)}
+          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          aria-label={t('import.pendingState')}
+        />
+      </label>
+      <span className="hint">{t('import.pendingStateHint')}</span>
       <label className="toggle-label">
         <input
           type="checkbox"

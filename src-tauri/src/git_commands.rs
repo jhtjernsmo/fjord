@@ -495,3 +495,42 @@ pub async fn open_in_editor(
 pub async fn checkout_default(state: State<'_, AppState>, project_id: i64) -> CmdResult<String> {
     with_store_bg(&state, move |s| fjord_vcs::checkout_default(s, project_id)).await
 }
+
+/// A task marked pending or not, and why Azure didn't follow, if it didn't.
+#[derive(serde::Serialize)]
+pub struct PendingResult {
+    pub task: Task,
+    pub azure_warning: Option<String>,
+}
+
+/// Marks a task pending (waiting on the client) or not. A task from Azure Boards moves its
+/// work item into or out of the pending state; the task is marked even if that fails.
+#[tauri::command]
+pub async fn set_task_pending(
+    state: State<'_, AppState>,
+    id: i64,
+    pending: bool,
+) -> CmdResult<PendingResult> {
+    use fjord_vcs::pending::{PendingSync, mark_pending, push_state, record_pushed};
+    let (task, sync) = with_store(&state, |s| mark_pending(s, id, pending))?;
+    let azure_warning = match sync {
+        PendingSync::Nothing => None,
+        PendingSync::UnknownResumeState { url } => Some(format!(
+            "the work item is still pending in Azure; move it back there: {url}"
+        )),
+        PendingSync::Push(push) => {
+            let sent = push.clone();
+            match off_thread(move || push_state(&sent)).await {
+                Ok(()) => {
+                    with_store(&state, |s| record_pushed(s, &push))?;
+                    None
+                }
+                Err(e) => Some(format!("Azure wasn't updated: {e}")),
+            }
+        }
+    };
+    Ok(PendingResult {
+        task,
+        azure_warning,
+    })
+}

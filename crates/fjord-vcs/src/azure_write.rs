@@ -264,6 +264,42 @@ pub fn apply_update(
     Ok(item.rev())
 }
 
+/// Moves a work item to another state, e.g. "Pending" or back to "Active".
+pub fn set_state(org: &str, id: u64, state: &str) -> Result<()> {
+    let org = check_org(org)?;
+    let (auth, _) = find_auth(org).ok_or_else(|| VcsError::NoAzureToken(org.to_string()))?;
+    let body = serde_json::json!([
+        { "op": "add", "path": "/fields/System.State", "value": state }
+    ])
+    .to_string();
+    let res = agent()
+        .patch(&format!(
+            "{HOST}/{}/_apis/wit/workitems/{id}?api-version={API_VERSION}",
+            encode(org)
+        ))
+        .header("Accept", "application/json")
+        .header("Authorization", &auth.header())
+        .content_type("application/json-patch+json")
+        .send(body.as_str())
+        .map_err(HttpError::from)
+        .and_then(checked);
+    match res {
+        Ok(_) => Ok(()),
+        // TF401320: the value isn't one of the states this work item type allows.
+        Err(HttpError::Status(400, Some(m))) if m.contains("TF401320") || m.contains("State") => {
+            Err(VcsError::Azure(state_rejected(state)))
+        }
+        Err(e) => Err(api_error(e, org)),
+    }
+}
+
+fn state_rejected(state: &str) -> String {
+    format!(
+        "Azure has no state «{state}» for this work item type. Add it to the process in Azure \
+         DevOps, or change the pending state in Settings → Integrations"
+    )
+}
+
 /// The longest reply Fjord sends; Azure's own limit is far higher.
 const MAX_REPLY_CHARS: usize = 20_000;
 

@@ -160,6 +160,13 @@ fn tool_definitions() -> Vec<Value> {
             &["id"],
         ),
         tool(
+            "set_task_pending",
+            "Mark a task pending (waiting on someone else, e.g. a reply from the client) or not. \
+             It stays in its column. A task from Azure Boards moves its work item to the pending state too.",
+            json!({ "id": { "type": "integer" }, "pending": { "type": "boolean", "description": "false to stop pending" } }),
+            &["id", "pending"],
+        ),
+        tool(
             "archive_task",
             "Archive a task (reversible).",
             json!({ "id": { "type": "integer" } }),
@@ -449,6 +456,15 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
             json!({ "task": task, "subtasks": store.list_subtasks(task.id)?,
                     "files": store.list_attachments(task.project_id, Some(task.id))? })
         }
+        "set_task_pending" => {
+            let pending = args
+                .get("pending")
+                .and_then(Value::as_bool)
+                .context("missing boolean argument «pending»")?;
+            let (task, warning) =
+                fjord_vcs::pending::set_pending(store, int_arg(args, "id")?, pending)?;
+            json!({ "task": task, "azure_warning": warning })
+        }
         "archive_task" => {
             serde_json::to_value(store.set_task_archived(int_arg(args, "id")?, true)?)?
         }
@@ -621,7 +637,7 @@ mod tests {
         );
         let tools =
             handle_line(&mut s, r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#).unwrap();
-        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 27);
+        assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 28);
         let unknown = handle_line(&mut s, r#"{"jsonrpc":"2.0","id":3,"method":"nope"}"#).unwrap();
         assert_eq!(unknown["error"]["code"], -32601);
         let bad = handle_line(&mut s, "{not json").unwrap();
