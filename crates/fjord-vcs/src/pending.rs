@@ -17,6 +17,18 @@ pub struct StatePush {
     pub state: String,
     /// True when the push takes the work item out of the pending state.
     pub resuming: bool,
+    /// The work item's new column on a team board: (board column field, column).
+    /// With a column, an empty `state` means only the column changes.
+    pub column: Option<(String, String)>,
+}
+
+impl StatePush {
+    /// The Fjord column this push is for.
+    pub fn column_name(&self) -> &str {
+        self.column
+            .as_ref()
+            .map_or(self.state.as_str(), |(_, c)| c.as_str())
+    }
 }
 
 /// What Azure needs after a task was marked pending or not.
@@ -73,6 +85,7 @@ fn sync_for(
             id,
             state: settings.pending_state.trim().to_string(),
             resuming: false,
+            column: None,
         }));
     }
     match store.resume_state(task_id)? {
@@ -82,6 +95,7 @@ fn sync_for(
             id,
             state,
             resuming: true,
+            column: None,
         })),
         None => Ok(PendingSync::UnknownResumeState { url: link.url }),
     }
@@ -89,12 +103,18 @@ fn sync_for(
 
 /// Network only: sends the state change.
 pub fn push_state(push: &StatePush) -> Result<()> {
-    crate::azure_write::set_state(&push.org, push.id, &push.state)
+    let column = push.column.as_ref().map(|(f, c)| (f.as_str(), c.as_str()));
+    crate::azure_write::set_state_and_column(&push.org, push.id, &push.state, column)
 }
 
 /// Store only: records the state Azure now has, so the next import doesn't see a change.
 pub fn record_pushed(store: &mut Store, push: &StatePush) -> Result<()> {
-    store.swap_external_state(push.task_id, &push.state)?;
+    if !push.state.trim().is_empty() {
+        store.swap_external_state(push.task_id, &push.state)?;
+    }
+    if let Some((_, column)) = &push.column {
+        store.swap_external_board_column(push.task_id, column)?;
+    }
     if push.resuming {
         store.set_resume_state(push.task_id, None)?;
     }

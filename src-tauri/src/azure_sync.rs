@@ -6,7 +6,10 @@ use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use fjord_core::{Store, Task};
-use fjord_vcs::azure_states::{StateColumnsReport, add_state_columns, project_states};
+use fjord_vcs::azure_states::{
+    StateColumnsReport, add_board_columns, add_state_columns, project_states,
+};
+use fjord_vcs::azure_teams::{AzureTeam, my_teams, team_board};
 use fjord_vcs::pending::{StatePush, push_state, record_pushed};
 use tauri::{AppHandle, Emitter, State};
 
@@ -43,7 +46,7 @@ fn send(job: &Job) -> Option<String> {
     let still_wanted = job.store.lock().ok().is_some_and(|s| {
         s.get_task(job.push.task_id)
             .and_then(|t| s.get_status(t.status_id))
-            .is_ok_and(|c| c.name.trim().eq_ignore_ascii_case(&job.push.state))
+            .is_ok_and(|c| c.name.trim().eq_ignore_ascii_case(job.push.column_name()))
     });
     if !still_wanted {
         return None;
@@ -91,21 +94,45 @@ pub fn move_task(
 }
 
 /// Gives a Fjord project a column for each state of an Azure DevOps project's work
-/// items, and puts imported tasks in the column for their state. Only reads from Azure.
+/// items, or with `team`, for each column of that team's board, and puts imported tasks
+/// in their column. Only reads from Azure.
 #[tauri::command]
 pub async fn azure_state_columns(
     state: State<'_, AppState>,
     org: String,
     project: String,
     project_id: i64,
+    team: Option<String>,
 ) -> CmdResult<StateColumnsReport> {
-    let states = tauri::async_runtime::spawn_blocking(move || project_states(&org, &project))
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())?;
+    let team = team.filter(|t| !t.trim().is_empty());
+    let columns = tauri::async_runtime::spawn_blocking(move || match team {
+        Some(team) => team_board(&org, &project, &team).map(Columns::Board),
+        None => project_states(&org, &project).map(Columns::States),
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
     let mut store = state
         .0
         .lock()
         .map_err(|_| "store lock poisoned".to_string())?;
-    add_state_columns(&mut store, project_id, &states).map_err(|e| e.to_string())
+    match columns {
+        Columns::Board(board) => add_board_columns(&mut store, project_id, &board),
+        Columns::States(states) => add_state_columns(&mut store, project_id, &states),
+    }
+    .map_err(|e| e.to_string())
+}
+
+enum Columns {
+    Board(fjord_core::TeamBoard),
+    States(Vec<fjord_vcs::azure_states::AzureState>),
+}
+
+/// The Azure DevOps teams you're a member of in `org`.
+#[tauri::command]
+pub async fn azure_my_teams(org: String) -> CmdResult<Vec<AzureTeam>> {
+    tauri::async_runtime::spawn_blocking(move || my_teams(&org))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
 }

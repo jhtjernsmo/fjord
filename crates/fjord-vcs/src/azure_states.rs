@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use fjord_core::Store;
+use fjord_core::{Store, TeamBoard};
 
 use crate::azure::{API_VERSION, HOST, api_error, check_org, encode, find_auth, read_json};
 use crate::github::{HttpError, agent, checked};
@@ -174,41 +174,75 @@ pub fn add_state_columns(
         .iter()
         .filter(|s| !settings.is_pending_state(&s.name))
         .collect();
-    let mut report = StateColumnsReport::default();
-    for state in &states {
+    let wanted: Vec<(&str, bool)> = states
+        .iter()
+        .map(|s| (s.name.as_str(), s.category.eq_ignore_ascii_case(COMPLETED)))
+        .collect();
+    let added = ensure_columns(store, project_id, &wanted)?;
+    store.clear_team_board(project_id)?;
+    let placed = place_imported_tasks(store, project_id)?;
+    Ok(StateColumnsReport { added, placed })
+}
+
+/// Store only: like [`add_state_columns`] for a team's board. The project remembers the
+/// board, so imports follow each work item's board column and moves send it back.
+pub fn add_board_columns(
+    store: &mut Store,
+    project_id: i64,
+    board: &TeamBoard,
+) -> Result<StateColumnsReport> {
+    let wanted: Vec<(&str, bool)> = board
+        .columns
+        .iter()
+        .map(|c| (c.name.as_str(), c.is_done))
+        .collect();
+    let added = ensure_columns(store, project_id, &wanted)?;
+    store.set_team_board(project_id, board)?;
+    let placed = place_imported_tasks(store, project_id)?;
+    Ok(StateColumnsReport { added, placed })
+}
+
+/// Adds the columns the project doesn't have yet and puts `wanted` first, in order;
+/// other columns keep their order after them. Returns the names added.
+fn ensure_columns(
+    store: &mut Store,
+    project_id: i64,
+    wanted: &[(&str, bool)],
+) -> Result<Vec<String>> {
+    let mut added = Vec::new();
+    for (name, done) in wanted {
         let exists = store
             .list_statuses(project_id)?
             .iter()
-            .any(|c| c.name.trim().eq_ignore_ascii_case(&state.name));
+            .any(|c| c.name.trim().eq_ignore_ascii_case(name));
         if !exists {
-            let done = state.category.eq_ignore_ascii_case(COMPLETED);
-            store.create_status(project_id, &state.name, None, done)?;
-            report.added.push(state.name.clone());
+            store.create_status(project_id, name, None, *done)?;
+            added.push(name.to_string());
         }
     }
     let columns = store.list_statuses(project_id)?;
-    let state_columns: Vec<i64> = states
+    let order: Vec<i64> = wanted
         .iter()
-        .filter_map(|s| {
+        .filter_map(|(name, _)| {
             columns
                 .iter()
-                .find(|c| c.name.trim().eq_ignore_ascii_case(&s.name))
+                .find(|c| c.name.trim().eq_ignore_ascii_case(name))
                 .map(|c| c.id)
         })
         .collect();
-    for (index, id) in state_columns.into_iter().enumerate() {
+    for (index, id) in order.into_iter().enumerate() {
         if store.list_statuses(project_id)?.get(index).map(|c| c.id) != Some(id) {
             store.move_status(id, index)?;
         }
     }
-    report.placed = place_imported_tasks(store, project_id)?;
-    Ok(report)
+    Ok(added)
 }
 
-/// Moves the project's imported tasks into the column named like their work item's
-/// state; tasks whose state has no column stay put. Never writes to Azure.
+/// Moves the project's imported tasks into the column for their work item's board
+/// column or state; tasks without a matching column stay put. Never writes to Azure.
 fn place_imported_tasks(store: &mut Store, project_id: i64) -> Result<usize> {
     let columns = store.list_statuses(project_id)?;
+    let board = store.team_board(project_id)?;
     let mut placed = 0;
     for (external_id, task_id) in store.external_ids("azure")? {
         if split_external_id(&external_id).is_none() {
@@ -218,18 +252,32 @@ fn place_imported_tasks(store: &mut Store, project_id: i64) -> Result<usize> {
         if task.project_id != project_id || task.archived_at.is_some() {
             continue;
         }
-        let Some(state) = store.external_state(task_id)? else {
+        let Some(name) = column_name(store, board.as_ref(), task_id)? else {
             continue;
         };
         let target = columns
             .iter()
-            .find(|c| c.name.trim().eq_ignore_ascii_case(state.trim()));
+            .find(|c| c.name.trim().eq_ignore_ascii_case(name.trim()));
         if let Some(column) = target.filter(|c| c.id != task.status_id) {
             store.move_task(task_id, column.id, None)?;
             placed += 1;
         }
     }
     Ok(placed)
+}
+
+/// The Fjord column an imported task belongs in: on a team board its board column (or,
+/// before an import has seen it, the first board column for its state); else its state.
+fn column_name(store: &Store, board: Option<&TeamBoard>, task_id: i64) -> Result<Option<String>> {
+    let state = store.external_state(task_id)?;
+    let Some(board) = board else {
+        return Ok(state);
+    };
+    if let Some(column) = store.external_board_column(task_id)? {
+        return Ok(Some(column));
+    }
+    let kind = store.external_kind(task_id)?.unwrap_or_default();
+    Ok(state.and_then(|s| board.column_for_state(&kind, &s).map(|c| c.name.clone())))
 }
 
 #[cfg(test)]

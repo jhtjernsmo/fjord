@@ -266,12 +266,34 @@ pub fn apply_update(
 
 /// Moves a work item to another state, e.g. "Pending" or back to "Active".
 pub fn set_state(org: &str, id: u64, state: &str) -> Result<()> {
+    set_state_and_column(org, id, state, None)
+}
+
+/// Sets a work item's state and/or its column on a team board (`(column field, column)`),
+/// in one update. An empty `state` leaves the state alone.
+pub fn set_state_and_column(
+    org: &str,
+    id: u64,
+    state: &str,
+    column: Option<(&str, &str)>,
+) -> Result<()> {
     let org = check_org(org)?;
     let (auth, _) = find_auth(org).ok_or_else(|| VcsError::NoAzureToken(org.to_string()))?;
-    let body = serde_json::json!([
-        { "op": "add", "path": "/fields/System.State", "value": state }
-    ])
-    .to_string();
+    let mut ops = Vec::new();
+    if !state.trim().is_empty() {
+        ops.push(
+            serde_json::json!({ "op": "add", "path": "/fields/System.State", "value": state }),
+        );
+    }
+    if let Some((field, value)) = column {
+        ops.push(
+            serde_json::json!({ "op": "add", "path": format!("/fields/{field}"), "value": value }),
+        );
+    }
+    if ops.is_empty() {
+        return Ok(());
+    }
+    let body = serde_json::Value::Array(ops).to_string();
     let res = agent()
         .patch(&format!(
             "{HOST}/{}/_apis/wit/workitems/{id}?api-version={API_VERSION}",

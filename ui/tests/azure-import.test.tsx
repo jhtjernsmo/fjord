@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 // A tiny fake backend: saving bumps the change counter, like a real write does.
-const backend = vi.hoisted(() => ({ saved: { enabled: false, mappings: [] as unknown[], closed_days: 30 }, counter: 0 }))
+const backend = vi.hoisted(() => ({ saved: { enabled: false, mappings: [] as unknown[], closed_days: 30 }, counter: 0, columnCalls: [] as unknown[] }))
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(async (cmd: string, args?: { settings?: typeof backend.saved }) => {
     if (cmd === 'get_import_settings') return structuredClone(backend.saved)
@@ -13,6 +13,12 @@ vi.mock('@tauri-apps/api/core', () => ({
       return null
     }
     if (cmd === 'list_projects') return [{ id: 1, name: 'Bokost' }]
+    if (cmd === 'azure_my_teams') return [{ project: 'Shop', name: 'Payments' }, { project: 'Shop', name: 'Bokost' }]
+    if (cmd === 'create_project') return { id: 7, name: 'Payments' }
+    if (cmd === 'azure_state_columns') {
+      backend.columnCalls.push(args as never)
+      return { added: ['New', 'In Review', 'Closed'], placed: 0 }
+    }
     if (cmd === 'change_counter') return backend.counter
     return null
   }),
@@ -50,6 +56,35 @@ describe('Azure Boards import settings', () => {
       await new Promise((r) => setTimeout(r, 50))
     })
     expect(backend.saved.mappings).toEqual([{ org: 'contoso', project: 'Mobile App', fjord_project_id: 1 }])
+  })
+
+  it('adds a team you are in as its own project with the board as columns', async () => {
+    render(
+      <AppProvider>
+        <AzureImportSettings />
+      </AppProvider>,
+    )
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    fireEvent.click(screen.getByText('Find my teams'))
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    const add = screen.getAllByText('Add as project')
+    expect(add).toHaveLength(2)
+    await act(async () => {
+      fireEvent.click(add[0])
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    expect(backend.saved.mappings).toContainEqual({ org: 'contoso', project: 'Shop', team: 'Payments', fjord_project_id: 7 })
+    expect(backend.columnCalls).toContainEqual({ org: 'contoso', project: 'Shop', projectId: 7, team: 'Payments' })
+    // A team named like an existing Fjord project goes into that project.
+    await act(async () => {
+      fireEvent.click(screen.getByText('Add as project'))
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    expect(backend.saved.mappings).toContainEqual({ org: 'contoso', project: 'Shop', team: 'Bokost', fjord_project_id: 1 })
   })
 })
 
