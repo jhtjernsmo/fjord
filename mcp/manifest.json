@@ -1,0 +1,38 @@
+{
+  "manifest_version": "0.3",
+  "name": "fjord",
+  "display_name": "Fjord",
+  "version": "0.0.0",
+  "description": "Kanban boards, markdown notes and files from the Fjord desktop app, for AI agents.",
+  "long_description": "Fjord is a free, open-source project manager that keeps boards, notes and files in one SQLite file on your own computer. This extension runs `fjord mcp`, so Claude can read your boards, create and move tasks, write notes, start branches and open pull requests. It works on the same data as the Fjord app. There is deliberately no delete tool, and every change is tagged as made by an AI.",
+  "author": {
+    "name": "Jonas Hollund Tjernsmo",
+    "url": "https://github.com/jhtjernsmo"
+  },
+  "homepage": "https://jhtjernsmo.github.io/fjord/",
+  "documentation": "https://github.com/jhtjernsmo/fjord#ai-agents-mcp",
+  "support": "https://github.com/jhtjernsmo/fjord/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jhtjernsmo/fjord"
+  },
+  "icon": "icon.png",
+  "license": "MIT OR Apache-2.0",
+  "keywords": ["kanban", "project management", "notes", "git", "azure devops"],
+  "server": {
+    "type": "binary",
+    "entry_point": "server/fjord-linux",
+    "mcp_config": {
+      "command": "${__dirname}/server/fjord-linux",
+      "args": ["mcp"],
+      "env": {},
+      "platform_overrides": {
+        "darwin": { "command": "${__dirname}/server/fjord-darwin" },
+        "win32": { "command": "${__dirname}/server/fjord-windows.exe" }
+      }
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"]
+  }
+}

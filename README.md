@@ -271,7 +271,12 @@ It needs the `fjord` CLI 0.2.18 or later and talks to the same local database as
 `fjord mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server on stdio. Changes it
 makes are recorded as `claude` (override with `--actor`) and shown with an **AI** tag in the app.
 
-It needs the `fjord` command-line tool on your PATH (see [Install](#install)). With Claude Code:
+**Claude Desktop:** download `fjord-mcp.mcpb` from the [latest release](https://github.com/jhtjernsmo/fjord/releases/latest)
+and open it; Claude Desktop installs Fjord as an extension, with the command-line tool included (macOS on Apple
+Silicon, Windows and Linux). Fjord is also listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as
+`io.github.jhtjernsmo/fjord`.
+
+Other clients need the `fjord` command-line tool on your PATH (see [Install](#install)). With Claude Code:
 
 ```sh
 claude mcp add fjord -- fjord mcp
