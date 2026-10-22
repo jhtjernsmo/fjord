@@ -6,6 +6,7 @@ Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 
 ## Unreleased
 
+- **MCP tool annotations:** every tool now tells AI clients whether it only reads, can overwrite (only `update_task` and `update_note`), is safe to repeat, and reaches GitHub or Azure DevOps. Clients such as Claude can use this to approve read-only tools without asking. Every MCP tool is now covered by tests.
 - *Add as project* (and any other save in **Settings → Integrations**) no longer fails with “project 5 not found” when an Azure row still points to a project deleted before 0.2.31. Such rows are now dropped when the settings load and when they are saved.
 
 ## 0.2.31 — 2026-10-22
