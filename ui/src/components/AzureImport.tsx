@@ -190,6 +190,9 @@ export function AzureImportSettings() {
       const next = { ...settings, mappings: [...settings.mappings, mapping] }
       setSettings(next)
       await api.setImportSettings({ ...next, mappings: next.mappings.filter((m) => m.org.trim() && m.project.trim() && m.fjord_project_id) })
+      // Saving drops rows into deleted projects; show what was kept.
+      const saved = await api.getImportSettings()
+      setSettings((current) => ({ ...current, mappings: saved.mappings }))
       const report = await api.azureStateColumns(org, team.project, projectId, team.name)
       toast(`${t('import.teamAdded', { name: team.name })} ${stateColumnsMessage(report, t)}`, 'success')
     } catch (e) {

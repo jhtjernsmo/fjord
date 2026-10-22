@@ -134,11 +134,22 @@ impl Default for ImportSettings {
 }
 
 impl Store {
+    /// The import settings. Mappings into a project that no longer exists (left behind
+    /// by deletes before 0.2.31) are left out, so they can't block saving or importing.
     pub fn import_settings(&self) -> Result<ImportSettings> {
-        Ok(self
+        let mut settings: ImportSettings = self
             .get_setting(IMPORT_SETTINGS_KEY)?
             .and_then(|json| serde_json::from_str(&json).ok())
-            .unwrap_or_default())
+            .unwrap_or_default();
+        settings.mappings = self.existing_mappings(settings.mappings);
+        Ok(settings)
+    }
+
+    fn existing_mappings(&self, mappings: Vec<ImportMapping>) -> Vec<ImportMapping> {
+        mappings
+            .into_iter()
+            .filter(|m| self.get_project(m.fjord_project_id).is_ok())
+            .collect()
     }
 
     /// Drops the Azure mappings into a deleted project, and its team board.
@@ -155,11 +166,14 @@ impl Store {
         self.clear_team_board(project_id)
     }
 
+    /// Saves the import settings. A mapping into a project that doesn't exist (e.g. one
+    /// deleted while Settings was open) is dropped rather than failing the whole save.
     pub fn set_import_settings(&mut self, settings: &ImportSettings) -> Result<()> {
-        for m in &settings.mappings {
-            self.get_project(m.fjord_project_id)?;
-        }
-        let json = serde_json::to_string(settings).expect("settings serialize");
+        let settings = ImportSettings {
+            mappings: self.existing_mappings(settings.mappings.clone()),
+            ..settings.clone()
+        };
+        let json = serde_json::to_string(&settings).expect("settings serialize");
         self.set_setting(IMPORT_SETTINGS_KEY, &json)
     }
 
@@ -501,7 +515,7 @@ mod tests {
     }
 
     #[test]
-    fn import_settings_round_trip_and_validate_projects() {
+    fn import_settings_round_trip_without_missing_projects() {
         let (mut s, _d) = store();
         assert_eq!(s.import_settings().unwrap(), ImportSettings::default());
         let p = s
@@ -523,13 +537,26 @@ mod tests {
         };
         s.set_import_settings(&settings).unwrap();
         assert_eq!(s.import_settings().unwrap(), settings);
-        let bad = ImportSettings {
-            mappings: vec![ImportMapping {
-                fjord_project_id: 999,
-                ..settings.mappings[0].clone()
-            }],
-            ..settings
+        // A mapping into a missing project is dropped, and the rest still saves.
+        let with_missing = ImportSettings {
+            mappings: vec![
+                ImportMapping {
+                    fjord_project_id: 999,
+                    ..settings.mappings[0].clone()
+                },
+                settings.mappings[0].clone(),
+            ],
+            closed_days: 7,
+            ..settings.clone()
         };
-        assert!(s.set_import_settings(&bad).is_err());
+        s.set_import_settings(&with_missing).unwrap();
+        let saved = s.import_settings().unwrap();
+        assert_eq!(saved.mappings, settings.mappings);
+        assert_eq!(saved.closed_days, 7);
+
+        // Settings saved before deletes cleaned up their mappings load without them.
+        let stale = serde_json::to_string(&with_missing).unwrap();
+        s.set_setting(IMPORT_SETTINGS_KEY, &stale).unwrap();
+        assert_eq!(s.import_settings().unwrap().mappings, settings.mappings);
     }
 }
