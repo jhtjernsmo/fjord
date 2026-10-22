@@ -5,6 +5,7 @@
 pub mod azure;
 pub mod azure_files;
 pub mod azure_mentions;
+pub mod azure_states;
 pub mod azure_write;
 pub mod credentials;
 pub mod editor;
@@ -13,6 +14,7 @@ pub mod github;
 pub mod new_repo;
 pub mod pending;
 mod process;
+pub mod state_sync;
 pub mod waiting;
 
 use std::collections::{HashMap, HashSet};
@@ -1577,6 +1579,7 @@ mod tests {
                 project: "App".into(),
                 fjord_project_id: p,
             }],
+            write_states: true,
             ..Default::default()
         };
         s.set_import_settings(&settings).unwrap();
@@ -1679,6 +1682,254 @@ mod tests {
         s.set_import_settings(&settings).unwrap();
         let (_, sync) = pending::mark_pending(&mut s, own.id, true).unwrap();
         assert_eq!(sync, pending::PendingSync::Nothing);
+    }
+
+    #[test]
+    fn writing_pending_to_azure_is_off_by_default() {
+        let (mut s, _d) = store();
+        let p = s
+            .create_project(NewProject {
+                name: "Demo".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let settings = ImportSettings {
+            enabled: true,
+            mappings: vec![fjord_core::ImportMapping {
+                org: "contoso".into(),
+                project: "App".into(),
+                fjord_project_id: p,
+            }],
+            ..Default::default()
+        };
+        assert!(!settings.write_states);
+        s.set_import_settings(&settings).unwrap();
+        apply_import(
+            &mut s,
+            &settings,
+            &ImportFetch {
+                items: vec![work_item(9, "Active")],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let t = s
+            .external_link("azure", "contoso/9")
+            .unwrap()
+            .unwrap()
+            .task_id;
+        let (task, sync) = pending::mark_pending(&mut s, t, true).unwrap();
+        assert!(task.pending_since.is_some());
+        assert_eq!(sync, pending::PendingSync::Nothing);
+    }
+
+    fn work_item(id: u64, state: &str) -> WorkItem {
+        WorkItem {
+            org: "contoso".into(),
+            id,
+            rev: 1,
+            project: "App".into(),
+            kind: "User Story".into(),
+            state: state.into(),
+            area: "App".into(),
+            title: format!("Story {id}"),
+            description_md: String::new(),
+            acceptance_md: String::new(),
+            risk_md: String::new(),
+            files: Vec::new(),
+            priority: None,
+            due: None,
+            parent: None,
+        }
+    }
+
+    /// A project with Azure's states as columns and two imported work items (9 Active
+    /// with subtask 10 New), with writing to Azure on or off.
+    fn synced_board(write_states: bool) -> (Store, tempfile::TempDir, i64, ImportSettings) {
+        let (mut s, d) = store();
+        let p = s
+            .create_project(NewProject {
+                name: "Demo".into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id;
+        let settings = ImportSettings {
+            enabled: true,
+            mappings: vec![fjord_core::ImportMapping {
+                org: "contoso".into(),
+                project: "App".into(),
+                fjord_project_id: p,
+            }],
+            write_states,
+            ..Default::default()
+        };
+        s.set_import_settings(&settings).unwrap();
+        let states: Vec<azure_states::AzureState> = [
+            ("New", "Proposed"),
+            ("Active", "InProgress"),
+            ("Pending", "InProgress"),
+            ("Resolved", "Resolved"),
+            ("Closed", "Completed"),
+        ]
+        .iter()
+        .map(|(name, category)| azure_states::AzureState {
+            name: (*name).into(),
+            category: (*category).into(),
+        })
+        .collect();
+        azure_states::add_state_columns(&mut s, p, &states).unwrap();
+        let child = WorkItem {
+            parent: Some(9),
+            ..work_item(10, "New")
+        };
+        apply_import(
+            &mut s,
+            &settings,
+            &ImportFetch {
+                items: vec![work_item(9, "Active"), child],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        (s, d, p, settings)
+    }
+
+    fn task_of(s: &Store, id: u64) -> Task {
+        let link = s
+            .external_link("azure", &format!("contoso/{id}"))
+            .unwrap()
+            .unwrap();
+        s.get_task(link.task_id).unwrap()
+    }
+
+    fn column(s: &Store, project: i64, name: &str) -> i64 {
+        s.list_statuses(project)
+            .unwrap()
+            .into_iter()
+            .find(|c| c.name == name)
+            .unwrap()
+            .id
+    }
+
+    #[test]
+    fn azure_states_become_columns_in_order_and_tasks_follow() {
+        let (s, _d, p, _) = synced_board(false);
+        let names: Vec<String> = s
+            .list_statuses(p)
+            .unwrap()
+            .into_iter()
+            .map(|c| c.name)
+            .collect();
+        // Azure's states first (Pending is a flag, not a column), the default columns after.
+        assert_eq!(&names[..4], ["New", "Active", "Resolved", "Closed"]);
+        assert!(!names[..4].contains(&"Pending".to_string()));
+        let closed = s
+            .list_statuses(p)
+            .unwrap()
+            .into_iter()
+            .find(|c| c.name == "Closed")
+            .unwrap();
+        assert!(closed.is_done);
+        assert_eq!(task_of(&s, 9).status_id, column(&s, p, "Active"));
+        assert_eq!(task_of(&s, 10).status_id, column(&s, p, "New"));
+    }
+
+    #[test]
+    fn adding_state_columns_again_adds_nothing_and_places_existing_tasks() {
+        let (mut s, _d, p, _) = synced_board(false);
+        let t = task_of(&s, 9);
+        s.move_task(t.id, column(&s, p, "New"), None).unwrap();
+        let again = azure_states::add_state_columns(
+            &mut s,
+            p,
+            &[azure_states::AzureState {
+                name: "active".into(),
+                category: "InProgress".into(),
+            }],
+        )
+        .unwrap();
+        assert!(again.added.is_empty());
+        assert_eq!(again.placed, 1);
+        assert_eq!(task_of(&s, 9).status_id, column(&s, p, "Active"));
+    }
+
+    #[test]
+    fn a_column_move_sends_exactly_one_state_for_that_work_item() {
+        let (mut s, _d, p, _) = synced_board(true);
+        let parent = task_of(&s, 9);
+        let resolved = column(&s, p, "Resolved");
+        let (_, push) = state_sync::move_task(&mut s, parent.id, resolved, None).unwrap();
+        let push = push.expect("a state to send");
+        assert_eq!(
+            (
+                push.org.as_str(),
+                push.id,
+                push.state.as_str(),
+                push.task_id
+            ),
+            ("contoso", 9, "Resolved", parent.id)
+        );
+        // The subtask's work item isn't touched.
+        assert_eq!(task_of(&s, 10).status_id, column(&s, p, "New"));
+        // Once sent, the next import sees no change and leaves the task where it is.
+        pending::record_pushed(&mut s, &push).unwrap();
+        assert_eq!(
+            s.external_state(parent.id).unwrap().as_deref(),
+            Some("Resolved")
+        );
+    }
+
+    #[test]
+    fn no_state_is_sent_for_reorders_own_tasks_matching_states_or_when_off() {
+        let (mut s, _d, p, _) = synced_board(true);
+        let active = column(&s, p, "Active");
+        let t = task_of(&s, 9);
+        // Reordering within the column.
+        let (_, push) = state_sync::move_task(&mut s, t.id, active, None).unwrap();
+        assert_eq!(push, None);
+        // A task that isn't from Azure.
+        let own = s
+            .create_task(fjord_core::NewTask {
+                project_id: p,
+                title: "Own".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        let (_, push) = state_sync::move_task(&mut s, own.id, active, None).unwrap();
+        assert_eq!(push, None);
+
+        // Writing off: the task moves, nothing is sent.
+        let (mut s, _d, p, _) = synced_board(false);
+        let t = task_of(&s, 9);
+        let resolved = column(&s, p, "Resolved");
+        let (moved, push) = state_sync::move_task(&mut s, t.id, resolved, None).unwrap();
+        assert_eq!(moved.status_id, resolved);
+        assert_eq!(push, None);
+    }
+
+    #[test]
+    fn moving_a_pending_task_changes_the_state_it_resumes_to() {
+        let (mut s, _d, p, settings) = synced_board(true);
+        let t = task_of(&s, 9);
+        apply_import(
+            &mut s,
+            &settings,
+            &ImportFetch {
+                items: vec![WorkItem {
+                    rev: 2,
+                    ..work_item(9, "Pending")
+                }],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(s.get_task(t.id).unwrap().pending_since.is_some());
+        let resolved = column(&s, p, "Resolved");
+        let (_, push) = state_sync::move_task(&mut s, t.id, resolved, None).unwrap();
+        assert_eq!(push, None);
+        assert_eq!(s.resume_state(t.id).unwrap().as_deref(), Some("Resolved"));
     }
 
     #[test]

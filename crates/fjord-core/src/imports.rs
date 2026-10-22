@@ -85,10 +85,15 @@ pub struct ImportSettings {
     #[serde(default)]
     pub write_back: bool,
     /// The Azure state that means pending (waiting on the client). Work items in it are
-    /// pending in Fjord, and marking a task pending in Fjord moves its work item there.
-    /// Empty turns the sync off.
+    /// pending in Fjord, and with `write_states` on, marking a task pending in Fjord moves
+    /// its work item there. Empty turns both off.
     #[serde(default = "default_pending_state")]
     pub pending_state: String,
+    /// Off by default: Fjord sends state changes to Azure Boards. Moving a task to
+    /// another column sets its work item's state to the column's name, and marking it
+    /// pending moves the work item to the pending state. Reading states works without it.
+    #[serde(default)]
+    pub write_states: bool,
 }
 
 pub const DEFAULT_PENDING_STATE: &str = "Pending";
@@ -119,6 +124,7 @@ impl Default for ImportSettings {
             download_files: true,
             write_back: false,
             pending_state: default_pending_state(),
+            write_states: false,
         }
     }
 }

@@ -214,7 +214,7 @@ enum TaskCmd {
     /// Start a user story analysis: a note from the template, linked to the task (or show the one it has)
     Analyze { id: i64 },
     /// Mark a task pending: waiting on someone else, e.g. a reply from the client.
-    /// A task from Azure Boards moves its work item to the pending state too.
+    /// With "Send state changes to Azure" on, its Azure Boards work item moves to the pending state too.
     Pending {
         id: i64,
         /// Stop pending instead
@@ -597,12 +597,14 @@ fn task(store: &mut Store, out: &output::Printer, cmd: TaskCmd) -> Result<()> {
             id,
             status,
             project,
-        } => out.task(&mcp::move_task_to(
-            store,
-            id,
-            status.as_deref(),
-            project.as_deref(),
-        )?),
+        } => {
+            let (task, warning) =
+                mcp::move_task_to(store, id, status.as_deref(), project.as_deref())?;
+            if let Some(warning) = warning {
+                eprintln!("warning: {warning}");
+            }
+            out.task(&task)
+        }
         TaskCmd::Nest { id, parent } => out.task(&store.set_task_parent(id, Some(parent))?),
         TaskCmd::Unnest { id } => out.task(&store.set_task_parent(id, None)?),
         TaskCmd::Done { id } => {
@@ -612,7 +614,11 @@ fn task(store: &mut Store, out: &output::Printer, cmd: TaskCmd) -> Result<()> {
                 .into_iter()
                 .find(|s| s.is_done)
                 .context("project has no done column")?;
-            out.task(&store.move_task(id, done.id, None)?)
+            let (task, warning) = fjord_vcs::state_sync::move_and_sync(store, id, done.id, None)?;
+            if let Some(warning) = warning {
+                eprintln!("warning: {warning}");
+            }
+            out.task(&task)
         }
         TaskCmd::Pending { id, off } => {
             let (task, warning) = fjord_vcs::pending::set_pending(store, id, !off)?;

@@ -31,11 +31,13 @@ works when MCP doesn't.
 - **Projects** are referenced by id or slug (`bokost`), tasks and notes by number id. In text, write
   a task as `#12`.
 - **Columns** are per project and named by the user (often To do, In progress, Done). `move_task`
-  takes a column name or id; `complete_task` moves to whichever column counts as done.
+  takes a column name or id; `complete_task` moves to whichever column counts as done. When the user
+  has turned on "Send state changes to Azure", moving a task from Azure Boards also sets its work
+  item's state to the column's name, so only move those when the user asked or clearly said so.
 - **Priority** is 0 none, 1 low, 2 medium, 3 high. Due dates are `YYYY-MM-DD`.
 - **Pending** means waiting on someone else, usually a reply from the client. Use `set_task_pending`
   instead of moving the task to another column; it stays where it is. On a task from Azure Boards this
-  also moves the work item to the pending state, so only do it when the user asked or clearly said so.
+  can also move the work item to the pending state, so only do it when the user asked or clearly said so.
 - **Bodies are markdown.** `update_task` with `body` replaces the whole description, so read the task
   first with `get_task` and keep what the user wrote. `update_note` has `append` for adding
   to the end without rewriting.

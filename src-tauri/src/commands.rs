@@ -101,16 +101,6 @@ pub fn update_task(state: State<AppState>, id: i64, patch: TaskPatch) -> CmdResu
 }
 
 #[tauri::command]
-pub fn move_task(
-    state: State<AppState>,
-    id: i64,
-    status_id: i64,
-    before_task_id: Option<i64>,
-) -> CmdResult<Task> {
-    with_store(&state, |s| s.move_task(id, status_id, before_task_id))
-}
-
-#[tauri::command]
 pub fn set_task_parent(state: State<AppState>, id: i64, parent_id: Option<i64>) -> CmdResult<Task> {
     with_store(&state, |s| s.set_task_parent(id, parent_id))
 }
