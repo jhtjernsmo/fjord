@@ -308,7 +308,10 @@ export function AzureImportSettings() {
         </button>
       </div>
       <div className="user-row">
-        <input className="input mono" value={teamOrg} placeholder={org || t('azure.org')} onChange={(e) => setTeamOrg(e.target.value)} aria-label={t('import.teamsOrg')} />
+        <label className="inline-select" title={t('import.teamsOrg')}>
+          {t('import.teamsOrgLabel')}
+          <input className="input mono" value={teamOrg} placeholder={org || t('azure.org')} onChange={(e) => setTeamOrg(e.target.value)} aria-label={t('import.teamsOrg')} />
+        </label>
         <button className="btn" disabled={busy || !org} onClick={findTeams}>
           <Users size={13} /> {t('import.findTeams')}
         </button>
@@ -317,7 +320,8 @@ export function AzureImportSettings() {
       {teams?.map((team) => (
         <div className="user-row import-mapping" key={`${team.project}/${team.name}`}>
           <span className="grow">
-            {team.name} <span className="dim">· {team.project}</span>
+            <span className="dim">{team.project} / </span>
+            {team.name}
           </span>
           {isMapped(team) ? (
             <span className="dim">{t('import.teamMapped')}</span>

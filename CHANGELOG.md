@@ -4,7 +4,7 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
-## Unreleased
+## 0.2.30 — 2026-10-22
 
 - **Column moves follow to Azure Boards:** with the new **Settings → Integrations → Send state changes to Azure** on, moving a task from Azure Boards to another column sets its work item's state to the column's name (New, Active, Resolved, …). One move changes one work item, the one the task came from; reordering within a column, imports and subtasks never write. The move saves at once and Azure is updated in the background; if Azure has no state with that name, a message says so and the work item keeps its state. The CLI (`fjord task move`, `fjord task done`) and the MCP tools `move_task` and `complete_task` follow the same switch.
 - **Azure states as columns:** the new columns button on each Azure project in **Settings → Integrations** adds a column for every state of that project's work items, in Azure's order (finished states count as done), and moves imported tasks into the column for their state. Your other columns stay, after them. It only reads from Azure.
