@@ -4,6 +4,10 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## Unreleased
+
+- *Add as project* (and any other save in **Settings → Integrations**) no longer fails with “project 5 not found” when an Azure row still points to a project deleted before 0.2.31. Such rows are now dropped when the settings load and when they are saved.
+
 ## 0.2.31 — 2026-10-22
 
 - **Find my boards** replaces *Find my teams*: it lists every Azure team board that holds your open work items, with how many (e.g. *Shop / Payments · 3 of your tasks*), whether or not you're a member of the team. Being on a board through a group used to hide it.
