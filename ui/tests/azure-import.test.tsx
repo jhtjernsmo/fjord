@@ -13,7 +13,7 @@ vi.mock('@tauri-apps/api/core', () => ({
       return null
     }
     if (cmd === 'list_projects') return [{ id: 1, name: 'Bokost' }]
-    if (cmd === 'azure_my_teams') return [{ project: 'Shop', name: 'Payments' }, { project: 'Shop', name: 'Bokost' }]
+    if (cmd === 'azure_my_boards') return [{ project: 'Shop', name: 'Payments', tasks: 3 }, { project: 'Shop', name: 'Bokost', tasks: 1 }]
     if (cmd === 'create_project') return { id: 7, name: 'Payments' }
     if (cmd === 'azure_state_columns') {
       backend.columnCalls.push(args as never)
@@ -58,7 +58,7 @@ describe('Azure Boards import settings', () => {
     expect(backend.saved.mappings).toEqual([{ org: 'contoso', project: 'Mobile App', fjord_project_id: 1 }])
   })
 
-  it('adds a team you are in as its own project with the board as columns', async () => {
+  it('adds a board with your tasks as its own project with the board as columns', async () => {
     render(
       <AppProvider>
         <AzureImportSettings />
@@ -67,7 +67,11 @@ describe('Azure Boards import settings', () => {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50))
     })
-    fireEvent.click(screen.getByText('Find my teams'))
+    fireEvent.click(screen.getByText('Find my boards'))
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    expect(screen.getByText('· 3 of your tasks')).toBeTruthy()
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50))
     })

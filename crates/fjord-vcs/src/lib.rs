@@ -493,8 +493,8 @@ fn team_key(org: &str, project: &str, team: &str) -> (String, String, String) {
     )
 }
 
-/// The mapping a work item goes to: a team mapping whose areas hold it, else the
-/// mapping for its whole Azure project.
+/// The mapping a work item goes to: the team mapping whose areas hold it most
+/// specifically, else the mapping for its whole Azure project.
 fn mapping_for<'a>(
     settings: &'a ImportSettings,
     fetch: &ImportFetch,
@@ -503,17 +503,22 @@ fn mapping_for<'a>(
     let same_project = |m: &&fjord_core::ImportMapping| {
         m.org.eq_ignore_ascii_case(&item.org) && m.project.eq_ignore_ascii_case(&item.project)
     };
-    let in_team = |m: &&fjord_core::ImportMapping| {
+    let depth = |m: &&fjord_core::ImportMapping| {
         fetch
             .team_areas
             .get(&team_key(&m.org, &m.project, &m.team))
-            .is_some_and(|areas| azure_teams::in_team_areas(&item.area, areas))
+            .and_then(|areas| azure_teams::owning_depth(&item.area, areas))
     };
+    // The team owning the deepest area wins (Payments over the project's default team).
     settings
         .mappings
         .iter()
         .filter(same_project)
-        .find(|m| !m.team.trim().is_empty() && in_team(m))
+        .filter(|m| !m.team.trim().is_empty())
+        .filter_map(|m| depth(&m).map(|d| (d, m)))
+        .rev()
+        .max_by_key(|(d, _)| *d)
+        .map(|(_, m)| m)
         .or_else(|| {
             settings
                 .mappings
@@ -909,7 +914,11 @@ pub fn apply_import(
     let mut report = ImportReport::default();
     let mut task_of: HashMap<(String, u64), Task> = HashMap::new();
     for item in &fetch.items {
-        let Some(mapping) = mapping_for(settings, fetch, item) else {
+        // A mapping into a project that no longer exists (deleted before 0.2.31 cleaned
+        // up its mappings) counts as unmapped instead of failing the whole import.
+        let Some(mapping) = mapping_for(settings, fetch, item)
+            .filter(|m| store.get_project(m.fjord_project_id).is_ok())
+        else {
             report.unmapped += 1;
             continue;
         };
@@ -2079,6 +2088,32 @@ mod tests {
     }
 
     #[test]
+    fn a_mapping_into_a_missing_project_is_skipped_not_fatal() {
+        let (mut s, _d, [payments, _, app], settings, mut fetch) = team_setup();
+        // Settings saved before deleting a project cleaned them up.
+        let stale = ImportSettings {
+            mappings: settings
+                .mappings
+                .iter()
+                .cloned()
+                .map(|m| fjord_core::ImportMapping {
+                    fjord_project_id: if m.fjord_project_id == payments {
+                        999
+                    } else {
+                        m.fjord_project_id
+                    },
+                    ..m
+                })
+                .collect(),
+            ..settings.clone()
+        };
+        fetch.items = vec![in_area(1, "App\\Payments"), in_area(2, "App")];
+        let report = apply_import(&mut s, &stale, &fetch).unwrap();
+        assert_eq!(report.unmapped, 1);
+        assert_eq!(task_of(&s, 2).project_id, app);
+    }
+
+    #[test]
     fn team_mappings_take_the_work_items_in_their_areas() {
         let (mut s, _d, [payments, web, app], settings, mut fetch) = team_setup();
         fetch.items = vec![
@@ -2105,6 +2140,33 @@ mod tests {
         fetch.items = vec![in_area(6, "App\\Other")];
         let report = apply_import(&mut s, &teams_only, &fetch).unwrap();
         assert_eq!(report.unmapped, 1);
+    }
+
+    #[test]
+    fn the_most_specific_team_wins_over_the_projects_default_team() {
+        let (mut s, _d, [payments, _, app], settings, mut fetch) = team_setup();
+        // The project's default team owns everything; it's listed before Payments.
+        let mut with_default = settings.clone();
+        with_default.mappings = vec![
+            fjord_core::ImportMapping {
+                org: "contoso".into(),
+                project: "App".into(),
+                fjord_project_id: app,
+                team: "App Team".into(),
+            },
+            settings.mappings[1].clone(),
+        ];
+        fetch.team_areas.insert(
+            team_key("contoso", "App", "App Team"),
+            vec![azure_teams::TeamArea {
+                value: "App".into(),
+                include_children: true,
+            }],
+        );
+        fetch.items = vec![in_area(1, "App\\Payments\\Refunds"), in_area(2, "App\\Web")];
+        apply_import(&mut s, &with_default, &fetch).unwrap();
+        assert_eq!(task_of(&s, 1).project_id, payments);
+        assert_eq!(task_of(&s, 2).project_id, app);
     }
 
     #[test]

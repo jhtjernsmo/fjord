@@ -4,6 +4,12 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## Unreleased
+
+- **Find my boards** replaces *Find my teams*: it lists every Azure team board that holds your open work items, with how many (e.g. *Shop / Payments · 3 of your tasks*), whether or not you're a member of the team. Being on a board through a group used to hide it.
+- When several mapped teams own the same work item (such as the project's default team and *Payments*), it goes to the team with the most specific area.
+- Deleting a Fjord project now removes the Azure rows pointing to it. Before, the import stopped with “project 5 not found”; it now skips such rows, and Settings marks them *(deleted project)*.
+
 ## 0.2.30 — 2026-10-22
 
 - **Column moves follow to Azure Boards:** with the new **Settings → Integrations → Send state changes to Azure** on, moving a task from Azure Boards to another column sets its work item's state to the column's name (New, Active, Resolved, …). One move changes one work item, the one the task came from; reordering within a column, imports and subtasks never write. The move saves at once and Azure is updated in the background; if Azure has no state with that name, a message says so and the work item keeps its state. The CLI (`fjord task move`, `fjord task done`) and the MCP tools `move_task` and `complete_task` follow the same switch.

@@ -162,7 +162,7 @@ export function AzureImportSettings() {
     }
   }
 
-  // Find my teams: each team you're in can become its own Fjord project.
+  // Find my boards: each team board with your work items can become its own Fjord project.
   const [teamOrg, setTeamOrg] = useState('')
   const [teams, setTeams] = useState<AzureTeam[] | null>(null)
   const org = teamOrg.trim() || settings.mappings.find((m) => m.org.trim())?.org.trim() || ''
@@ -172,7 +172,7 @@ export function AzureImportSettings() {
   const findTeams = async () => {
     setBusy(true)
     try {
-      setTeams(await api.azureMyTeams(org))
+      setTeams(await api.azureMyBoards(org))
     } catch (e) {
       toast(errorMessage(e), 'error')
     } finally {
@@ -276,6 +276,7 @@ export function AzureImportSettings() {
           <input className="input" value={m.team ?? ''} placeholder={t('import.team')} onChange={(e) => setMapping(i, { team: e.target.value })} onBlur={() => save(settings)} aria-label={t('import.team')} title={t('import.teamHint')} />
           <span className="dim">→</span>
           <select className="input" value={m.fjord_project_id} onChange={(e) => save({ ...settings, mappings: settings.mappings.map((x, j) => (j === i ? { ...x, fjord_project_id: Number(e.target.value) } : x)) })} aria-label={t('notes.project')}>
+            {projects && !projects.some((p) => p.id === m.fjord_project_id) && <option value={m.fjord_project_id}>{t('import.missingProject')}</option>}
             {(projects ?? []).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -321,7 +322,7 @@ export function AzureImportSettings() {
         <div className="user-row import-mapping" key={`${team.project}/${team.name}`}>
           <span className="grow">
             <span className="dim">{team.project} / </span>
-            {team.name}
+            {team.name} <span className="dim">· {t('import.boardTasks', { n: team.tasks })}</span>
           </span>
           {isMapped(team) ? (
             <span className="dim">{t('import.teamMapped')}</span>

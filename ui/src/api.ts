@@ -197,10 +197,12 @@ export interface ImportMapping {
   team?: string
 }
 
-/** An Azure DevOps team you're a member of. */
+/** An Azure team whose board has open work items assigned to you. */
 export interface AzureTeam {
   project: string
   name: string
+  /** How many of your open work items are on its board. */
+  tasks: number
 }
 
 export interface ImportSettings {
@@ -534,7 +536,7 @@ export const api = {
   /** Adds a column for each state of the Azure project's work items; only reads from Azure. */
   azureStateColumns: (org: string, project: string, projectId: number, team: string | null = null) =>
     invoke<StateColumnsReport>('azure_state_columns', { org, project, projectId, team }),
-  azureMyTeams: (org: string) => invoke<AzureTeam[]>('azure_my_teams', { org }),
+  azureMyBoards: (org: string) => invoke<AzureTeam[]>('azure_my_boards', { org }),
 }
 
 export function errorMessage(err: unknown): string {
