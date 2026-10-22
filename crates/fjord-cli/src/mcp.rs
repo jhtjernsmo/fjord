@@ -88,11 +88,82 @@ fn initialize(params: &Value) -> Value {
     })
 }
 
+/// What a tool does to the world, for clients deciding what to ask the user about
+/// (MCP tool annotations). Every hint is given, since the spec's defaults assume the worst.
+#[derive(Clone, Copy)]
+struct Hints {
+    /// Only reads; changes nothing.
+    read_only: bool,
+    /// May overwrite or remove what's there (rather than only add).
+    destructive: bool,
+    /// Calling it again with the same arguments changes nothing more.
+    idempotent: bool,
+    /// Talks to something outside Fjord's own data (GitHub, Azure DevOps).
+    open_world: bool,
+}
+
+const READ: Hints = Hints {
+    read_only: true,
+    destructive: false,
+    idempotent: true,
+    open_world: false,
+};
+const READ_REMOTE: Hints = Hints {
+    open_world: true,
+    ..READ
+};
+const ADD: Hints = Hints {
+    read_only: false,
+    destructive: false,
+    idempotent: false,
+    open_world: false,
+};
+const SET: Hints = Hints {
+    idempotent: true,
+    ..ADD
+};
+/// A setting that also changes the task's Azure Boards work item when the user has
+/// turned on "Send state changes to Azure".
+const SET_REMOTE: Hints = Hints {
+    open_world: true,
+    ..SET
+};
+const OVERWRITE: Hints = Hints {
+    destructive: true,
+    ..SET
+};
+
+fn hints(name: &str) -> Hints {
+    match name {
+        "list_projects" | "get_board" | "get_task" | "list_notes" | "get_note"
+        | "list_new_imports" | "backlinks" | "search" | "git_status" | "recent_activity" => READ,
+        "list_pull_requests" => READ_REMOTE,
+        "create_project" | "create_task" | "add_note" | "attach_file" => ADD,
+        "open_pull_request" => Hints {
+            open_world: true,
+            ..ADD
+        },
+        "analyze_story" | "mark_analyzed" | "link_repo" | "link_branch" | "start_branch"
+        | "archive_task" => SET,
+        "move_task" | "complete_task" | "set_task_pending" | "import_azure" => SET_REMOTE,
+        // Replace the description or note body.
+        "update_task" | "update_note" => OVERWRITE,
+        other => panic!("MCP tool «{other}» has no annotations"),
+    }
+}
+
 fn tool(name: &str, description: &str, properties: Value, required: &[&str]) -> Value {
+    let h = hints(name);
     json!({
         "name": name,
         "description": description,
-        "inputSchema": { "type": "object", "properties": properties, "required": required }
+        "inputSchema": { "type": "object", "properties": properties, "required": required },
+        "annotations": {
+            "readOnlyHint": h.read_only,
+            "destructiveHint": h.destructive,
+            "idempotentHint": h.idempotent,
+            "openWorldHint": h.open_world
+        }
     })
 }
 
@@ -663,6 +734,164 @@ mod tests {
         assert_eq!(unknown["error"]["code"], -32601);
         let bad = handle_line(&mut s, "{not json").unwrap();
         assert_eq!(bad["error"]["code"], -32700);
+    }
+
+    #[test]
+    fn every_tool_says_what_it_does_to_the_world() {
+        let (mut s, _d) = store();
+        let tools =
+            handle_line(&mut s, r#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#).unwrap();
+        let tools = tools["result"]["tools"].as_array().unwrap().clone();
+        let hint = |name: &str, key: &str| {
+            tools.iter().find(|t| t["name"] == name).unwrap()["annotations"][key]
+                .as_bool()
+                .unwrap()
+        };
+        for t in &tools {
+            for key in [
+                "readOnlyHint",
+                "destructiveHint",
+                "idempotentHint",
+                "openWorldHint",
+            ] {
+                assert!(
+                    t["annotations"][key].is_boolean(),
+                    "{} lacks {key}",
+                    t["name"]
+                );
+            }
+        }
+        assert!(hint("get_board", "readOnlyHint") && !hint("get_board", "openWorldHint"));
+        assert!(
+            hint("list_pull_requests", "readOnlyHint")
+                && hint("list_pull_requests", "openWorldHint")
+        );
+        assert!(!hint("create_task", "readOnlyHint") && !hint("create_task", "destructiveHint"));
+        assert!(hint("update_task", "destructiveHint") && hint("update_note", "destructiveHint"));
+        // Moves can update Azure Boards; nothing deletes.
+        assert!(hint("move_task", "openWorldHint") && !hint("move_task", "destructiveHint"));
+        assert!(
+            tools
+                .iter()
+                .filter(|t| t["annotations"]["destructiveHint"] == true)
+                .count()
+                == 2
+        );
+    }
+
+    #[test]
+    fn lists_projects_and_archives_and_pends_tasks() {
+        let (mut s, _d) = store();
+        call(&mut s, 1, "create_project", json!({ "name": "Bokost" }));
+        let task = call(
+            &mut s,
+            2,
+            "create_task",
+            json!({ "project": "bokost", "title": "Logo" }),
+        );
+        let id = task["structuredContent"]["result"]["id"].as_i64().unwrap();
+
+        let projects = call(&mut s, 3, "list_projects", json!({}));
+        assert_eq!(projects["structuredContent"]["result"][0]["slug"], "bokost");
+
+        let pending = call(
+            &mut s,
+            4,
+            "set_task_pending",
+            json!({ "id": id, "pending": true }),
+        );
+        assert!(pending["structuredContent"]["result"]["task"]["pending_since"].is_string());
+        // Not from Azure: nothing to warn about.
+        assert!(pending["structuredContent"]["result"]["azure_warning"].is_null());
+
+        let archived = call(&mut s, 5, "archive_task", json!({ "id": id }));
+        assert!(archived["structuredContent"]["result"]["archived_at"].is_string());
+        let board = call(&mut s, 6, "get_board", json!({ "project": "bokost" }));
+        assert_eq!(
+            board["structuredContent"]["result"]["tasks"]
+                .as_array()
+                .unwrap()
+                .len(),
+            0
+        );
+    }
+
+    fn git(dir: &std::path::Path, args: &[&str]) {
+        let ok = std::process::Command::new("git")
+            .args(["-c", "user.name=T", "-c", "user.email=t@example.com"])
+            .args(args)
+            .current_dir(dir)
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(ok, "git {args:?}");
+    }
+
+    #[test]
+    fn git_tools_link_a_repo_and_branch_from_a_task() {
+        let (mut s, d) = store();
+        let repo = d.path().join("repo");
+        std::fs::create_dir(&repo).unwrap();
+        git(&repo, &["init", "-q", "-b", "main"]);
+        git(&repo, &["commit", "-q", "--allow-empty", "-m", "init"]);
+        call(&mut s, 1, "create_project", json!({ "name": "Bokost" }));
+        let task = call(
+            &mut s,
+            2,
+            "create_task",
+            json!({ "project": "bokost", "title": "Fix login" }),
+        );
+        let id = task["structuredContent"]["result"]["id"].as_i64().unwrap();
+
+        let linked = call(
+            &mut s,
+            3,
+            "link_repo",
+            json!({ "project": "bokost", "path": repo.to_str().unwrap() }),
+        );
+        assert!(linked["isError"].is_null(), "{linked}");
+        let status = call(&mut s, 4, "git_status", json!({ "project": "bokost" }));
+        assert_eq!(
+            status["structuredContent"]["result"]["current_branch"],
+            "main"
+        );
+
+        let started = call(
+            &mut s,
+            5,
+            "start_branch",
+            json!({ "id": id, "type": "fix" }),
+        );
+        let branch = started["structuredContent"]["result"]["branch"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert!(branch.starts_with("fix/"), "{branch}");
+
+        let unlinked = call(&mut s, 6, "link_branch", json!({ "id": id }));
+        assert!(unlinked["structuredContent"]["result"]["branch"].is_null());
+        let relinked = call(
+            &mut s,
+            7,
+            "link_branch",
+            json!({ "id": id, "branch": branch }),
+        );
+        assert_eq!(
+            relinked["structuredContent"]["result"]["branch"],
+            branch.as_str()
+        );
+
+        // Without a GitHub or Azure remote, the network tools explain instead of failing hard.
+        let prs = call(
+            &mut s,
+            8,
+            "list_pull_requests",
+            json!({ "project": "bokost" }),
+        );
+        assert_eq!(prs["isError"], true, "{prs}");
+        let pr = call(&mut s, 9, "open_pull_request", json!({ "id": id }));
+        assert_eq!(pr["isError"], true, "{pr}");
     }
 
     #[test]
