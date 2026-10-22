@@ -1,0 +1,68 @@
+name: MCP Registry
+
+# When a release is published, bundle the fjord CLI for Claude Desktop (fjord-mcp.mcpb, also
+# attached to the release) and list that version in the official MCP Registry as
+# io.github.jhtjernsmo/fjord. The registry downloads the bundle and checks its SHA-256, so
+# this only runs once the release (and its CLI binaries) are public.
+# Logs in with GitHub OIDC; no secrets needed.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to bundle and publish, e.g. v0.2.32
+        required: true
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    name: Bundle and publish
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Collect the CLI binaries
+        run: |
+          mkdir -p bundle/server
+          gh release download "$TAG" -D dl \
+            -p fjord-cli-aarch64-apple-darwin \
+            -p fjord-cli-x86_64-pc-windows-msvc.exe \
+            -p fjord-cli-x86_64-unknown-linux-gnu
+          mv dl/fjord-cli-aarch64-apple-darwin bundle/server/fjord-darwin
+          mv dl/fjord-cli-x86_64-pc-windows-msvc.exe bundle/server/fjord-windows.exe
+          mv dl/fjord-cli-x86_64-unknown-linux-gnu bundle/server/fjord-linux
+          chmod +x bundle/server/fjord-darwin bundle/server/fjord-linux
+          cp src-tauri/icons/icon.png bundle/icon.png
+
+      - name: Build fjord-mcp.mcpb
+        run: |
+          version="${TAG#v}"
+          jq --arg v "$version" '.version = $v' mcp/manifest.json > bundle/manifest.json
+          npx -y @anthropic-ai/mcpb validate bundle/manifest.json
+          npx -y @anthropic-ai/mcpb pack bundle fjord-mcp.mcpb
+          gh release upload "$TAG" fjord-mcp.mcpb --clobber
+
+      - name: Publish to the MCP Registry
+        run: |
+          version="${TAG#v}"
+          sha=$(sha256sum fjord-mcp.mcpb | cut -d' ' -f1)
+          url="https://github.com/${{ github.repository }}/releases/download/$TAG/fjord-mcp.mcpb"
+          jq --arg v "$version" --arg url "$url" --arg sha "$sha" \
+            '.version = $v | .packages[0].identifier = $url | .packages[0].fileSha256 = $sha' \
+            mcp/server.json > server.json
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" \
+            | tar xz mcp-publisher
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish

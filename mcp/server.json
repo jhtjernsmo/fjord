@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.jhtjernsmo/fjord",
+  "title": "Fjord",
+  "description": "Local kanban boards, markdown notes and Git/GitHub/Azure DevOps work from the Fjord app.",
+  "repository": {
+    "url": "https://github.com/jhtjernsmo/fjord",
+    "source": "github"
+  },
+  "websiteUrl": "https://jhtjernsmo.github.io/fjord/",
+  "version": "0.0.0",
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/jhtjernsmo/fjord/releases/download/v0.0.0/fjord-mcp.mcpb",
+      "fileSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
