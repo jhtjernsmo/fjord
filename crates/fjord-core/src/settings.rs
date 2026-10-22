@@ -93,6 +93,7 @@ impl Store {
         tx.execute("DELETE FROM tasks WHERE project_id = ?1", [id])?;
         tx.execute("DELETE FROM projects WHERE id = ?1", [id])?;
         tx.commit()?;
+        self.forget_import_project(id)?;
         self.log(None, None, "project.delete", &project.name, None)?;
         self.remove_orphan_files()?;
         Ok(())

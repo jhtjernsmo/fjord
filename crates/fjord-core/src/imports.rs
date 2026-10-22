@@ -141,6 +141,20 @@ impl Store {
             .unwrap_or_default())
     }
 
+    /// Drops the Azure mappings into a deleted project, and its team board.
+    pub(crate) fn forget_import_project(&mut self, project_id: i64) -> Result<()> {
+        let mut settings = self.import_settings()?;
+        let before = settings.mappings.len();
+        settings
+            .mappings
+            .retain(|m| m.fjord_project_id != project_id);
+        if settings.mappings.len() != before {
+            let json = serde_json::to_string(&settings).expect("settings serialize");
+            self.set_setting(IMPORT_SETTINGS_KEY, &json)?;
+        }
+        self.clear_team_board(project_id)
+    }
+
     pub fn set_import_settings(&mut self, settings: &ImportSettings) -> Result<()> {
         for m in &settings.mappings {
             self.get_project(m.fjord_project_id)?;
@@ -364,6 +378,45 @@ mod tests {
             priority: 3,
             due_at: Some("2026-10-20".into()),
         }
+    }
+
+    #[test]
+    fn deleting_a_project_drops_its_azure_mappings_and_board() {
+        let (mut s, _d) = store();
+        let mut project = |name: &str| {
+            s.create_project(NewProject {
+                name: name.into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id
+        };
+        let (keep, gone) = (project("Keep"), project("Gone"));
+        let mapping = |team: &str, id: i64| ImportMapping {
+            org: "contoso".into(),
+            project: "Shop".into(),
+            fjord_project_id: id,
+            team: team.into(),
+        };
+        s.set_import_settings(&ImportSettings {
+            mappings: vec![mapping("", keep), mapping("Payments", gone)],
+            ..Default::default()
+        })
+        .unwrap();
+        s.set_team_board(
+            gone,
+            &crate::TeamBoard {
+                column_field: "WEF_1_Kanban.Column".into(),
+                columns: Vec::new(),
+            },
+        )
+        .unwrap();
+        s.delete_project(gone).unwrap();
+        assert_eq!(
+            s.import_settings().unwrap().mappings,
+            vec![mapping("", keep)]
+        );
+        assert_eq!(s.team_board(gone).unwrap(), None);
     }
 
     #[test]

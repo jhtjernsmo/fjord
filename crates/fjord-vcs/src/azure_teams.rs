@@ -1,6 +1,6 @@
-//! Azure DevOps teams: the teams you're a member of, the area paths a team owns (its
-//! work items), and its board (columns, and the state each column means per work item
-//! type). Only reads from Azure.
+//! Azure DevOps teams: the boards your work items are on, the area paths a team owns
+//! (its work items), and its board (columns, and the state each column means per work
+//! item type). Only reads from Azure.
 
 use std::collections::BTreeMap;
 
@@ -16,16 +16,16 @@ const AREA_PATH_FIELD: &str = "System.AreaPath";
 /// The board for the backlog level stories (or PBIs, or issues) live on.
 const REQUIREMENT_BACKLOG: &str = "requirement";
 const DONE_COLUMN_TYPE: &str = "outgoing";
-/// Listing all teams is still a preview API.
-const TEAMS_API_VERSION: &str = "7.1-preview.3";
 const WORK_API_VERSION: &str = "7.1";
 const MAX_TEAMS: usize = 500;
 
-/// A team you're a member of.
+/// A team whose board has work items assigned to you.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AzureTeam {
     pub project: String,
     pub name: String,
+    /// How many of your open work items are on its board.
+    pub tasks: usize,
 }
 
 /// An area path a team owns; with `include_children` the areas below it too.
@@ -39,11 +39,21 @@ pub struct TeamArea {
 
 /// Whether a work item in `area` belongs to the team that owns `areas`.
 pub fn in_team_areas(area: &str, areas: &[TeamArea]) -> bool {
+    owning_depth(area, areas).is_some()
+}
+
+/// How deep the team's area holding `area` is (`Shop` 1, `Shop\Payments` 2), so the
+/// most specific team can win when several own the same work item.
+pub fn owning_depth(area: &str, areas: &[TeamArea]) -> Option<usize> {
     let area = area.trim().to_lowercase();
-    areas.iter().any(|a| {
-        let owned = a.value.trim().to_lowercase();
-        area == owned || (a.include_children && area.starts_with(&format!("{owned}\\")))
-    })
+    areas
+        .iter()
+        .filter(|a| {
+            let owned = a.value.trim().to_lowercase();
+            area == owned || (a.include_children && area.starts_with(&format!("{owned}\\")))
+        })
+        .map(|a| a.value.split('\\').count())
+        .max()
 }
 
 #[derive(Deserialize)]
@@ -52,10 +62,8 @@ struct ApiList<T> {
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct ApiTeam {
     name: String,
-    project_name: String,
 }
 
 #[derive(Deserialize)]
@@ -132,24 +140,60 @@ fn check_names(project: &str, team: &str) -> Result<()> {
     Ok(())
 }
 
-/// The teams you're a member of in `org`, by project.
-pub fn my_teams(org: &str) -> Result<Vec<AzureTeam>> {
+/// The teams whose boards hold your open work items, by project and then by how many,
+/// whether or not you're a member of the team. Teams organised by something other than
+/// area paths are left out.
+pub fn my_boards(org: &str, items: &[crate::WorkItem]) -> Result<Vec<AzureTeam>> {
     let org = check_org(org)?;
-    let url = format!(
-        "{HOST}/{}/_apis/teams?$mine=true&$top={MAX_TEAMS}&api-version={TEAMS_API_VERSION}",
-        encode(org)
-    );
-    let teams: ApiList<ApiTeam> = get(org, url)?;
-    let mut teams: Vec<AzureTeam> = teams
-        .value
-        .into_iter()
-        .map(|t| AzureTeam {
-            project: t.project_name,
-            name: t.name,
+    let mut projects: Vec<&str> = items.iter().map(|i| i.project.as_str()).collect();
+    projects.sort_unstable();
+    projects.dedup();
+    let mut boards = Vec::new();
+    for project in projects {
+        let url = format!(
+            "{HOST}/{}/_apis/projects/{}/teams?$top={MAX_TEAMS}&api-version={WORK_API_VERSION}",
+            encode(org),
+            encode(project)
+        );
+        let teams: ApiList<ApiTeam> = get(org, url)?;
+        let areas: Vec<(String, Vec<TeamArea>)> = teams
+            .value
+            .into_iter()
+            .filter_map(|t| {
+                let areas = team_areas(org, project, &t.name).ok()?;
+                Some((t.name, areas))
+            })
+            .collect();
+        let in_project: Vec<&str> = items
+            .iter()
+            .filter(|i| i.project == project)
+            .map(|i| i.area.as_str())
+            .collect();
+        boards.extend(count_on_boards(project, &areas, &in_project));
+    }
+    Ok(boards)
+}
+
+/// The teams with at least one of `item_areas` in their areas, most items first.
+fn count_on_boards(
+    project: &str,
+    teams: &[(String, Vec<TeamArea>)],
+    item_areas: &[&str],
+) -> Vec<AzureTeam> {
+    let mut boards: Vec<AzureTeam> = teams
+        .iter()
+        .map(|(name, areas)| AzureTeam {
+            project: project.to_string(),
+            name: name.clone(),
+            tasks: item_areas
+                .iter()
+                .filter(|a| in_team_areas(a, areas))
+                .count(),
         })
+        .filter(|b| b.tasks > 0)
         .collect();
-    teams.sort_by(|a, b| (&a.project, &a.name).cmp(&(&b.project, &b.name)));
-    Ok(teams)
+    boards.sort_by(|a, b| b.tasks.cmp(&a.tasks).then_with(|| a.name.cmp(&b.name)));
+    boards
 }
 
 /// The area paths a team owns.
@@ -248,12 +292,45 @@ mod tests {
     }
 
     #[test]
+    fn lists_the_boards_holding_your_items_most_first() {
+        let area = |value: &str, include_children: bool| TeamArea {
+            value: value.into(),
+            include_children,
+        };
+        let teams = vec![
+            ("Shop".to_string(), vec![area("Shop", true)]),
+            ("Payments".to_string(), vec![area("Shop\\Payments", true)]),
+            ("Web".to_string(), vec![area("Shop\\Web", false)]),
+            ("Mobile".to_string(), vec![area("Shop\\Mobile", true)]),
+        ];
+        let items = [
+            "Shop\\Payments",
+            "Shop\\Payments\\Refunds",
+            "Shop\\Web",
+            "Shop",
+        ];
+        let boards: Vec<(String, usize)> = count_on_boards("Shop", &teams, &items)
+            .into_iter()
+            .map(|b| (b.name, b.tasks))
+            .collect();
+        // The project's default team owns every area below it; Mobile has none of yours.
+        assert_eq!(
+            boards,
+            [
+                ("Shop".to_string(), 4),
+                ("Payments".to_string(), 2),
+                ("Web".to_string(), 1)
+            ]
+        );
+    }
+
+    #[test]
     fn reads_teams_and_area_values() {
         let teams: ApiList<ApiTeam> = serde_json::from_str(
             r#"{"value":[{"id":"t1","name":"Payments","projectName":"Shop","projectId":"p"}],"count":1}"#,
         )
         .unwrap();
-        assert_eq!(teams.value[0].project_name, "Shop");
+        assert_eq!(teams.value[0].name, "Payments");
         let values: ApiTeamFieldValues = serde_json::from_str(
             r#"{"field":{"referenceName":"System.AreaPath","url":"x"},"defaultValue":"Shop\\Payments",
                 "values":[{"value":"Shop\\Payments","includeChildren":true}]}"#,

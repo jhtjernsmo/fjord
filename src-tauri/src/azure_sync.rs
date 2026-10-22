@@ -9,7 +9,7 @@ use fjord_core::{Store, Task};
 use fjord_vcs::azure_states::{
     StateColumnsReport, add_board_columns, add_state_columns, project_states,
 };
-use fjord_vcs::azure_teams::{AzureTeam, my_teams, team_board};
+use fjord_vcs::azure_teams::{AzureTeam, my_boards, team_board};
 use fjord_vcs::pending::{StatePush, push_state, record_pushed};
 use tauri::{AppHandle, Emitter, State};
 
@@ -128,11 +128,14 @@ enum Columns {
     States(Vec<fjord_vcs::azure_states::AzureState>),
 }
 
-/// The Azure DevOps teams you're a member of in `org`.
+/// The team boards in `org` that hold your open work items, with how many.
 #[tauri::command]
-pub async fn azure_my_teams(org: String) -> CmdResult<Vec<AzureTeam>> {
-    tauri::async_runtime::spawn_blocking(move || my_teams(&org))
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())
+pub async fn azure_my_boards(org: String) -> CmdResult<Vec<AzureTeam>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let items = fjord_vcs::assigned_work_items(&org, 0, "")?;
+        my_boards(&org, &items)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())
 }
