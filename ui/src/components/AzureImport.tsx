@@ -320,7 +320,8 @@ export function AzureImportSettings() {
       {teams?.map((team) => (
         <div className="user-row import-mapping" key={`${team.project}/${team.name}`}>
           <span className="grow">
-            {team.name} <span className="dim">· {team.project}</span>
+            <span className="dim">{team.project} / </span>
+            {team.name}
           </span>
           {isMapped(team) ? (
             <span className="dim">{t('import.teamMapped')}</span>
