@@ -58,6 +58,10 @@ pub struct ImportMapping {
     /// Azure DevOps project name (`System.TeamProject`).
     pub project: String,
     pub fjord_project_id: i64,
+    /// An Azure team in the project; empty imports the whole project. Only work items in
+    /// the team's area paths come in, and the columns button uses the team's board.
+    #[serde(default)]
+    pub team: String,
 }
 
 /// How many days back finished work items (Done, Resolved, …) are imported.
@@ -460,6 +464,7 @@ mod tests {
                 org: "contoso".into(),
                 project: "Mobile App".into(),
                 fjord_project_id: p,
+                team: String::new(),
             }],
             ..Default::default()
         };

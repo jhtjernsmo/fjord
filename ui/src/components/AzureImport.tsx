@@ -2,10 +2,10 @@
 // project) and the background runner that imports every few minutes.
 import { useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
-import { AtSign, Columns3, Download, Plus, X } from 'lucide-react'
+import { AtSign, Columns3, Download, Plus, Users, X } from 'lucide-react'
 import { api, errorMessage } from '../api'
 import { importMentions } from '../mentions'
-import type { ImportMapping, ImportReport, ImportSettings, StateColumnsReport, Task } from '../api'
+import type { AzureTeam, ImportMapping, ImportReport, ImportSettings, StateColumnsReport, Task } from '../api'
 import type { MessageKey } from '../i18n'
 import { useApp, useLive } from '../data'
 
@@ -154,7 +154,44 @@ export function AzureImportSettings() {
   const stateColumns = async (m: ImportMapping) => {
     setBusy(true)
     try {
-      toast(stateColumnsMessage(await api.azureStateColumns(m.org, m.project, m.fjord_project_id), t), 'success')
+      toast(stateColumnsMessage(await api.azureStateColumns(m.org, m.project, m.fjord_project_id, m.team || null), t), 'success')
+    } catch (e) {
+      toast(errorMessage(e), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Find my teams: each team you're in can become its own Fjord project.
+  const [teamOrg, setTeamOrg] = useState('')
+  const [teams, setTeams] = useState<AzureTeam[] | null>(null)
+  const org = teamOrg.trim() || settings.mappings.find((m) => m.org.trim())?.org.trim() || ''
+  const isMapped = (team: AzureTeam) =>
+    settings.mappings.some((m) => m.org.toLowerCase() === org.toLowerCase() && m.project.toLowerCase() === team.project.toLowerCase() && (m.team ?? '').toLowerCase() === team.name.toLowerCase())
+
+  const findTeams = async () => {
+    setBusy(true)
+    try {
+      setTeams(await api.azureMyTeams(org))
+    } catch (e) {
+      toast(errorMessage(e), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** A Fjord project for the team (an existing one with its name, or a new one), mapped and given the board's columns. */
+  const addTeam = async (team: AzureTeam) => {
+    setBusy(true)
+    try {
+      const existing = (projects ?? []).find((p) => p.name.toLowerCase() === team.name.toLowerCase())
+      const projectId = existing?.id ?? (await api.createProject({ name: team.name })).id
+      const mapping: ImportMapping = { org, project: team.project, team: team.name, fjord_project_id: projectId }
+      const next = { ...settings, mappings: [...settings.mappings, mapping] }
+      setSettings(next)
+      await api.setImportSettings({ ...next, mappings: next.mappings.filter((m) => m.org.trim() && m.project.trim() && m.fjord_project_id) })
+      const report = await api.azureStateColumns(org, team.project, projectId, team.name)
+      toast(`${t('import.teamAdded', { name: team.name })} ${stateColumnsMessage(report, t)}`, 'success')
     } catch (e) {
       toast(errorMessage(e), 'error')
     } finally {
@@ -236,6 +273,7 @@ export function AzureImportSettings() {
         <div className="user-row import-mapping" key={i}>
           <input className="input mono" value={m.org} placeholder={t('azure.org')} onChange={(e) => setMapping(i, { org: e.target.value })} onBlur={() => save(settings)} aria-label={t('azure.org')} />
           <input className="input grow" value={m.project} placeholder={t('import.azureProject')} onChange={(e) => setMapping(i, { project: e.target.value })} onBlur={() => save(settings)} aria-label={t('import.azureProject')} />
+          <input className="input" value={m.team ?? ''} placeholder={t('import.team')} onChange={(e) => setMapping(i, { team: e.target.value })} onBlur={() => save(settings)} aria-label={t('import.team')} title={t('import.teamHint')} />
           <span className="dim">→</span>
           <select className="input" value={m.fjord_project_id} onChange={(e) => save({ ...settings, mappings: settings.mappings.map((x, j) => (j === i ? { ...x, fjord_project_id: Number(e.target.value) } : x)) })} aria-label={t('notes.project')}>
             {(projects ?? []).map((p) => (
@@ -269,6 +307,27 @@ export function AzureImportSettings() {
           <AtSign size={13} /> {t('mentions.import')}
         </button>
       </div>
+      <div className="user-row">
+        <input className="input mono" value={teamOrg} placeholder={org || t('azure.org')} onChange={(e) => setTeamOrg(e.target.value)} aria-label={t('import.teamsOrg')} />
+        <button className="btn" disabled={busy || !org} onClick={findTeams}>
+          <Users size={13} /> {t('import.findTeams')}
+        </button>
+      </div>
+      {teams && teams.length === 0 && <span className="hint">{t('import.noTeams')}</span>}
+      {teams?.map((team) => (
+        <div className="user-row import-mapping" key={`${team.project}/${team.name}`}>
+          <span className="grow">
+            {team.name} <span className="dim">· {team.project}</span>
+          </span>
+          {isMapped(team) ? (
+            <span className="dim">{t('import.teamMapped')}</span>
+          ) : (
+            <button className="btn" disabled={busy} onClick={() => addTeam(team)}>
+              <Plus size={13} /> {t('import.addTeam')}
+            </button>
+          )}
+        </div>
+      ))}
       <span className="hint">{t('import.hint')}</span>
     </div>
   )

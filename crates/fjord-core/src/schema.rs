@@ -223,6 +223,12 @@ const MIGRATIONS: &[&str] = &[
     ALTER TABLE tasks ADD COLUMN pending_since TEXT;
     ALTER TABLE external_links ADD COLUMN resume_state TEXT;
     "#,
+    // v12: an imported item's type and its column on an Azure team board, so a move in
+    // Fjord can send the board column and the state it maps to for that type
+    r#"
+    ALTER TABLE external_links ADD COLUMN kind TEXT;
+    ALTER TABLE external_links ADD COLUMN board_column TEXT;
+    "#,
 ];
 
 pub fn configure(conn: &Connection) -> Result<()> {

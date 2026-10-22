@@ -193,6 +193,14 @@ export interface ImportMapping {
   org: string
   project: string
   fjord_project_id: number
+  /** An Azure team in the project; empty imports the whole project. */
+  team?: string
+}
+
+/** An Azure DevOps team you're a member of. */
+export interface AzureTeam {
+  project: string
+  name: string
 }
 
 export interface ImportSettings {
@@ -524,8 +532,9 @@ export const api = {
   setImportSettings: (settings: ImportSettings) => invoke<void>('set_import_settings', { settings }),
   runAzureImport: () => invoke<ImportReport>('run_azure_import'),
   /** Adds a column for each state of the Azure project's work items; only reads from Azure. */
-  azureStateColumns: (org: string, project: string, projectId: number) =>
-    invoke<StateColumnsReport>('azure_state_columns', { org, project, projectId }),
+  azureStateColumns: (org: string, project: string, projectId: number, team: string | null = null) =>
+    invoke<StateColumnsReport>('azure_state_columns', { org, project, projectId, team }),
+  azureMyTeams: (org: string) => invoke<AzureTeam[]>('azure_my_teams', { org }),
 }
 
 export function errorMessage(err: unknown): string {

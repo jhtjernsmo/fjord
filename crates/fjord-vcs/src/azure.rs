@@ -684,9 +684,20 @@ pub struct WorkItem {
     pub parent: Option<u64>,
     /// Attachments and images pasted into the description, acceptance criteria or risk.
     pub files: Vec<crate::azure_files::AzureFile>,
+    /// The work item's column on each team board it's on: board column field → column.
+    pub board_columns: Vec<(String, String)>,
 }
 
 impl WorkItem {
+    /// The work item's column on the board whose column field is `field`.
+    pub fn board_column(&self, field: &str) -> Option<&str> {
+        self.board_columns
+            .iter()
+            .find(|(f, _)| f.eq_ignore_ascii_case(field))
+            .map(|(_, c)| c.as_str())
+            .filter(|c| !c.trim().is_empty())
+    }
+
     pub fn url(&self) -> String {
         format!(
             "{HOST}/{}/{}/_workitems/edit/{}",
@@ -731,6 +742,17 @@ impl WorkItem {
             due_at: self.due.clone(),
         }
     }
+}
+
+/// Boards keep each work item's column in a field of their own, `WEF_<id>_Kanban.Column`.
+const BOARD_COLUMN_SUFFIX: &str = "_Kanban.Column";
+
+fn board_columns(fields: &serde_json::Map<String, serde_json::Value>) -> Vec<(String, String)> {
+    fields
+        .iter()
+        .filter(|(k, _)| k.starts_with("WEF_") && k.ends_with(BOARD_COLUMN_SUFFIX))
+        .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_string())))
+        .collect()
 }
 
 pub(crate) fn field_str(fields: &serde_json::Map<String, serde_json::Value>, key: &str) -> String {
@@ -804,6 +826,7 @@ pub(crate) fn work_item_from(org: &str, item: ApiWorkItem, risk: &str) -> WorkIt
         project: field_str(f, "System.TeamProject"),
         kind: field_str(f, "System.WorkItemType"),
         state: field_str(f, "System.State"),
+        board_columns: board_columns(f),
         area: field_str(f, "System.AreaPath"),
         title: field_str(f, "System.Title"),
         description_md: html_to_markdown(&description),

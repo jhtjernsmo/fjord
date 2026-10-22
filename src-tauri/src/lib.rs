@@ -56,6 +56,7 @@ pub fn run() {
             commands::update_task,
             azure_sync::move_task,
             azure_sync::azure_state_columns,
+            azure_sync::azure_my_teams,
             commands::move_task_to_project,
             commands::set_task_parent,
             commands::archive_task,

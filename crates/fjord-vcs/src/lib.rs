@@ -6,6 +6,7 @@ pub mod azure;
 pub mod azure_files;
 pub mod azure_mentions;
 pub mod azure_states;
+pub mod azure_teams;
 pub mod azure_write;
 pub mod credentials;
 pub mod editor;
@@ -480,6 +481,46 @@ pub struct ImportFetch {
     /// Parent and state of other relevant work items: ancestors of the items
     /// above, and previously imported items that are no longer assigned/open.
     pub info: HashMap<(String, u64), WorkItemInfo>,
+    /// The area paths of each team in the mappings, by lowercased (org, project, team).
+    pub team_areas: HashMap<(String, String, String), Vec<azure_teams::TeamArea>>,
+}
+
+fn team_key(org: &str, project: &str, team: &str) -> (String, String, String) {
+    (
+        org.trim().to_lowercase(),
+        project.trim().to_lowercase(),
+        team.trim().to_lowercase(),
+    )
+}
+
+/// The mapping a work item goes to: a team mapping whose areas hold it, else the
+/// mapping for its whole Azure project.
+fn mapping_for<'a>(
+    settings: &'a ImportSettings,
+    fetch: &ImportFetch,
+    item: &WorkItem,
+) -> Option<&'a fjord_core::ImportMapping> {
+    let same_project = |m: &&fjord_core::ImportMapping| {
+        m.org.eq_ignore_ascii_case(&item.org) && m.project.eq_ignore_ascii_case(&item.project)
+    };
+    let in_team = |m: &&fjord_core::ImportMapping| {
+        fetch
+            .team_areas
+            .get(&team_key(&m.org, &m.project, &m.team))
+            .is_some_and(|areas| azure_teams::in_team_areas(&item.area, areas))
+    };
+    settings
+        .mappings
+        .iter()
+        .filter(same_project)
+        .find(|m| !m.team.trim().is_empty() && in_team(m))
+        .or_else(|| {
+            settings
+                .mappings
+                .iter()
+                .filter(same_project)
+                .find(|m| m.team.trim().is_empty())
+        })
 }
 
 /// How far up the hierarchy to look for an imported ancestor (Task → Story →
@@ -537,6 +578,18 @@ pub fn fetch_import(settings: &ImportSettings, known: &[String]) -> Result<Impor
                 .extend(info.into_iter().map(|(id, i)| ((org.clone(), id), i)));
         }
         fetch.items.extend(items);
+    }
+    for m in settings
+        .mappings
+        .iter()
+        .filter(|m| !m.team.trim().is_empty())
+    {
+        if let std::collections::hash_map::Entry::Vacant(slot) = fetch
+            .team_areas
+            .entry(team_key(&m.org, &m.project, &m.team))
+        {
+            slot.insert(azure_teams::team_areas(&m.org, &m.project, &m.team)?);
+        }
     }
     Ok(fetch)
 }
@@ -777,6 +830,48 @@ fn column_for_state<'a>(
         })
 }
 
+/// Follows the work item into the column for its board column (when the project's
+/// columns came from a team board) or for its state, but only when that changed in
+/// Azure (or on first import), so manual moves stick. Pending follows the state.
+fn follow_imported(
+    store: &mut Store,
+    settings: &ImportSettings,
+    task: Task,
+    item: &WorkItem,
+) -> Result<Task> {
+    store.set_external_kind(task.id, &item.kind)?;
+    let previous = store.swap_external_state(task.id, &item.state)?;
+    let state_changed = previous.as_deref() != Some(item.state.as_str());
+    let board = store.team_board(task.project_id)?;
+    let on_board = board
+        .as_ref()
+        .and_then(|b| item.board_column(&b.column_field));
+    let columns = store.list_statuses(task.project_id)?;
+    let target = match on_board {
+        Some(column) => {
+            let before = store.swap_external_board_column(task.id, column)?;
+            (before.as_deref() != Some(column))
+                .then(|| {
+                    columns
+                        .iter()
+                        .find(|c| c.name.trim().eq_ignore_ascii_case(column))
+                })
+                .flatten()
+        }
+        None if state_changed => column_for_state(&columns, &item.state),
+        None => None,
+    };
+    let task = match target {
+        Some(column) if column.id != task.status_id => store.move_task(task.id, column.id, None)?,
+        _ => task,
+    };
+    if state_changed {
+        pending::follow_azure(store, settings, task, previous.as_deref(), &item.state)
+    } else {
+        Ok(task)
+    }
+}
+
 /// The topmost ancestor of `item` that is also being imported, if any.
 fn imported_root(
     item: &WorkItem,
@@ -814,10 +909,7 @@ pub fn apply_import(
     let mut report = ImportReport::default();
     let mut task_of: HashMap<(String, u64), Task> = HashMap::new();
     for item in &fetch.items {
-        let target = settings.mappings.iter().find(|m| {
-            m.org.eq_ignore_ascii_case(&item.org) && m.project.eq_ignore_ascii_case(&item.project)
-        });
-        let Some(mapping) = target else {
+        let Some(mapping) = mapping_for(settings, fetch, item) else {
             report.unmapped += 1;
             continue;
         };
@@ -831,21 +923,7 @@ pub fn apply_import(
             }
             ImportOutcome::Unchanged => report.unchanged += 1,
         }
-        // Follow Azure's state into a column with the same name, but only when the
-        // state changed there (or on first import), so manual moves stick.
-        let previous = store.swap_external_state(task.id, &item.state)?;
-        let task = if previous.as_deref() != Some(item.state.as_str()) {
-            let columns = store.list_statuses(task.project_id)?;
-            let task = match column_for_state(&columns, &item.state) {
-                Some(column) if column.id != task.status_id => {
-                    store.move_task(task.id, column.id, None)?
-                }
-                _ => task,
-            };
-            pending::follow_azure(store, settings, task, previous.as_deref(), &item.state)?
-        } else {
-            task
-        };
+        let task = follow_imported(store, settings, task, item)?;
         task_of.insert((item.org.to_lowercase(), item.id), task);
     }
 
@@ -1165,6 +1243,7 @@ mod tests {
                 org: "Contoso".into(),
                 project: "mobile app".into(),
                 fjord_project_id: p,
+                team: String::new(),
             }],
             ..Default::default()
         };
@@ -1184,6 +1263,7 @@ mod tests {
             priority: Some(2),
             due: None,
             parent: None,
+            board_columns: Vec::new(),
         };
         let items = [wi(1, "Mobile App"), wi(2, "Other team")];
         let fetch = ImportFetch {
@@ -1238,6 +1318,7 @@ mod tests {
                 org: "contoso".into(),
                 project: "App".into(),
                 fjord_project_id: p,
+                team: String::new(),
             }],
             ..Default::default()
         };
@@ -1257,6 +1338,7 @@ mod tests {
             priority: None,
             due: None,
             parent,
+            board_columns: Vec::new(),
         };
         let info = |parent: Option<u64>, state: &str| WorkItemInfo {
             parent,
@@ -1326,6 +1408,7 @@ mod tests {
         let mut later = ImportFetch {
             items: vec![wi(1, None), wi(3, Some(2)), wi(4, Some(3))],
             info: tree.info.clone(),
+            ..Default::default()
         };
         later
             .info
@@ -1469,6 +1552,7 @@ mod tests {
                 org: "contoso".into(),
                 project: "App".into(),
                 fjord_project_id: p,
+                team: String::new(),
             }],
             ..Default::default()
         };
@@ -1488,6 +1572,7 @@ mod tests {
             priority: None,
             due: None,
             parent: None,
+            board_columns: Vec::new(),
         };
         apply_import(
             &mut s,
@@ -1578,6 +1663,7 @@ mod tests {
                 org: "contoso".into(),
                 project: "App".into(),
                 fjord_project_id: p,
+                team: String::new(),
             }],
             write_states: true,
             ..Default::default()
@@ -1599,6 +1685,7 @@ mod tests {
             priority: None,
             due: None,
             parent: None,
+            board_columns: Vec::new(),
         };
         let import = |s: &mut Store, item: WorkItem| {
             apply_import(
@@ -1700,6 +1787,7 @@ mod tests {
                 org: "contoso".into(),
                 project: "App".into(),
                 fjord_project_id: p,
+                team: String::new(),
             }],
             ..Default::default()
         };
@@ -1741,6 +1829,7 @@ mod tests {
             priority: None,
             due: None,
             parent: None,
+            board_columns: Vec::new(),
         }
     }
 
@@ -1761,6 +1850,7 @@ mod tests {
                 org: "contoso".into(),
                 project: "App".into(),
                 fjord_project_id: p,
+                team: String::new(),
             }],
             write_states,
             ..Default::default()
@@ -1909,6 +1999,172 @@ mod tests {
         assert_eq!(push, None);
     }
 
+    fn team_board() -> fjord_core::TeamBoard {
+        let col = |name: &str, story: &str, done: bool| fjord_core::BoardColumn {
+            name: name.into(),
+            state_mappings: [("User Story".to_string(), story.to_string())]
+                .into_iter()
+                .collect(),
+            is_done: done,
+        };
+        fjord_core::TeamBoard {
+            column_field: "WEF_P_Kanban.Column".into(),
+            columns: vec![
+                col("New", "New", false),
+                col("Ready", "New", false),
+                col("In Review", "Active", false),
+                col("Closed", "Closed", true),
+            ],
+        }
+    }
+
+    /// Azure project "App" with two teams mapped to their own Fjord projects (Payments
+    /// owns App\Payments and below, Web owns App\Web only) and the rest of the project
+    /// mapped to a third.
+    fn team_setup() -> (
+        Store,
+        tempfile::TempDir,
+        [i64; 3],
+        ImportSettings,
+        ImportFetch,
+    ) {
+        let (mut s, d) = store();
+        let mut project = |name: &str| {
+            s.create_project(NewProject {
+                name: name.into(),
+                ..Default::default()
+            })
+            .unwrap()
+            .id
+        };
+        let ids = [project("Payments"), project("Web"), project("App")];
+        let mapping = |team: &str, id: i64| fjord_core::ImportMapping {
+            org: "contoso".into(),
+            project: "App".into(),
+            fjord_project_id: id,
+            team: team.into(),
+        };
+        let settings = ImportSettings {
+            enabled: true,
+            mappings: vec![
+                mapping("", ids[2]),
+                mapping("Payments", ids[0]),
+                mapping("Web", ids[1]),
+            ],
+            write_states: true,
+            ..Default::default()
+        };
+        s.set_import_settings(&settings).unwrap();
+        let area = |value: &str, include_children: bool| azure_teams::TeamArea {
+            value: value.into(),
+            include_children,
+        };
+        let mut fetch = ImportFetch::default();
+        fetch.team_areas.insert(
+            team_key("contoso", "App", "payments"),
+            vec![area("App\\Payments", true)],
+        );
+        fetch.team_areas.insert(
+            team_key("Contoso", "app", "Web"),
+            vec![area("App\\Web", false)],
+        );
+        (s, d, ids, settings, fetch)
+    }
+
+    fn in_area(id: u64, area: &str) -> WorkItem {
+        WorkItem {
+            area: area.into(),
+            ..work_item(id, "Active")
+        }
+    }
+
+    #[test]
+    fn team_mappings_take_the_work_items_in_their_areas() {
+        let (mut s, _d, [payments, web, app], settings, mut fetch) = team_setup();
+        fetch.items = vec![
+            in_area(1, "App\\Payments"),
+            in_area(2, "App\\Payments\\Refunds"),
+            in_area(3, "App\\Web"),
+            in_area(4, "App\\Web\\Admin"),
+            in_area(5, "App"),
+        ];
+        apply_import(&mut s, &settings, &fetch).unwrap();
+        let project_of = |s: &Store, id: u64| task_of(s, id).project_id;
+        assert_eq!(project_of(&s, 1), payments);
+        assert_eq!(project_of(&s, 2), payments);
+        assert_eq!(project_of(&s, 3), web);
+        // Web doesn't include its child areas; the whole-project mapping takes those.
+        assert_eq!(project_of(&s, 4), app);
+        assert_eq!(project_of(&s, 5), app);
+
+        // Without a whole-project mapping, items outside every team are left out.
+        let teams_only = ImportSettings {
+            mappings: settings.mappings[1..].to_vec(),
+            ..settings.clone()
+        };
+        fetch.items = vec![in_area(6, "App\\Other")];
+        let report = apply_import(&mut s, &teams_only, &fetch).unwrap();
+        assert_eq!(report.unmapped, 1);
+    }
+
+    #[test]
+    fn a_team_board_project_follows_board_columns_and_sends_them_back() {
+        let (mut s, _d, [payments, ..], settings, mut fetch) = team_setup();
+        azure_states::add_board_columns(&mut s, payments, &team_board()).unwrap();
+        let names: Vec<String> = s
+            .list_statuses(payments)
+            .unwrap()
+            .into_iter()
+            .map(|c| c.name)
+            .collect();
+        assert_eq!(&names[..4], ["New", "Ready", "In Review", "Closed"]);
+        assert!(s.list_statuses(payments).unwrap()[3].is_done);
+
+        // The import puts the task in its board column, not the column for its state.
+        let on_board = |rev: i64, column: &str, state: &str| WorkItem {
+            rev,
+            board_columns: vec![("WEF_P_Kanban.Column".into(), column.into())],
+            state: state.into(),
+            ..in_area(1, "App\\Payments")
+        };
+        fetch.items = vec![on_board(1, "Ready", "New")];
+        apply_import(&mut s, &settings, &fetch).unwrap();
+        let t = task_of(&s, 1);
+        assert_eq!(t.status_id, column(&s, payments, "Ready"));
+
+        // Moving to In Review sends that column and the state it means for a story.
+        let review = column(&s, payments, "In Review");
+        let (_, push) = state_sync::move_task(&mut s, t.id, review, None).unwrap();
+        let push = push.expect("a change to send");
+        assert_eq!(
+            (push.id, push.state.as_str(), push.column.clone()),
+            (
+                1,
+                "Active",
+                Some(("WEF_P_Kanban.Column".to_string(), "In Review".to_string()))
+            )
+        );
+        pending::record_pushed(&mut s, &push).unwrap();
+
+        // In Review → New changes the state too; New → Ready keeps it, so only the
+        // column is sent.
+        let ready = column(&s, payments, "Ready");
+        let new = column(&s, payments, "New");
+        let (_, push) = state_sync::move_task(&mut s, t.id, new, None).unwrap();
+        let push = push.unwrap();
+        assert_eq!(push.state, "New");
+        pending::record_pushed(&mut s, &push).unwrap();
+        let (_, push) = state_sync::move_task(&mut s, t.id, ready, None).unwrap();
+        let push = push.unwrap();
+        assert_eq!((push.state.as_str(), push.column_name()), ("", "Ready"));
+        pending::record_pushed(&mut s, &push).unwrap();
+
+        // An import that sees what was sent leaves the task where it is.
+        fetch.items = vec![on_board(2, "Ready", "New")];
+        apply_import(&mut s, &settings, &fetch).unwrap();
+        assert_eq!(task_of(&s, 1).status_id, ready);
+    }
+
     #[test]
     fn moving_a_pending_task_changes_the_state_it_resumes_to() {
         let (mut s, _d, p, settings) = synced_board(true);
@@ -1949,6 +2205,7 @@ mod tests {
                 org: "contoso".into(),
                 project: "App".into(),
                 fjord_project_id: p,
+                team: String::new(),
             }],
             ..Default::default()
         };
@@ -1968,6 +2225,7 @@ mod tests {
             priority: None,
             due: None,
             parent: None,
+            board_columns: Vec::new(),
         };
         let import = |s: &mut Store, item: WorkItem| {
             apply_import(
@@ -2035,6 +2293,7 @@ mod tests {
                 org: "contoso".into(),
                 project: "App".into(),
                 fjord_project_id: p,
+                team: String::new(),
             }],
             ..Default::default()
         };
@@ -2055,6 +2314,7 @@ mod tests {
             priority: None,
             due: None,
             parent: None,
+            board_columns: Vec::new(),
         };
         let fetch = ImportFetch {
             items: vec![wi(1, "Done"), wi(2, "Resolved"), wi(3, "Closed")],

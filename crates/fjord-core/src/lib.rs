@@ -2,6 +2,7 @@
 //! Shared by the GUI, the `fjord` CLI and the MCP server.
 
 mod analysis;
+mod boards;
 mod error;
 mod files;
 mod imports;
@@ -21,6 +22,7 @@ pub use analysis::{
     ANALYSIS_FOLDER, AnalysisContext, DEFAULT_ANALYSIS_TEMPLATE, StoryParts, analysis_title,
     render_analysis, split_story,
 };
+pub use boards::{BoardColumn, TeamBoard};
 pub use error::{Error, Result};
 pub use imports::{
     DEFAULT_CLOSED_DAYS, ExternalItem, ExternalLink, ImportMapping, ImportOutcome, ImportSettings,
