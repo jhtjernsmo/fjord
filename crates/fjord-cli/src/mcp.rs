@@ -148,21 +148,23 @@ fn tool_definitions() -> Vec<Value> {
         tool(
             "move_task",
             "Move a task to another column, or to another project (its subtasks and files go with it; \
-             without status it lands in the column with the same name).",
+             without status it lands in the column with the same name). With \"Send state changes to Azure\" \
+             on, a column move also sets the state of the task's Azure Boards work item to the column's name.",
             json!({ "id": { "type": "integer" }, "status": { "type": "string" },
                     "project": { "type": "string", "description": "Name or slug of the project to move it to" } }),
             &["id"],
         ),
         tool(
             "complete_task",
-            "Move a task to the project's done column.",
+            "Move a task to the project's done column (its Azure Boards work item follows when writing to Azure is on).",
             json!({ "id": { "type": "integer" } }),
             &["id"],
         ),
         tool(
             "set_task_pending",
             "Mark a task pending (waiting on someone else, e.g. a reply from the client) or not. \
-             It stays in its column. A task from Azure Boards moves its work item to the pending state too.",
+             It stays in its column. With \"Send state changes to Azure\" on, a task from Azure Boards moves \
+             its work item to the pending state too.",
             json!({ "id": { "type": "integer" }, "pending": { "type": "boolean", "description": "false to stop pending" } }),
             &["id", "pending"],
         ),
@@ -316,13 +318,15 @@ fn opt_str(args: &Value, key: &str) -> Option<String> {
     args.get(key).and_then(Value::as_str).map(str::to_string)
 }
 
-/// Moves a task to a column by name, in its own project or in `project`.
+/// Moves a task to a column by name, in its own project or in `project`. A column
+/// move follows to Azure Boards when writing there is on; returns why it didn't, if
+/// it didn't (the task moves anyway).
 pub(crate) fn move_task_to(
     store: &mut Store,
     id: i64,
     status: Option<&str>,
     project: Option<&str>,
-) -> Result<Task> {
+) -> Result<(Task, Option<String>)> {
     let task = store.get_task(id)?;
     let target = match project {
         Some(p) => store.find_project(p)?.id,
@@ -330,10 +334,22 @@ pub(crate) fn move_task_to(
     };
     let status = status.map(|s| store.find_status(target, s)).transpose()?;
     match (status, target == task.project_id) {
-        (Some(s), true) => Ok(store.move_task(id, s.id, None)?),
+        (Some(s), true) => Ok(fjord_vcs::state_sync::move_and_sync(store, id, s.id, None)?),
         (None, true) if project.is_none() => Err(anyhow!("give a status or a project")),
-        (s, _) => Ok(store.move_task_to_project(id, target, s.map(|s| s.id))?),
+        (s, _) => Ok((
+            store.move_task_to_project(id, target, s.map(|s| s.id))?,
+            None,
+        )),
     }
+}
+
+/// The task as JSON, with `azure_warning` added when Azure didn't follow.
+fn task_with_warning(task: &Task, warning: Option<String>) -> Result<Value> {
+    let mut value = serde_json::to_value(task)?;
+    if let (Some(warning), Some(object)) = (warning, value.as_object_mut()) {
+        object.insert("azure_warning".into(), Value::String(warning));
+    }
+    Ok(value)
 }
 
 fn note_summary(n: &Note) -> Value {
@@ -436,12 +452,15 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
             }
             serde_json::to_value(task)?
         }
-        "move_task" => serde_json::to_value(move_task_to(
-            store,
-            int_arg(args, "id")?,
-            opt_str(args, "status").as_deref(),
-            opt_str(args, "project").as_deref(),
-        )?)?,
+        "move_task" => {
+            let (task, warning) = move_task_to(
+                store,
+                int_arg(args, "id")?,
+                opt_str(args, "status").as_deref(),
+                opt_str(args, "project").as_deref(),
+            )?;
+            task_with_warning(&task, warning)?
+        }
         "complete_task" => {
             let task = store.get_task(int_arg(args, "id")?)?;
             let done = store
@@ -449,7 +468,9 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
                 .into_iter()
                 .find(|s| s.is_done)
                 .context("project has no done column")?;
-            serde_json::to_value(store.move_task(task.id, done.id, None)?)?
+            let (task, warning) =
+                fjord_vcs::state_sync::move_and_sync(store, task.id, done.id, None)?;
+            task_with_warning(&task, warning)?
         }
         "get_task" => {
             let task = store.get_task(int_arg(args, "id")?)?;

@@ -1,7 +1,8 @@
 //! Pending tasks: waiting on someone else, typically a reply from the client. A task
 //! from Azure Boards follows its work item both ways: the work item entering the
 //! pending state (Settings → Integrations, "Pending" by default) marks the task
-//! pending, and marking the task pending in Fjord moves the work item there.
+//! pending, and with "Send state changes to Azure" on, marking the task pending in
+//! Fjord moves the work item there.
 
 use fjord_core::{ImportSettings, Store, Task};
 
@@ -21,7 +22,7 @@ pub struct StatePush {
 /// What Azure needs after a task was marked pending or not.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PendingSync {
-    /// Not from Azure, the sync is off, or the work item already has the right state.
+    /// Not from Azure, writing to Azure is off, or the work item already has the right state.
     Nothing,
     Push(StatePush),
     /// The work item is pending in Azure, but Fjord doesn't know which state it came
@@ -54,7 +55,7 @@ fn sync_for(
     let Some((org, id)) = split_external_id(&link.external_id) else {
         return Ok(PendingSync::Nothing);
     };
-    if settings.pending_state.trim().is_empty() {
+    if !settings.write_states || settings.pending_state.trim().is_empty() {
         return Ok(PendingSync::Nothing);
     }
     let current = store.external_state(task_id)?;

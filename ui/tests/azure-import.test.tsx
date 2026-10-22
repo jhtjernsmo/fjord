@@ -73,3 +73,16 @@ describe('import notifications', () => {
     expect(listTitles([1, 2, 3, 4, 5].map(task), (n) => `+${n}`)).toBe('Item 1, Item 2, Item 3 +2')
   })
 })
+
+import { stateColumnsMessage } from '../src/components/AzureImport'
+import { translator } from '../src/i18n'
+
+describe('Azure states as columns', () => {
+  const t = translator('en')
+  it('names the added columns and how many tasks moved', () => {
+    expect(stateColumnsMessage({ added: ['New', 'Active', 'Closed'], placed: 4 }, t)).toBe('Added columns: New, Active, Closed. Moved 4 tasks to their state')
+  })
+  it('says so when every state already has a column', () => {
+    expect(stateColumnsMessage({ added: [], placed: 0 }, t)).toBe('The project already has a column for every Azure state')
+  })
+})

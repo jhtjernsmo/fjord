@@ -4,6 +4,12 @@ All notable changes to Fjord. Versions follow [Semantic Versioning](https://semv
 Fjord is below 1.0, minor versions can change behaviour. Downloads are on the
 [releases page](https://github.com/jhtjernsmo/fjord/releases).
 
+## Unreleased
+
+- **Column moves follow to Azure Boards:** with the new **Settings → Integrations → Send state changes to Azure** on, moving a task from Azure Boards to another column sets its work item's state to the column's name (New, Active, Resolved, …). One move changes one work item, the one the task came from; reordering within a column, imports and subtasks never write. The move saves at once and Azure is updated in the background; if Azure has no state with that name, a message says so and the work item keeps its state. The CLI (`fjord task move`, `fjord task done`) and the MCP tools `move_task` and `complete_task` follow the same switch.
+- **Azure states as columns:** the new columns button on each Azure project in **Settings → Integrations** adds a column for every state of that project's work items, in Azure's order (finished states count as done), and moves imported tasks into the column for their state. Your other columns stay, after them. It only reads from Azure.
+- **Writing to Azure is off by default:** marking a task pending no longer moves its work item in Azure unless *Send state changes to Azure* is on. Reading states from Azure, including pending, works as before.
+
 ## 0.2.29 — 2026-10-21
 
 - **Pending tasks:** mark a task as waiting on someone else, such as a reply from the client, with `w`, right-click → *Mark pending*, or the task panel. It stays in its column with a “pending 3d” badge, the board filter has a *Pending* toggle, the Overview lists pending tasks with the longest waiting first, and the standup lists them as blockers. Tasks from Azure Boards follow their work item both ways: a work item set to *Pending* in Azure becomes pending in Fjord, and marking it pending in Fjord moves the work item to *Pending* (and back to its previous state when you clear it). The state name is in **Settings → Integrations**. From the CLI: `fjord task pending <id>` and `--off`; agents use the new MCP tool `set_task_pending`.

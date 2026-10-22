@@ -295,8 +295,8 @@ pub fn set_state(org: &str, id: u64, state: &str) -> Result<()> {
 
 fn state_rejected(state: &str) -> String {
     format!(
-        "Azure has no state «{state}» for this work item type. Add it to the process in Azure \
-         DevOps, or change the pending state in Settings → Integrations"
+        "Azure has no state «{state}» for this work item type, so it kept its state. Use one of \
+         its states as the column name or as the pending state (Settings → Integrations)"
     )
 }
 

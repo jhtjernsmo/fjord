@@ -1,14 +1,16 @@
 // Azure Boards import: Settings section (which Azure project goes into which Fjord
 // project) and the background runner that imports every few minutes.
 import { useEffect, useRef, useState } from 'react'
-import { AtSign, Download, Plus, X } from 'lucide-react'
+import { listen } from '@tauri-apps/api/event'
+import { AtSign, Columns3, Download, Plus, X } from 'lucide-react'
 import { api, errorMessage } from '../api'
 import { importMentions } from '../mentions'
-import type { ImportMapping, ImportReport, ImportSettings, Task } from '../api'
+import type { ImportMapping, ImportReport, ImportSettings, StateColumnsReport, Task } from '../api'
 import type { MessageKey } from '../i18n'
 import { useApp, useLive } from '../data'
 
 const IMPORT_EVERY_MS = 10 * 60 * 1000
+const AZURE_WARNING_EVENT = 'azure-warning'
 const FIRST_IMPORT_DELAY_MS = 8000
 const NOTIFY_KEY = 'fjord.importNotify'
 const TITLES_IN_NOTIFICATION = 3
@@ -60,11 +62,25 @@ export function announceImport(report: ImportReport, t: (key: MessageKey, vars?:
   }
 }
 
+/** "Added New, Active and Closed; moved 4 tasks" */
+export function stateColumnsMessage(report: StateColumnsReport, t: (key: MessageKey, vars?: Record<string, string | number>) => string): string {
+  const added = report.added.length > 0 ? t('import.columnsAdded', { names: report.added.join(', ') }) : t('import.columnsNone')
+  return report.placed > 0 ? `${added}. ${t('import.columnsPlaced', { n: report.placed })}` : added
+}
+
 /** Runs the import on startup and every 10 minutes while it's enabled. */
 export function AzureImportRunner() {
   const { t, toast } = useApp()
   const [settings] = useLive(() => api.getImportSettings(), [])
   const enabled = !!settings?.enabled && settings.mappings.length > 0
+
+  // A column move saves at once and updates Azure afterwards; say so when Azure didn't follow.
+  useEffect(() => {
+    const unlisten = listen<string>(AZURE_WARNING_EVENT, ({ payload }) => toast(payload, 'error')).catch(() => undefined)
+    return () => {
+      unlisten.then((fn) => fn?.())
+    }
+  }, [toast])
 
   useEffect(() => {
     if (!enabled) return
@@ -83,7 +99,7 @@ export function AzureImportRunner() {
   return null
 }
 
-const EMPTY: ImportSettings = { enabled: false, mappings: [], closed_days: 30, risk_field: '', download_files: true, write_back: false, pending_state: 'Pending' }
+const EMPTY: ImportSettings = { enabled: false, mappings: [], closed_days: 30, risk_field: '', download_files: true, write_back: false, pending_state: 'Pending', write_states: false }
 const CLOSED_DAY_CHOICES = [0, 7, 30, 90]
 
 export function AzureImportSettings() {
@@ -128,6 +144,17 @@ export function AzureImportSettings() {
     try {
       const r = await api.runAzureImport()
       toast(t('import.report', { created: r.created.length, updated: r.updated, closed: r.closed, unmapped: r.unmapped, files: r.files }), 'success')
+    } catch (e) {
+      toast(errorMessage(e), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const stateColumns = async (m: ImportMapping) => {
+    setBusy(true)
+    try {
+      toast(stateColumnsMessage(await api.azureStateColumns(m.org, m.project, m.fjord_project_id), t), 'success')
     } catch (e) {
       toast(errorMessage(e), 'error')
     } finally {
@@ -190,6 +217,11 @@ export function AzureImportSettings() {
       </label>
       <span className="hint">{t('import.pendingStateHint')}</span>
       <label className="toggle-label">
+        <input type="checkbox" checked={settings.write_states ?? false} onChange={(e) => save({ ...settings, write_states: e.target.checked })} />
+        {t('import.writeStates')} <span className="beta">beta</span>
+      </label>
+      <span className="hint">{t('import.writeStatesHint')}</span>
+      <label className="toggle-label">
         <input
           type="checkbox"
           checked={notifyOn}
@@ -212,6 +244,15 @@ export function AzureImportSettings() {
               </option>
             ))}
           </select>
+          <button
+            className="icon-btn"
+            disabled={busy || !m.org.trim() || !m.project.trim() || !m.fjord_project_id}
+            onClick={() => stateColumns(m)}
+            title={t('import.columnsHint')}
+            aria-label={t('import.columns')}
+          >
+            <Columns3 size={14} />
+          </button>
           <button className="icon-btn" onClick={() => save({ ...settings, mappings: settings.mappings.filter((_, j) => j !== i) })} aria-label={t('menu.delete')}>
             <X size={14} />
           </button>

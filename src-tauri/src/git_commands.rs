@@ -503,8 +503,9 @@ pub struct PendingResult {
     pub azure_warning: Option<String>,
 }
 
-/// Marks a task pending (waiting on the client) or not. A task from Azure Boards moves its
-/// work item into or out of the pending state; the task is marked even if that fails.
+/// Marks a task pending (waiting on the client) or not. With writing to Azure on, a task from
+/// Azure Boards moves its work item into or out of the pending state; the task is marked even
+/// if that fails.
 #[tauri::command]
 pub async fn set_task_pending(
     state: State<'_, AppState>,

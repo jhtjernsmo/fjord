@@ -1,5 +1,6 @@
 //! Tauri shell: exposes fjord-core to the React UI as commands.
 
+mod azure_sync;
 mod commands;
 mod distribution;
 mod git_commands;
@@ -53,7 +54,8 @@ pub fn run() {
             commands::get_task,
             commands::create_task,
             commands::update_task,
-            commands::move_task,
+            azure_sync::move_task,
+            azure_sync::azure_state_columns,
             commands::move_task_to_project,
             commands::set_task_parent,
             commands::archive_task,

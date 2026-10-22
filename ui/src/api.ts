@@ -208,6 +208,14 @@ export interface ImportSettings {
   write_back: boolean
   /** The Azure state that means pending; empty turns the sync off. */
   pending_state: string
+  /** Off by default: column moves and pending send the work item's new state to Azure. */
+  write_states?: boolean
+}
+
+/** What "Use Azure states as columns" did. */
+export interface StateColumnsReport {
+  added: string[]
+  placed: number
 }
 
 export interface WorkItemComment {
@@ -515,6 +523,9 @@ export const api = {
   getImportSettings: () => invoke<ImportSettings>('get_import_settings'),
   setImportSettings: (settings: ImportSettings) => invoke<void>('set_import_settings', { settings }),
   runAzureImport: () => invoke<ImportReport>('run_azure_import'),
+  /** Adds a column for each state of the Azure project's work items; only reads from Azure. */
+  azureStateColumns: (org: string, project: string, projectId: number) =>
+    invoke<StateColumnsReport>('azure_state_columns', { org, project, projectId }),
 }
 
 export function errorMessage(err: unknown): string {
