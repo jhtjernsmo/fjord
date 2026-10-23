@@ -1,6 +1,6 @@
 [package]
 name = "fjord-app"
-version = "0.2.31"
+version = "0.2.32"
 description = "Fjord — local-first project management, Linux first, also Windows and macOS"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/jhtjernsmo/fjord"
