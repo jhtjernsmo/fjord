@@ -28,7 +28,7 @@ jobs:
     steps:
       # The bundle files live on main; older tags predate them. The binaries come from the release.
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
