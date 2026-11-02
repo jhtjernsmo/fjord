@@ -7,7 +7,27 @@ use crate::store::{Store, require_text};
 /// (color, is_done) of every new project's columns; names come from `status_names`.
 const DEFAULT_STATUSES: &[(&str, bool)] =
     &[("#8b8f98", false), ("#f5a524", false), ("#3fb950", true)];
+/// (name, color, is_done) of Azure Boards' default columns. Kept in English in every
+/// locale so they match the work item states.
+const AZURE_STATUSES: &[(&str, &str, bool)] = &[
+    ("New", "#8b8f98", false),
+    ("Active", "#f5a524", false),
+    ("Resolved", "#7aa6b8", false),
+    ("Closed", "#3fb950", true),
+];
 const DEFAULT_ICON: &str = ">_";
+
+/// (name, color, is_done) of a new project's columns: Azure's when asked for, else Fjord's.
+fn new_project_statuses(new: &NewProject) -> Vec<(&'static str, &'static str, bool)> {
+    if new.columns.as_deref() == Some("azure") {
+        return AZURE_STATUSES.to_vec();
+    }
+    status_names(new.locale.as_deref())
+        .into_iter()
+        .zip(DEFAULT_STATUSES)
+        .map(|(name, (color, is_done))| (name, *color, *is_done))
+        .collect()
+}
 
 /// Column names for a locale; English unless Norwegian is asked for.
 pub fn status_names(locale: Option<&str>) -> [&'static str; 3] {
@@ -90,8 +110,8 @@ impl Store {
             ],
         )?;
         let id = tx.last_insert_rowid();
-        let names = status_names(new.locale.as_deref());
-        for (position, ((color, is_done), status)) in DEFAULT_STATUSES.iter().zip(names).enumerate()
+        for (position, (status, color, is_done)) in
+            new_project_statuses(&new).into_iter().enumerate()
         {
             tx.execute(
                 "INSERT INTO statuses (project_id, name, color, position, is_done)
@@ -247,6 +267,28 @@ mod tests {
         assert_eq!(slugify("Min Første App!"), "min-forste-app");
         assert_eq!(slugify("Bokost   2.0"), "bokost-2-0");
         assert_eq!(slugify("!!!"), "project");
+    }
+
+    #[test]
+    fn azure_columns_give_the_four_azure_states_in_english() {
+        let (mut s, _dir) = store();
+        let p = s
+            .create_project(NewProject {
+                name: "Sprint".into(),
+                locale: Some("nb".into()),
+                columns: Some("azure".into()),
+                ..Default::default()
+            })
+            .unwrap();
+        let statuses = s.list_statuses(p.id).unwrap();
+        assert_eq!(
+            statuses.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+            ["New", "Active", "Resolved", "Closed"]
+        );
+        assert_eq!(
+            statuses.iter().map(|s| s.is_done).collect::<Vec<_>>(),
+            [false, false, false, true]
+        );
     }
 
     #[test]

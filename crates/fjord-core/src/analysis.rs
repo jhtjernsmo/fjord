@@ -282,6 +282,7 @@ mod tests {
                 description: String::new(),
                 color: None,
                 icon: None,
+                columns: None,
             })
             .unwrap();
         s.create_task(NewTask {

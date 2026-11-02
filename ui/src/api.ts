@@ -402,7 +402,11 @@ export interface NewProject {
   description?: string
   color?: string
   icon?: string
+  /** 'azure': New, Active, Resolved, Closed. Otherwise To do, In progress, Done. */
+  columns?: ColumnTemplate
 }
+
+export type ColumnTemplate = 'fjord' | 'azure'
 
 export interface TaskPatch {
   title?: string

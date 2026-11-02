@@ -129,6 +129,9 @@ enum ProjectCmd {
         color: Option<String>,
         #[arg(long)]
         icon: Option<String>,
+        /// Starting columns: fjord (To do, In progress, Done) or azure (New, Active, Resolved, Closed)
+        #[arg(long, value_parser = ["fjord", "azure"], default_value = "fjord")]
+        columns: String,
     },
     /// Show a project's board (statuses and tasks)
     Show { project: String },
@@ -491,6 +494,7 @@ fn project(store: &mut Store, out: &output::Printer, cmd: ProjectCmd) -> Result<
             desc,
             color,
             icon,
+            columns,
         } => {
             let locale = std::env::var("LANG").ok();
             out.project(&store.create_project(NewProject {
@@ -499,6 +503,7 @@ fn project(store: &mut Store, out: &output::Printer, cmd: ProjectCmd) -> Result<
                 description: desc,
                 color,
                 icon,
+                columns: Some(columns),
             })?)
         }
         ProjectCmd::Show { project } => {

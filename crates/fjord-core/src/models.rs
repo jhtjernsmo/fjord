@@ -31,6 +31,9 @@ pub struct NewProject {
     pub description: String,
     pub color: Option<String>,
     pub icon: Option<String>,
+    /// "azure" gives Azure Boards' columns (New, Active, Resolved, Closed); anything
+    /// else Fjord's own (To do, In progress, Done).
+    pub columns: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
