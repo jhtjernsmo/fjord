@@ -187,7 +187,9 @@ fn tool_definitions() -> Vec<Value> {
             "Create a project with default columns.",
             json!({ "name": { "type": "string" }, "description": { "type": "string" },
                     "icon": { "type": "string", "description": "Short glyph, e.g. >_" },
-                    "color": { "type": "string", "description": "#rrggbb" } }),
+                    "color": { "type": "string", "description": "#rrggbb" },
+                    "columns": { "type": "string", "enum": ["fjord", "azure"],
+                                 "description": "fjord: To do, In progress, Done (default). azure: New, Active, Resolved, Closed" } }),
             &["name"],
         ),
         tool(
@@ -479,6 +481,7 @@ fn run_tool(store: &mut Store, name: &str, args: &Value) -> Result<Value> {
             icon: opt_str(args, "icon"),
             color: opt_str(args, "color"),
             locale: None,
+            columns: opt_str(args, "columns"),
         })?)?,
         "create_task" => {
             let p = store.find_project(str_arg(args, "project")?)?;

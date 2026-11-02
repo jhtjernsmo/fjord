@@ -1,11 +1,30 @@
 import { useEffect, useState } from 'react'
 import { FolderGit2, RefreshCw } from 'lucide-react'
-import type { NewProject, Project } from '../api'
+import type { ColumnTemplate, NewProject, Project } from '../api'
 import { useApp } from '../data'
 import { PROJECT_GLYPHS, ProjectGlyph } from './Icons'
 import { NewRepoFields } from './NewRepoFields'
 import type { RepoDraft } from './NewRepoFields'
 import { appVersion, installedFromStore, setUpdateCheckEnabled, updateCheckEnabled, useUpdater } from './Updater'
+
+const COLUMNS_KEY = 'fjord.newProjectColumns'
+
+/** The column set picked for the last new project, so it becomes the default. */
+function lastColumns(): ColumnTemplate {
+  try {
+    return localStorage.getItem(COLUMNS_KEY) === 'azure' ? 'azure' : 'fjord'
+  } catch {
+    return 'fjord'
+  }
+}
+
+function rememberColumns(columns: ColumnTemplate) {
+  try {
+    localStorage.setItem(COLUMNS_KEY, columns)
+  } catch {
+    // Not remembered; the dialog falls back to Fjord's columns next time.
+  }
+}
 
 const COLORS = ['#7aa6b8', '#6fb39b', '#8bb174', '#d4a656', '#d98a5f', '#d97474', '#b58ac9', '#a78bfa']
 
@@ -25,6 +44,7 @@ export function NewProjectDialog({ onCancel, onCreate, project }: Props) {
   const [color, setColor] = useState(project?.color ?? COLORS[0])
   const [icon, setIcon] = useState(project?.icon ?? PROJECT_GLYPHS[0])
   const colors = COLORS.includes(color) ? COLORS : [...COLORS, color]
+  const [columns, setColumns] = useState<ColumnTemplate>(lastColumns)
   const [withRepo, setWithRepo] = useState(false)
   const [repo, setRepo] = useState<RepoDraft | null>(null)
   const [busy, setBusy] = useState(false)
@@ -34,7 +54,8 @@ export function NewProjectDialog({ onCancel, onCreate, project }: Props) {
     if (!canSubmit) return
     setBusy(true)
     try {
-      await onCreate({ name: name.trim(), description, color, icon, locale }, withRepo ? repo : null)
+      if (!project) rememberColumns(columns)
+      await onCreate({ name: name.trim(), description, color, icon, locale, columns }, withRepo ? repo : null)
     } finally {
       setBusy(false)
     }
@@ -97,6 +118,15 @@ export function NewProjectDialog({ onCancel, onCreate, project }: Props) {
             ))}
           </div>
         </div>
+        {!project && (
+          <label className="row">
+            {t('dialog.columns')}
+            <select className="input" value={columns} onChange={(e) => setColumns(e.target.value as ColumnTemplate)}>
+              <option value="fjord">{t('dialog.columnsFjord')}</option>
+              <option value="azure">{t('dialog.columnsAzure')}</option>
+            </select>
+          </label>
+        )}
         {!project && (
           <div className="row">
             <label className="toggle-label">
